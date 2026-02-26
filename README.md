@@ -2,5 +2,7 @@
 THE REPOSITORY FOR THE BEST SOFTWARE ENGINEERS EVER
 
 Names/Contributors:
+- Jonathon Chang
+- 
 
 
