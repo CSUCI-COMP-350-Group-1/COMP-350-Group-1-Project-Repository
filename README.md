@@ -5,4 +5,5 @@ Names/Contributors:
 - Jonathon Chang
 - Noah Collins
 - Adish Tripathi
+- Lorenzo Argueta
 
