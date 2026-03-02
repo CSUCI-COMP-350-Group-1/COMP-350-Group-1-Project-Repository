@@ -5,4 +5,10 @@
     <string name="delete_account">Delete Account</string>
     <string name="welcome">Welcome</string>
     <string name="lapras_sprite_stylized_unknown_source">Lapras sprite, stylized. Unknown source</string>
+    <string name="login">Login</string>
+    <string name="username">username</string>
+    <string name="password">password</string>
+    <string name="email">email</string>
+    <string name="login_button">LOGIN</string>
+    <string name="don_t_have_an_account_yet">Don\'t have an account yet?</string>
 </resources>

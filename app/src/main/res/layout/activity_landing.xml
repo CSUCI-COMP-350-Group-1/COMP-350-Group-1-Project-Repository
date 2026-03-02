@@ -9,7 +9,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Login"
+        android:text="@string/login"
         android:textSize="40sp"
         android:textColor="#FFFFFF"
         android:layout_alignParentTop = "true"
@@ -21,7 +21,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginRight="40dp"
-        android:hint="username"
+        android:hint="@string/username"
+        android:autofillHints="Enter username"
         android:textCursorDrawable="@null"
         android:inputType="text"
         android:drawableStart="@drawable/blank"
@@ -33,7 +34,8 @@
     <EditText
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="password"
+        android:hint="@string/password"
+        android:autofillHints="Enter password"
         android:textCursorDrawable="@null"
         android:drawableStart="@drawable/blank"
         android:drawablePadding="5dp"
@@ -50,6 +52,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="330dp"
         android:layout_marginStart="330dp"
+        android:focusable="true"
         android:scaleType="centerCrop"
         android:onClick="toggle"
         android:clickable="true"
@@ -58,7 +61,8 @@
     <EditText
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="email"
+        android:hint="@string/email"
+        android:autofillHints="Enter email"
         android:textCursorDrawable="@null"
         android:drawableStart="@drawable/blank"
         android:drawablePadding="5dp"
@@ -72,14 +76,14 @@
     <Button
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="LOGIN"
+        android:text="@string/login_button"
         android:id="@+id/login"
         android:textAllCaps="false"
         android:layout_marginRight="40dp"
         android:layout_marginLeft="40dp"
         android:layout_marginTop="480dp"
         android:textColor="#FFF"
-        android:textSize="20dp"
+        android:textSize="20sp"
         android:onClick="login"
         android:background="@drawable/round_button"
         android:gravity="center"/>
@@ -89,11 +93,11 @@
         android:layout_width="wrap_content"
         android:layout_height="23dp"
         android:layout_marginTop="600dp"
-        android:layout_marginLeft="100dp"
+        android:layout_marginStart="100dp"
         android:fontFamily="sans-serif"
-        android:text="Don't have an account yet?"
+        android:text="@string/don_t_have_an_account_yet"
         android:textColor="#FFF"
-        android:textSize="12dp"
+        android:textSize="12sp"
         android:focusable="true" />
 
     <TextView
