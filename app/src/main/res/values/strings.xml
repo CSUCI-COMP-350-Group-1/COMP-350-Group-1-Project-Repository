@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Firebase - Sprint 0</string>
+    <string name="register">"   Register!"</string>
+    <string name="there_s_nothing_here_yet_nsay_hello_to_lapras">There\'s nothing here yet.\nSay hello to Lapras!</string>
+    <string name="delete_account">Delete Account</string>
+    <string name="welcome">Welcome</string>
+    <string name="lapras_sprite_stylized_unknown_source">Lapras sprite, stylized. Unknown source</string>
 </resources>
