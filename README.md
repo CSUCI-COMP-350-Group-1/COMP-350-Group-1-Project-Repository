@@ -2,9 +2,8 @@
 THE REPOSITORY FOR THE BEST SOFTWARE ENGINEERS EVER
 
 Names/Contributors:
-- Madeline Dong
+- Jonathon Chang
 - Noah Collins
 - Adish Tripathi
 - Lorenzo Argueta
-- Jonathon Chang
-
+- Maddi D
