@@ -33,7 +33,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 
 private lateinit var googleSignInClient: GoogleSignInClient
-private val RC_SIGN_IN = 100 // any number you choose
+private val RC_SIGN_IN = 100
 
 class MainActivity : ComponentActivity() {
 
