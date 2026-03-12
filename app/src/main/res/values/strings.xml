@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Campus Companion</string>
+    <string name="profile_title">Profile</string>
+    <string name="example_user_name">Example User</string>
+    <string name="example_user_email">example@myci.csuci.edu</string>
+    <string name="friends_count">0 Friends</string>
+</resources>
