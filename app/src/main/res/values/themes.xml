@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Material3.DayNight.NoActionBar" parent="Theme.Material3.DayNight.NoActionBar" />
+    <!-- Base application theme -->
+    <style name="Theme.MyProject" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/red_500</item>
+
+        <!-- Material 3 does not use colorPrimaryVariant.
+             You can use primaryContainer or a specific color for the status bar. -->
+        <item name="android:statusBarColor">@color/red_700</item>
+    </style>
+
+    <style name="Theme.MyApp" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary_red</item>
+    </style>
 </resources>

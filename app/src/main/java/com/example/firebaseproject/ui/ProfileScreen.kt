@@ -121,7 +121,7 @@ fun ProfileHeader(modifier: Modifier = Modifier) {
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Profile Image Placeholder (Circle with Silhouette)
+        // Profile image placeholder
         Box(
             modifier = Modifier
                 .size(120.dp)

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Literal color names -->
+    <color name="primary_red">#EE0000</color>
+    <color name="red_500">#EE0000</color>
+    <color name="red_700">#B30000</color>
+    <color name="red_var">#C30041</color>
+</resources>
