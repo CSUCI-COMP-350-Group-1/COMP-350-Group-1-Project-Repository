@@ -1,5 +1,6 @@
 package com.example.myapplication3
 
+// Imports for VIEWMODEL
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +37,7 @@ class RoomViewModel : ViewModel() {
                 val className = slot.optString("className", "").lowercase()
 
                 val isAvailable = if (className.isEmpty()) true
+                //
                 else !className.contains("s-lc-eq-checkout") && !className.contains("unavailable")
 
                 processedData.getOrPut(date) { mutableMapOf() }
@@ -43,6 +45,7 @@ class RoomViewModel : ViewModel() {
                     .add(TimeSlot(time, isAvailable))
             }
 
+            // Sort by name
             _weeklyData.value = processedData.mapValues { (_, roomsMap) ->
                 roomsMap.map { (name, slots) -> StudyRoom(name, slots) }.sortedBy { it.name }
             }
@@ -50,6 +53,7 @@ class RoomViewModel : ViewModel() {
         }
     }
 
+    // Map entity ID from website to room number
     private fun getRoomName(itemId: Int): String {
         return when (itemId) {
             61317 -> "Room 1753"
