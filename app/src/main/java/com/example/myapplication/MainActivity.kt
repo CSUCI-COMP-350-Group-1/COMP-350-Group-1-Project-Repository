@@ -50,36 +50,37 @@ fun MapScreen(modifier: Modifier = Modifier) {
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
     var isLoadingLocation by remember { mutableStateOf(false) }
     var hasLocationPermission by remember { mutableStateOf(false) }
-    var showTraffic by remember { mutableStateOf(false) }
 
-    // Fallback location (Moorpark, CA)
+    // this is how we determine hard coded locations, to be used in a future user story
+    // my example was just moorpark.
     val moorparkLocation = LatLng(34.285, -118.882)
 
-    val cameraPositionState = rememberCameraPositionState {
+    val cameraPositionState = rememberCameraPositionState { // animation for the camera
+        // will be used for future user stories
         position = CameraPosition.fromLatLngZoom(moorparkLocation, 14f)
     }
 
-    // Fetch real user location logic
+    // getting the user location
     val fetchUserLocation: suspend () -> Unit = {
         isLoadingLocation = true
         try {
             var location = fusedLocationClient.lastLocation.await()
-            if (location == null || location.accuracy > 100) {
+            if (location == null || location.accuracy > 100) { // accuracy settings i got from a tutorial
                 location = fusedLocationClient.getCurrentLocation(
-                    Priority.PRIORITY_HIGH_ACCURACY,
+                    Priority.PRIORITY_HIGH_ACCURACY, // prio high accuracy for location
                     null
                 ).await()
             }
             if (location != null) {
                 userLocation = LatLng(location.latitude, location.longitude)
-                cameraPositionState.animate(
+                cameraPositionState.animate( // this is for the button/when the user moves!
                     CameraUpdateFactory.newLatLngZoom(userLocation!!, 16f)
                 )
             }
         } catch (e: SecurityException) {
-            // Permission lost
+            // when there are no permissions
         } catch (e: Exception) {
-            // Error fetching location
+            // an error occured!
         } finally {
             isLoadingLocation = false
         }
@@ -111,17 +112,17 @@ fun MapScreen(modifier: Modifier = Modifier) {
 
     val uiSettings = remember {
         MapUiSettings(
-            myLocationButtonEnabled = true,
+            myLocationButtonEnabled = false, // We have our own location button
             zoomControlsEnabled = true,
             compassEnabled = true,
-            mapToolbarEnabled = true
+            mapToolbarEnabled = false //  gets rid of that annoying button at the bottom of the maps
         )
     }
 
-    val mapProperties = remember(showTraffic, hasLocationPermission) {
+    val mapProperties = remember(hasLocationPermission) {
         MapProperties(
             isMyLocationEnabled = hasLocationPermission,
-            isTrafficEnabled = showTraffic,
+            isTrafficEnabled = false, // was for testing, not needed
             mapType = MapType.NORMAL
         )
     }
@@ -133,80 +134,48 @@ fun MapScreen(modifier: Modifier = Modifier) {
             properties = mapProperties,
             uiSettings = uiSettings
         ) {
-            // Moorpark Marker
-            Marker(
-                //moorpark marker
-                state = rememberMarkerState(position = moorparkLocation),
-                title = "Moorpark",
-                snippet = "Ventura County, California"
-            )
+            // this was the marker for moorpark, but it is not needed
+            // It WILL be needed for key locations on campus map.
 
             userLocation?.let { pos ->
                 Marker(
-                    // for location services
-                    state = rememberMarkerState(position = pos),
-                    title = "You are here",
+                    state = rememberMarkerState(position = pos), // the markerstate needs to be there for the state to work.
+                    title = "You are here!",
                     snippet = "Your approximate location"
                 )
 
                 Circle(
-                    // color of the circle
-                    center = pos,
-                    radius = 200.0,
+                    center = pos, // radius around the location, can be edited
+                    radius = 25.0,
                     fillColor = Color(0, 150, 255, 80),
                     strokeColor = Color.Blue,
                     strokeWidth = 2f
                 )
             }
-
-            Polyline(
-                points = listOf(
-                    // list of locations for my sake
-                    LatLng(34.285, -118.882),
-                    LatLng(34.290, -118.870),
-                    LatLng(34.275, -118.865),
-                    LatLng(34.285, -118.882)
-                ),
-                color = Color.Red,
-                width = 8f,
-                clickable = true
-            )
         }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-                .systemBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            if (hasLocationPermission) {
-                FloatingActionButton(
-                    onClick = {
-                        scope.launch {
-                            if (userLocation != null) {
-                                cameraPositionState.animate(
-                                    CameraUpdateFactory.newLatLngZoom(userLocation!!, 17f)
-                                )
-                            } else {
-                                fetchUserLocation()
-                            }
+        // location button using a floating action button
+        if (hasLocationPermission) {
+            FloatingActionButton(
+                onClick = {
+                    scope.launch {
+                        if (userLocation != null) {
+                            cameraPositionState.animate( // when clicked, animate to the user location
+                                CameraUpdateFactory.newLatLngZoom(userLocation!!, 17f)
+                            )
+                        } else {
+                            fetchUserLocation()
                         }
                     }
-                ) {
-                    Icon(
-                        painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
-                        contentDescription = "My Location"
-                    )
-                }
-            }
-
-            FloatingActionButton(
-                onClick = { showTraffic = !showTraffic }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomStart) //bottom left start
+                    .padding(16.dp)
+                    .systemBarsPadding()
             ) {
                 Icon(
-                    painter = painterResource(id = android.R.drawable.ic_menu_mapmode),
-                    contentDescription = if (showTraffic) "Hide Traffic" else "Show Traffic"
+                    painter = painterResource(id = android.R.drawable.ic_menu_mylocation), // icon for location, embedded from google maps themselves
+                    contentDescription = "My Location" // you cant see it, but we have to call it this
                 )
             }
         }
@@ -217,9 +186,9 @@ fun MapScreen(modifier: Modifier = Modifier) {
             )
         }
 
-        if (!hasLocationPermission) {
+        if (!hasLocationPermission) { // location permissions
             Card(
-                modifier = Modifier
+                modifier = Modifier // prompts the location permission to show
                     .align(Alignment.Center)
                     .padding(32.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
