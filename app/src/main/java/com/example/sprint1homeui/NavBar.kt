@@ -1,10 +1,14 @@
 package com.example.sprint1homeui.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -14,9 +18,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 @Composable
 fun NavBar(navController: NavHostController) {
     val items = listOf(
-        NavBarItem("Home", "home"),
-        NavBarItem("Search", "search"),
-        NavBarItem("Profile", "profile")
+        NavBarItem("Home", "home", Icons.Filled.Home),
+        NavBarItem("Search", "search", Icons.Filled.Search),
+        NavBarItem("Profile", "profile", Icons.Filled.Person)
     )
 
     NavigationBar {
@@ -25,7 +29,7 @@ fun NavBar(navController: NavHostController) {
 
         items.forEach { item ->
             NavigationBarItem(
-                icon = { /* add later */ },
+                icon = { Icon(imageVector = item.icon, contentDescription = item.title) },
                 label = { Text(item.title) },
                 selected = currentRoute == item.route,
                 onClick = {
@@ -56,4 +60,8 @@ fun NavBar(navController: NavHostController) {
     }
 }
 
-data class NavBarItem(val title: String, val route: String)
+data class NavBarItem(
+    val title: String,
+    val route: String,
+    val icon: ImageVector
+)
