@@ -9,6 +9,8 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 
+
+
 @Composable
 fun NavBar(navController: NavHostController) {
     val items = listOf(
@@ -23,15 +25,31 @@ fun NavBar(navController: NavHostController) {
 
         items.forEach { item ->
             NavigationBarItem(
-                icon = { /* You can add icons here later */ },
+                icon = { /* add later */ },
                 label = { Text(item.title) },
                 selected = currentRoute == item.route,
                 onClick = {
-                    navController.navigate(item.route) {
-                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
+                    val currentRoute = navController.currentBackStackEntry?.destination?.route
+
+                    val homeRoutes = listOf("home", "map", "calendar")
+
+                    val isOnTab = when (item.route) {
+                        "home" -> currentRoute in homeRoutes
+                        else -> currentRoute == item.route
                     }
+
+                    if (isOnTab) {
+                        navController.popBackStack(item.route, inclusive = false)
+                    } else {
+                        navController.navigate(item.route) {
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+
                 }
             )
         }
