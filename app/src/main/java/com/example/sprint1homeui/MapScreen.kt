@@ -40,7 +40,7 @@ fun MapScreen(navController: NavHostController) {
 
     // this is how we determine hard coded locations, to be used in a future user story
     // my example was just moorpark.
-    val hardcodedlocation = LatLng(34.285, -118.882)
+    //val hardcodedlocation = LatLng(34.285, -118.882)
 
     val cameraPositionState = rememberCameraPositionState { // animation for the camera, this variable is NEEDED.
         // will be used for future user stories
