@@ -40,11 +40,11 @@ fun MapScreen(navController: NavHostController) {
 
     // this is how we determine hard coded locations, to be used in a future user story
     // my example was just moorpark.
-    // val hardcodedlocation = LatLng(34.285, -118.882)
+    val hardcodedlocation = LatLng(34.285, -118.882)
 
-    val cameraPositionState = rememberCameraPositionState { // animation for the camera
+    val cameraPositionState = rememberCameraPositionState { // animation for the camera, this variable is NEEDED.
         // will be used for future user stories
-        //position = CameraPosition.fromLatLngZoom(hardcodedlocation, 14f)
+        // position = CameraPosition.fromLatLngZoom(hardcodedlocation, 14f)
     }
 
     // getting the user location
@@ -122,7 +122,7 @@ fun MapScreen(navController: NavHostController) {
             )
         },
         content = { paddingValues ->
-            // the main content
+            // Main content
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -158,7 +158,7 @@ fun MapScreen(navController: NavHostController) {
 
                 // ui navigation, has lorenzo's back button here
                 Column(
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 20.dp),
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 20.dp), // moves the button to the top
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
