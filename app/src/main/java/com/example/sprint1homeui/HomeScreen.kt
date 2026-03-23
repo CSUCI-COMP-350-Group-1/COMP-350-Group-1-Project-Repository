@@ -40,6 +40,8 @@ fun HomeScreen(navController: NavHostController) {
                 ) {
                     ButtonMap(navController)
                     ButtonCalendar(navController)
+                    // ADDED: Study Room button to page
+                    ButtonStudyRoom(navController)
 
                 }
             }
@@ -58,5 +60,12 @@ fun ButtonMap(navController: NavHostController) {
 fun ButtonCalendar(navController: NavHostController) {
     Button(onClick = { navController.navigate("calendar") }) {
         Text("Calendar")
+    }
+}
+
+@Composable
+fun ButtonStudyRoom(navController: NavHostController) {
+    Button(onClick =  { navController.navigate("studyRoom") }) {
+        Text("Study Room")
     }
 }
