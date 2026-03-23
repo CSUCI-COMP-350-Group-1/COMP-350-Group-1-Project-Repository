@@ -63,6 +63,7 @@ fun ButtonCalendar(navController: NavHostController) {
     }
 }
 
+@Composable
 fun ButtonStudyRoom(navController: NavHostController) {
     Button(onClick =  { navController.navigate("studyRoom") }) {
         Text("Study Room")

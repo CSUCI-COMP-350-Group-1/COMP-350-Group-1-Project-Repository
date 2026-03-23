@@ -44,7 +44,8 @@ class MainActivity : ComponentActivity() {
 }
 
 
-
+// *****IMPORTANT******
+// *****This is for the study room*****
 // Handle big picture view
 // Shows all rooms and UI of page
 // This is what the user will see
@@ -110,14 +111,7 @@ fun RoomListScreen(viewModel: RoomViewModel, onBackClicked: () -> Unit) {
                     }
                 }
             }
-            // ADDED: Home button at the bottom, matching teammate's UI
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = { navController.navigate("home") },
-                modifier = Modifier.padding(bottom = 16.dp)
-            ) {
-                Text("Back to Home")
-            }
+
         }
     }
 }
