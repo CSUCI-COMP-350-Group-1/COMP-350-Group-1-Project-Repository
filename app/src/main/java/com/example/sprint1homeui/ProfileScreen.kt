@@ -1,32 +1,60 @@
-package com.example.firebaseproject.ui
+package com.example.sprint1homeui
 
+// unused imports are for the yet-to-be-implemented, fleshed-out top bar
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.firebaseproject.R
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
+import com.example.sprint1homeui.ui.theme.Sprint1HomeUITheme
+import androidx.compose.material3.TopAppBar
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(modifier: Modifier = Modifier) {
+fun ProfileScreen(navController: NavHostController) {
     Scaffold(
-        modifier = modifier.fillMaxSize(),
+        // topBar is a stub.
+        // for consistency, my (Noah) specific top bar elements are commented out,
+        // it may be useful to refer to this fleshed-out bar in the future
         topBar = {
+            TopAppBar(
+                title = { Text("Profile", fontSize = 20.sp) }
+            )
+        }
+        /*
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = stringResource(id = R.string.profile_title),
+                        text = "Profile",
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp
                     )
@@ -53,44 +81,8 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                     containerColor = Color.White
                 )
             )
-        },
-        bottomBar = {
-            NavigationBar(
-                containerColor = Color.White,
-                tonalElevation = 0.dp
-            ) {
-                NavigationBarItem(
-                    selected = false,
-                    onClick = { /* TODO */ },
-                    icon = {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_home),
-                            contentDescription = "Home"
-                        )
-                    }
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = { /* TODO */ },
-                    icon = {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_search),
-                            contentDescription = "Search"
-                        )
-                    }
-                )
-                NavigationBarItem(
-                    selected = true,
-                    onClick = { /* TODO */ },
-                    icon = {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_account_circle),
-                            contentDescription = "Profile"
-                        )
-                    }
-                )
-            }
         }
+        */
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -103,14 +95,20 @@ fun ProfileScreen(modifier: Modifier = Modifier) {
                     .padding(horizontal = 24.dp, vertical = 32.dp)
                     .fillMaxWidth()
             )
-            
+
             // Gray content area
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(Color(0xFFE0E0E0)) // Light gray background
-            )
+                    .background(Color(0xFFE0E0E0)), // Light gray background
+                contentAlignment = Alignment.Center
+            ) {
+                // probably removable, but leaving for now
+                Button(onClick = { navController.navigate("home") }) {
+                    Text("Back to Home")
+                }
+            }
         }
     }
 }
@@ -155,19 +153,19 @@ fun ProfileHeader(modifier: Modifier = Modifier) {
 
         Column {
             Text(
-                text = stringResource(id = R.string.example_user_name),
+                text = "User Name",
                 fontWeight = FontWeight.Bold,
                 fontSize = 24.sp,
                 color = Color.Black
             )
             Text(
-                text = stringResource(id = R.string.example_user_email),
+                text = "user@example.com",
                 color = Color.Gray,
                 fontSize = 16.sp
             )
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = stringResource(id = R.string.friends_count),
+                text = "Friends: 0",
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 color = Color.Black
@@ -179,7 +177,8 @@ fun ProfileHeader(modifier: Modifier = Modifier) {
 @Preview(showBackground = true)
 @Composable
 fun ProfileScreenPreview() {
-    MaterialTheme {
-        ProfileScreen()
+    Sprint1HomeUITheme {
+        val navController = rememberNavController()
+        ProfileScreen(navController = navController)
     }
 }
