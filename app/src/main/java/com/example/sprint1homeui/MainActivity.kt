@@ -93,8 +93,6 @@ fun AppNavigation() {
 @Composable
 fun MainApp() {
     val navController = rememberNavController()
-    // ADDED: Study Room VIEWMODEL
-    val roomViewModel: RoomViewModel = viewModel()
 
     Scaffold(
         bottomBar = { NavBar(navController) } // persistent bottom bar
