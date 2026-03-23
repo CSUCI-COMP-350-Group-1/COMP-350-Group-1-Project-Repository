@@ -70,20 +70,7 @@ fun RoomListScreen(viewModel: RoomViewModel, onBackClicked: () -> Unit) {
         topBar = {
             TopAppBar(
                 // Display text at top of page
-                title = { Text("CSUCI Weekly Availability", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(16.dp)) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClicked) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF800000), // CSUCI Red??
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
-                )
+                title = { Text("Study Room Weekly Availability") },
             )
         }
     ) { paddingValues -> // Prevents contents being hidden from top bar
@@ -91,6 +78,8 @@ fun RoomListScreen(viewModel: RoomViewModel, onBackClicked: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .padding(bottom = 16.dp), // For back bottom button
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
         ) {
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
@@ -120,6 +109,14 @@ fun RoomListScreen(viewModel: RoomViewModel, onBackClicked: () -> Unit) {
                         RoomItem(room)
                     }
                 }
+            }
+            // ADDED: Home button at the bottom, matching teammate's UI
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = { navController.navigate("home") },
+                modifier = Modifier.padding(bottom = 16.dp)
+            ) {
+                Text("Back to Home")
             }
         }
     }

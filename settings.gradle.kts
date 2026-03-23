@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "My Application3"
+rootProject.name = "Sprint 1 Home UI"
 include(":app")
  
