@@ -64,19 +64,20 @@ fun CalendarScreen(navController: NavHostController) {
             )
         },
         content = { paddingValues ->
+            // Main content
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
+                    .padding(paddingValues), // apply scaffold padding
                 contentAlignment = Alignment.Center
             ) {
-                // Main Calendar UI
+                // calender ui
                 CalendarApp(
                     viewModel = calendarViewModel,
                     onConnectCalendar = ::connectGoogleCalendar
                 )
 
-                // Navigation button grouped at the bottom
+                // navigation at the bottom
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)

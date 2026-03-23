@@ -31,7 +31,7 @@ android {
         }
     }
     compileOptions {
-        // Enable support for the new language APIs
+        // enable library support
         isCoreLibraryDesugaringEnabled = true
         
         sourceCompatibility = JavaVersion.VERSION_11
@@ -56,7 +56,7 @@ dependencies {
     // Calendar implementation
     implementation("com.google.android.gms:play-services-auth:21.5.1")
     
-    // Core Library Desugaring for java.time support on API 24
+    // core library needed
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 
     testImplementation(libs.junit)
