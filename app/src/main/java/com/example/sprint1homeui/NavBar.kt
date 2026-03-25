@@ -35,7 +35,7 @@ fun NavBar(navController: NavHostController) {
                 onClick = {
                     val currentRoute = navController.currentBackStackEntry?.destination?.route
 
-                    val homeRoutes = listOf("home", "map", "calendar")
+                    val homeRoutes = listOf("home", "map", "calendar", "studyRoom")
 
                     val isOnTab = when (item.route) {
                         "home" -> currentRoute in homeRoutes
