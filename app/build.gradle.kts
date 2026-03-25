@@ -39,6 +39,9 @@ android {
         }
     }
     compileOptions {
+        // enable library support
+        isCoreLibraryDesugaringEnabled = true
+
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -71,6 +74,13 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
+
+
+    // Calendar implementation
+    implementation("com.google.android.gms:play-services-auth:21.5.1")
+
+    // core library needed
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
