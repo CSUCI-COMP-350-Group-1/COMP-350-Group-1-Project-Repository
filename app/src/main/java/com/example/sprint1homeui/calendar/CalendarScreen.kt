@@ -1,4 +1,4 @@
-package com.example.sprint1homeui
+package com.example.sprint1homeui.calendar
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
-import com.example.sprint1homeui.auth.GoogleCalendarAuthManager
+import com.example.sprint1homeui.calendar.auth.GoogleCalendarAuthManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -1,6 +1,7 @@
-package com.example.sprint1homeui
+package com.example.sprint1homeui.maps
 
 import android.Manifest
+import android.R
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,7 +20,6 @@ import androidx.navigation.NavHostController
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
 import kotlinx.coroutines.launch
@@ -188,7 +188,7 @@ fun MapScreen(navController: NavHostController) {
                             .systemBarsPadding()
                     ) {
                         Icon(
-                            painter = painterResource(id = android.R.drawable.ic_menu_mylocation), // icon for location, embedded from google maps themselves
+                            painter = painterResource(id = R.drawable.ic_menu_mylocation), // icon for location, embedded from google maps themselves
                             contentDescription = "My Location" // you cant see it, but we have to call it this
                         )
                     }

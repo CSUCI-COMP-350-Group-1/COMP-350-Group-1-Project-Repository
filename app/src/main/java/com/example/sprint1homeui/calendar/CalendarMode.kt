@@ -1,4 +1,4 @@
-package com.example.sprint1homeui
+package com.example.sprint1homeui.calendar
 
 enum class CalendarMode {
     DAY,

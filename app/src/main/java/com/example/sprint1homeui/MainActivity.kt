@@ -39,6 +39,13 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.sprint1homeui.calendar.CalendarScreen
+import com.example.sprint1homeui.home.HomeScreen
+import com.example.sprint1homeui.maps.MapScreen
+import com.example.sprint1homeui.social.ProfileScreen
+import com.example.sprint1homeui.studyRoom.LegendItem
+import com.example.sprint1homeui.studyRoom.RoomItem
+import com.example.sprint1homeui.studyRoom.RoomViewModel
 import com.example.sprint1homeui.ui.NavBar
 
 class MainActivity : ComponentActivity() {

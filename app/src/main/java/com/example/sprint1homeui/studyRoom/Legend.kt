@@ -1,4 +1,4 @@
-package com.example.sprint1homeui
+package com.example.sprint1homeui.studyRoom
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
