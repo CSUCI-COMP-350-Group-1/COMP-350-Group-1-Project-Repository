@@ -1,10 +1,10 @@
-package com.example.sprint1homeui.data.api
+package com.example.sprint1homeui.calendar.data.api
 
 import android.net.Uri
-import com.example.sprint1homeui.model.CalendarEvent
-import com.example.sprint1homeui.model.CalendarSummary
-import com.example.sprint1homeui.model.EventDraft
-import com.example.sprint1homeui.model.EventsPage
+import com.example.sprint1homeui.calendar.model.CalendarEvent
+import com.example.sprint1homeui.calendar.model.CalendarSummary
+import com.example.sprint1homeui.calendar.model.EventDraft
+import com.example.sprint1homeui.calendar.model.EventsPage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray

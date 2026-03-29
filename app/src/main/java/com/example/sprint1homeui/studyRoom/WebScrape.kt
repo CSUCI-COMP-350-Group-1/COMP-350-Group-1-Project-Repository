@@ -1,4 +1,4 @@
-package com.example.sprint1homeui
+package com.example.sprint1homeui.studyRoom
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

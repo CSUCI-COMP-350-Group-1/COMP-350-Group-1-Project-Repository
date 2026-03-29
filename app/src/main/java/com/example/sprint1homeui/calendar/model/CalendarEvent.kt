@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.model
+package com.example.sprint1homeui.calendar.model
 
 import java.time.LocalDate
 import java.time.ZonedDateTime

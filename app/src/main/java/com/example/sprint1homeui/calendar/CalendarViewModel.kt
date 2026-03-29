@@ -1,14 +1,15 @@
-package com.example.sprint1homeui
+package com.example.sprint1homeui.calendar
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.sprint1homeui.data.repository.CalendarRepository
-import com.example.sprint1homeui.model.CalendarEvent
-import com.example.sprint1homeui.model.CalendarSummary
-import com.example.sprint1homeui.model.EventDraft
+import com.example.sprint1homeui.calendar.data.repository.CalendarRepository
+import com.example.sprint1homeui.calendar.model.CalendarEvent
+import com.example.sprint1homeui.calendar.model.CalendarSummary
+import com.example.sprint1homeui.calendar.model.EventDraft
+import com.example.sprint1homeui.calendar.model.EventsPage
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
@@ -209,6 +210,6 @@ class CalendarViewModel(
     private data class LoadedData(
         val calendars: List<CalendarSummary>,
         val selectedCalendar: CalendarSummary,
-        val page: com.example.sprint1homeui.model.EventsPage
+        val page: EventsPage
     )
 }

@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.auth
+package com.example.sprint1homeui.calendar.auth
 
 import android.app.PendingIntent
 import android.content.Context
