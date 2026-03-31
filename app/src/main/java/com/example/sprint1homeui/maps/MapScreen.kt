@@ -1,7 +1,6 @@
 package com.example.sprint1homeui.maps
 
 import android.Manifest
-import android.R
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,73 +16,58 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
+import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+// CSUCI Boundaries - prevents scrolling far from campus area in Camarillo
+private val CSUCI_BOUNDS = LatLngBounds(
+    LatLng(34.155, -119.055), // Southwest corner
+    LatLng(34.170, -119.030)  // Northeast corner
+)
+private val CSUCI_CENTER = LatLng(34.16222772570257, -119.0435017637274)
+
+// Updated Campus Landmark Coordinates near the new center
+private val BELL_TOWER = LatLng(34.1614, -119.0428)
+private val BROOME_LIBRARY = LatLng(34.1624, -119.0434)
+private val STUDENT_UNION = LatLng(34.1610, -119.0436)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(navController: NavHostController) {
-    // The map's logic
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
+    var selectedDestination by remember { mutableStateOf<LatLng?>(null) }
     var isLoadingLocation by remember { mutableStateOf(false) }
     var hasLocationPermission by remember { mutableStateOf(false) }
 
-    // this is how we determine hard coded locations, to be used in a future user story
-    // my example was just moorpark.
-    //val hardcodedlocation = LatLng(34.285, -118.882)
-
-    val cameraPositionState = rememberCameraPositionState { // animation for the camera, this variable is NEEDED.
-        // will be used for future user stories
-        // position = CameraPosition.fromLatLngZoom(hardcodedlocation, 14f)
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(CSUCI_CENTER, 17f)
     }
 
-    // getting the user location
-    val fetchUserLocation: suspend () -> Unit = {
-        isLoadingLocation = true
-        try {
-            var location = fusedLocationClient.lastLocation.await()
-            if (location == null || location.accuracy > 100) { // accuracy settings i got from a tutorial
-                location = fusedLocationClient.getCurrentLocation(
-                    Priority.PRIORITY_HIGH_ACCURACY, // prio high accuracy for location
-                    null
-                ).await()
-            }
-            if (location != null) {
-                userLocation = LatLng(location.latitude, location.longitude)
-                cameraPositionState.animate( // this is for the button/when the user moves!
-                    CameraUpdateFactory.newLatLngZoom(userLocation!!, 16f)
-                )
-            }
-        } catch (e: SecurityException) {
-            // when there are no permissions
-        } catch (e: Exception) {
-            // an error occured!
-        } finally {
-            isLoadingLocation = false
-        }
-    }
-
-    // launch permissions
+    // Permission launcher logic
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         hasLocationPermission = isGranted
         if (isGranted) {
-            scope.launch { fetchUserLocation() } // when location is accepted
+            scope.launch { 
+                fetchLocation(fusedLocationClient, cameraPositionState) { userLocation = it } 
+            }
         }
     }
 
-    // check permissions
+    // Check for permissions on start
     LaunchedEffect(Unit) {
         hasLocationPermission = ContextCompat.checkSelfPermission(
             context,
@@ -91,130 +75,246 @@ fun MapScreen(navController: NavHostController) {
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasLocationPermission) {
-            fetchUserLocation()
+            fetchLocation(fusedLocationClient, cameraPositionState) { userLocation = it }
         } else {
             permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("CSUCI Campus Map", fontSize = 20.sp) }
+            )
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            contentAlignment = Alignment.Center
+        ) {
+            // Refactored Map Content
+            MapContent(
+                cameraPositionState = cameraPositionState,
+                hasLocationPermission = hasLocationPermission,
+                userLocation = userLocation,
+                selectedDestination = selectedDestination,
+                onLandmarkClick = { selectedDestination = it },
+                onMapClick = { selectedDestination = null }
+            )
+
+            // Refactored UI Overlays
+            MapOverlays(
+                hasLocationPermission = hasLocationPermission,
+                isLoadingLocation = isLoadingLocation,
+                onLocationRequest = {
+                    scope.launch {
+                        isLoadingLocation = true
+                        fetchLocation(fusedLocationClient, cameraPositionState) { 
+                            userLocation = it 
+                            isLoadingLocation = false
+                        }
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun MapContent(
+    cameraPositionState: CameraPositionState,
+    hasLocationPermission: Boolean,
+    userLocation: LatLng?,
+    selectedDestination: LatLng?,
+    onLandmarkClick: (LatLng) -> Unit,
+    onMapClick: (LatLng) -> Unit
+) {
     val uiSettings = remember {
         MapUiSettings(
-            myLocationButtonEnabled = false, // We have our own location button
-            zoomControlsEnabled = true, // very useful
-            compassEnabled = true, // useful
-            mapToolbarEnabled = false //  gets rid of that annoying button at the bottom of the maps
+            myLocationButtonEnabled = false, // Custom FAB used instead
+            zoomControlsEnabled = true,
+            compassEnabled = true,
+            mapToolbarEnabled = false
         )
     }
 
     val mapProperties = remember(hasLocationPermission) {
         MapProperties(
             isMyLocationEnabled = hasLocationPermission,
-            isTrafficEnabled = false, // was for testing, not needed
-            mapType = MapType.NORMAL
+            latLngBoundsForCameraTarget = CSUCI_BOUNDS // Strict restriction to campus
         )
     }
 
+    GoogleMap(
+        modifier = Modifier.fillMaxSize(),
+        cameraPositionState = cameraPositionState,
+        properties = mapProperties,
+        uiSettings = uiSettings,
+        onMapClick = onMapClick
+    ) {
+        // User Location Marker
+        if (userLocation != null) {
+            UserLocationMarker(userLocation)
+        }
+        
+        // Landmark Markers
+        CampusLandmarks(onLandmarkClick = onLandmarkClick)
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Map", fontSize = 20.sp) }
+        // Draw walking path (straight line for now as a mock)
+        if (userLocation != null && selectedDestination != null) {
+            Polyline(
+                points = listOf(userLocation, selectedDestination),
+                color = Color(0xFF1A73E8), // Google Maps Blue
+                width = 8f,
+                geodesic = true
             )
-        },
-        content = { paddingValues ->
-            // Main content
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues), // apply scaffold padding
-                contentAlignment = Alignment.Center
-            ) {
-                // the map view
-                GoogleMap(
-                    modifier = Modifier.fillMaxSize(),
-                    cameraPositionState = cameraPositionState,
-                    properties = mapProperties,
-                    uiSettings = uiSettings
-                ) {
-                    // this was the marker for 'moorpark', but it is not needed
-                    // It WILL be needed for key locations on campus map.
+        }
+    }
+}
 
-                    userLocation?.let { pos ->
-                        Marker(
-                            state = rememberMarkerState(position = pos), // the markerstate needs to be there for the state to work.
-                            title = "You are here!",
-                            snippet = "Your approximate location"
-                        )
-
-                        Circle(
-                            center = pos, // radius around the location, can be edited
-                            radius = 25.0,
-                            fillColor = Color(0, 150, 255, 80),
-                            strokeColor = Color.Blue,
-                            strokeWidth = 2f
-                        )
-                    }
-                }
-
-                // ui navigation, has lorenzo's back button here
-                Column(
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(top = 20.dp), // moves the button to the top
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Button(onClick = { navController.navigate("home") }) {
-                        Text("Back to Home")
-                    }
-                }
-
-                // overlaying my location button
-                // location button using a floating action button
-                if (hasLocationPermission) {
-                    FloatingActionButton(
-                        onClick = {
-                            scope.launch {
-                                if (userLocation != null) {
-                                    cameraPositionState.animate( // when clicked, animate to the user location
-                                        CameraUpdateFactory.newLatLngZoom(userLocation!!, 17f)
-                                    )
-                                } else {
-                                    fetchUserLocation()
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .align(Alignment.BottomStart) //bottom left start
-                            .padding(16.dp)
-                            .systemBarsPadding()
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_menu_mylocation), // icon for location, embedded from google maps themselves
-                            contentDescription = "My Location" // you cant see it, but we have to call it this
-                        )
-                    }
-                }
-
-                if (isLoadingLocation) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
-
-                if (!hasLocationPermission) { // location permissions
-                    Card(
-                        modifier = Modifier // prompts the location permission to show
-                            .align(Alignment.Center)
-                            .padding(32.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-                    ) {
-                        Text(
-                            text = "Location permission is required to show your position and nearby features.",
-                            modifier = Modifier.padding(16.dp),
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-                }
-            }
+@Composable
+fun CampusLandmarks(onLandmarkClick: (LatLng) -> Unit) {
+    Marker(
+        state = rememberMarkerState(position = BELL_TOWER),
+        title = "Bell Tower",
+        snippet = "Center of Campus",
+        onClick = {
+            onLandmarkClick(it.position)
+            false // return false to show info window
+        }
+    )
+    Marker(
+        state = rememberMarkerState(position = BROOME_LIBRARY),
+        title = "John Spoor Broome Library",
+        snippet = "Main Library",
+        onClick = {
+            onLandmarkClick(it.position)
+            false
+        }
+    )
+    Marker(
+        state = rememberMarkerState(position = STUDENT_UNION),
+        title = "Student Union",
+        snippet = "Dining and Lounge",
+        onClick = {
+            onLandmarkClick(it.position)
+            false
         }
     )
 }
+
+@Composable
+fun UserLocationMarker(position: LatLng) {
+    Marker(
+        state = rememberMarkerState(position = position),
+        title = "You are here!",
+        snippet = "Your approximate location"
+    )
+    Circle(
+        center = position,
+        radius = 25.0,
+        fillColor = Color(0, 150, 255, 80),
+        strokeColor = Color.Blue,
+        strokeWidth = 2f
+    )
+}
+
+@Composable
+fun MapOverlays(
+    hasLocationPermission: Boolean,
+    isLoadingLocation: Boolean,
+    onLocationRequest: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(16.dp)
+        ) {
+            // The 'my location' button
+            if (hasLocationPermission) {
+                MyLocationFab(onClick = onLocationRequest)
+            }
+        }
+
+        if (isLoadingLocation) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+        }
+
+        if (!hasLocationPermission) {
+            PermissionCard(modifier = Modifier.align(Alignment.Center))
+        }
+    }
+}
+
+@Composable
+fun MyLocationFab(onClick: () -> Unit) { // ui that handles the location tab
+    FloatingActionButton(
+        onClick = onClick,
+        modifier = Modifier.systemBarsPadding()
+    ) {
+        Icon(
+            painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
+            contentDescription = "My Location"
+        )
+    }
+}
+
+@Composable
+fun PermissionCard(modifier: Modifier) { // permission check for location services
+    Card(
+        modifier = modifier.padding(32.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+    ) {
+        Text(
+            text = "Location permission is required to show your position on the map.",
+            modifier = Modifier.padding(16.dp),
+            color = MaterialTheme.colorScheme.onErrorContainer
+        )
+    }
+}
+
+// the logic to fetch user location, camera animations
+suspend fun fetchLocation(
+    client: FusedLocationProviderClient,
+    cameraState: CameraPositionState,
+    onResult: (LatLng) -> Unit
+) {
+    try {
+        var location = client.lastLocation.await()
+        if (location == null || location.accuracy > 100) {
+            location = client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null).await()
+        }
+        location?.let {
+            val latLng = LatLng(it.latitude, it.longitude)
+            onResult(latLng)
+            cameraState.animate(CameraUpdateFactory.newLatLngZoom(latLng, 17f))
+        }
+    } catch (e: SecurityException) {
+        // Handle no permissions
+    } catch (e: Exception) {
+        // Handle errors fetching location
+    }
+}
+
+// reset camera to CSUCI center
+suspend fun resetCameraToCampus(cameraState: CameraPositionState) {
+    cameraState.animate(CameraUpdateFactory.newLatLngZoom(CSUCI_CENTER, 17f))
+}
+
+// move to a certain landmark when searched or clicked
+suspend fun moveToLandmark(cameraState: CameraPositionState, landmark: LatLng) {
+    cameraState.animate(CameraUpdateFactory.newLatLngZoom(landmark, 18f))
+}
+
+/**
+ * Quick jump to Bell Tower
+ */
+suspend fun jumpToBellTower(cameraState: CameraPositionState) = moveToLandmark(cameraState, BELL_TOWER)
+
+/**
+ * Quick jump to Broome Library
+ */
+suspend fun jumpToLibrary(cameraState: CameraPositionState) = moveToLandmark(cameraState, BROOME_LIBRARY)
