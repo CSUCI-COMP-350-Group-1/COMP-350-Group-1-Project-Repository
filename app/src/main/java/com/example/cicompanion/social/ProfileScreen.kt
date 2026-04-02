@@ -1,6 +1,8 @@
 package com.example.cicompanion.social
 
-// unused imports are for the yet-to-be-implemented, fleshed-out top bar
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,53 +33,60 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.example.cicompanion.ui.theme.Sprint1HomeUITheme
 import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.example.cicompanion.firebase.FirebaseAuthManager
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
+import com.google.firebase.auth.FirebaseAuth
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(navController: NavHostController) {
+
+    val context = LocalContext.current
+    
+    // State to hold the current Firebase user
+    var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
+
+    // Listen for authentication state changes (sign-in/sign-out)
+    DisposableEffect(Unit) {
+        val listener = FirebaseAuth.AuthStateListener { auth ->
+            currentUser = auth.currentUser
+        }
+        FirebaseAuth.getInstance().addAuthStateListener(listener)
+        onDispose {
+            FirebaseAuth.getInstance().removeAuthStateListener(listener)
+        }
+    }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(ApiException::class.java)
+                account?.idToken?.let { idToken ->
+                    FirebaseAuthManager.firebaseAuthWithGoogle(idToken)
+                }
+            } catch (e: ApiException) {
+                // Handle error
+            }
+        }
+    }
+
     Scaffold(
-        // topBar is a stub.
-        // for consistency, my (Noah) specific top bar elements are commented out,
-        // it may be useful to refer to this fleshed-out bar in the future
         topBar = {
             TopAppBar(
                 title = { Text("Profile", fontSize = 20.sp) }
             )
         }
-        /*
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = "Profile",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { /* TODO */ }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_menu),
-                            contentDescription = "Menu",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { /* TODO */ }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_settings),
-                            contentDescription = "Settings",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.White
-                )
-            )
-        }
-        */
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -85,7 +94,10 @@ fun ProfileScreen(navController: NavHostController) {
                 .fillMaxSize()
                 .background(Color.White)
         ) {
+            // Pass the current user's name and email to the header
             ProfileHeader(
+                name = currentUser?.displayName ?: "Guest",
+                email = currentUser?.email ?: "Not signed in",
                 modifier = Modifier
                     .padding(horizontal = 24.dp, vertical = 32.dp)
                     .fillMaxWidth()
@@ -99,9 +111,24 @@ fun ProfileScreen(navController: NavHostController) {
                     .background(Color(0xFFE0E0E0)), // Light gray background
                 contentAlignment = Alignment.Center
             ) {
-                // probably removable, but leaving for now
-                Button(onClick = { navController.navigate("home") }) {
-                    Text("Back to Home")
+                if (currentUser == null) {
+                    Button(
+                        onClick = {
+                            val signInClient = FirebaseAuthManager.getGoogleSignInClient(context)
+                            launcher.launch(signInClient.signInIntent)
+                        }
+                    ) {
+                        Text("Sign in with Google")
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            FirebaseAuth.getInstance().signOut()
+                            FirebaseAuthManager.getGoogleSignInClient(context).signOut()
+                        }
+                    ) {
+                        Text("Sign Out")
+                    }
                 }
             }
         }
@@ -109,7 +136,11 @@ fun ProfileScreen(navController: NavHostController) {
 }
 
 @Composable
-fun ProfileHeader(modifier: Modifier = Modifier) {
+fun ProfileHeader(
+    name: String,
+    email: String,
+    modifier: Modifier = Modifier
+) {
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
@@ -148,19 +179,19 @@ fun ProfileHeader(modifier: Modifier = Modifier) {
 
         Column {
             Text(
-                text = "User Name",
+                text = name,
                 fontWeight = FontWeight.Bold,
                 fontSize = 24.sp,
                 color = Color.Black
             )
             Text(
-                text = "user@example.com",
+                text = email,
                 color = Color.Gray,
                 fontSize = 16.sp
             )
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = "Friends: 0",
+                text = "0 Friends",
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 color = Color.Black
