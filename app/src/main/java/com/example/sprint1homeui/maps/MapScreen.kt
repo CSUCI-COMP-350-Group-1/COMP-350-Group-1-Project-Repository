@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 // sets the boundaries, preventing user from scrolling away from CSUCI
+// the center default is in the middle of the campus
 private val CSUCI_BOUNDS = LatLngBounds(
     LatLng(34.155, -119.055), // Southwest corner
     LatLng(34.170, -119.030)  // Northeast corner
@@ -80,10 +81,10 @@ private val MAP_STYLE_JSON = """
     ]
 """.trimIndent()
 
-// Location categories for filtering, called in actual location itself
-enum class LocationType { BUILDING, PARKING }
+// Class is called for filtering services
+enum class LocationType { BUILDING, PARKING, FOOD, AREA }
 
-// we have a few data classes for each campus location, customizable
+// we have a few data classes for each campus location
 data class CampusLocation(
     val name: String,
     val position: LatLng,
@@ -93,11 +94,13 @@ data class CampusLocation(
     val color: Color
 )
 
-// List of all campus locations including buildings, food and parking lots
+// Campus locations. Goes in list of name, pos, latitude, longitude, description, type, icon, color
 val campusLocations = listOf(
     // Buildings
-    CampusLocation("Bell Tower", LatLng(34.1614, -119.0428), "Center of Campus", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("John Spoor Broome Library", LatLng(34.1624, -119.0434), "Main Library", LocationType.BUILDING, Icons.AutoMirrored.Filled.MenuBook, Color(0xFF1976D2)),
+    CampusLocation("Bell Tower", LatLng(34.16138604361421, -119.0432651672823), "Center of Campus", LocationType.BUILDING, Icons.Default.Business, Color(0xFFD32F2F)),
+    CampusLocation("Bell Tower East", LatLng(34.16134665298329, -119.04189180309578), "", LocationType.BUILDING, Icons.Default.Business, Color(0xFFD32F2F)),
+    CampusLocation("Bell Tower West", LatLng(34.16070116130278, -119.04439859472768), "", LocationType.BUILDING, Icons.Default.Business, Color(0xFFD32F2F)),
+    CampusLocation("John Spoor Broome Library", LatLng(34.16269668565898, -119.04094849136715), "Main Library", LocationType.BUILDING, Icons.AutoMirrored.Filled.MenuBook, Color(0xFF388E3C)),
     CampusLocation("Student Union", LatLng(34.1610, -119.0436), "Dining and Lounge", LocationType.BUILDING, Icons.Default.Groups, Color(0xFF388E3C)),
     CampusLocation("Marin Hall", LatLng(34.164528096869034, -119.04507117740494), "Faculty Offices for Mathematics and Data Science", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Shasta Hall", LatLng(34.164576865185516, -119.04472618829523), "Faculty Offices for Computer Science and Engineering", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
@@ -123,6 +126,19 @@ val campusLocations = listOf(
     CampusLocation("Lindero Hall", LatLng(34.15956619235504, -119.04141202350661), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Ojai Hall", LatLng(34.16173923354911, -119.04257933412188), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     
+    // Food category, orange
+    CampusLocation("Islands Cafe", LatLng(34.16046259918211, -119.04156950739008), "Dining commons for students and employees.", LocationType.FOOD, Icons.Default.Restaurant, Color(0xFFFF9800)),
+    CampusLocation("Coastal Cup", LatLng(34.16517607999232, -119.04492439787398), "A coffee shop inside Gateway Hall.", LocationType.FOOD, Icons.Default.Restaurant, Color(0xFFFF9800)),
+    CampusLocation("Mom Wong Kitchen", LatLng(34.162865389467136, -119.03934866185736), "Camarillo’s Premier Chinese Restaurant", LocationType.FOOD, Icons.Default.Restaurant, Color(0xFFFF9800)),
+    CampusLocation("Tortillas Grill", LatLng(34.16304512832548, -119.03936598760045), "Mexican Food", LocationType.FOOD, Icons.Default.Restaurant, Color(0xFFFF9800)),
+
+    // Areas category
+    CampusLocation("North Quad", LatLng(34.163869256675795, -119.04439875392643), "", LocationType.AREA, Icons.Default.People, Color(0xFF9C27B0)),
+    CampusLocation("North Field", LatLng(34.167561045970785, -119.04526582938406), "", LocationType.AREA, Icons.Default.Park, Color(0xFF9C27B0)),
+    CampusLocation("Central Mall", LatLng(34.16182005886744, -119.04344776363348), "", LocationType.AREA, Icons.Default.People, Color(0xFF9C27B0)),
+    CampusLocation("Potrero Fields", LatLng(34.159887809784415, -119.04743204832411), "", LocationType.AREA, Icons.Default.Park, Color(0xFF9C27B0)),
+    CampusLocation("South Quad", LatLng(34.160229605621325, -119.04270063156984), "", LocationType.AREA, Icons.Default.People, Color(0xFF9C27B0)),
+
     // Parking Lots, in blue
     CampusLocation("Parking Lot A3", LatLng(34.166606172710715, -119.04703678095836), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
     CampusLocation("Parking Lot A4", LatLng(34.164244290933254, -119.04646170905023), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
@@ -160,7 +176,7 @@ fun MapScreen(navController: NavHostController) {
         position = CameraPosition.fromLatLngZoom(CSUCI_CENTER, 17f)
     }
 
-    // Filter locations based on search query and selected filter type
+    // Filter locations based on search, and selected filter type
     val filteredLocations = remember(searchQuery, filterType) {
         val trimmedQuery = searchQuery.trim()
         campusLocations.filter { 
@@ -221,7 +237,7 @@ fun MapScreen(navController: NavHostController) {
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp)
                     )
-                    // Filter Chips
+                    // Chips on the filter (select buildings, food, etc.)
                     LazyRow(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -245,9 +261,25 @@ fun MapScreen(navController: NavHostController) {
                         }
                         item {
                             FilterChip(
+                                selected = filterType == LocationType.FOOD,
+                                onClick = { filterType = LocationType.FOOD },
+                                label = { Text("Food") },
+                                leadingIcon = { Icon(Icons.Default.Restaurant, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                            )
+                        }
+                        item {
+                            FilterChip(
+                                selected = filterType == LocationType.AREA,
+                                onClick = { filterType = LocationType.AREA },
+                                label = { Text("Areas") },
+                                leadingIcon = { Icon(Icons.Default.People, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                            )
+                        }
+                        item {
+                            FilterChip(
                                 selected = filterType == LocationType.PARKING,
                                 onClick = { filterType = LocationType.PARKING },
-                                label = { Text("Parking Only") },
+                                label = { Text("Parking") },
                                 leadingIcon = { Icon(Icons.Default.LocalParking, contentDescription = null, modifier = Modifier.size(18.dp)) }
                             )
                         }
@@ -262,7 +294,7 @@ fun MapScreen(navController: NavHostController) {
                 .padding(paddingValues),
             contentAlignment = Alignment.Center
         ) {
-            // Refactored Map Content
+            // Map content
             MapContent(
                 cameraPositionState = cameraPositionState,
                 hasLocationPermission = hasLocationPermission,
