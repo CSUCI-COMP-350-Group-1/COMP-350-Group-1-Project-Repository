@@ -4,7 +4,14 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,24 +30,118 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-// CSUCI Boundaries - prevents scrolling far from campus area in Camarillo
+// sets the boundaries, preventing user from scrolling away from CSUCI
 private val CSUCI_BOUNDS = LatLngBounds(
     LatLng(34.155, -119.055), // Southwest corner
     LatLng(34.170, -119.030)  // Northeast corner
 )
 private val CSUCI_CENTER = LatLng(34.16222772570257, -119.0435017637274)
 
-// Updated Campus Landmark Coordinates near the new center
-private val BELL_TOWER = LatLng(34.1614, -119.0428)
-private val BROOME_LIBRARY = LatLng(34.1624, -119.0434)
-private val STUDENT_UNION = LatLng(34.1610, -119.0436)
+// Parking lot descriptions, called here since it's not ethical to copy-paste them for each
+private const val SH_PARKING_DESC = "Student housing parking (only for SH permit holders)"
+private const val GENERAL_PARKING_DESC = "General parking (A, F, E or Visitor permit required)"
+private const val RESTRICTED_PARKING_DESC = "Restricted parking lot (only for R or RV permit holders)"
+
+// Google maps customizations, to get rid of preexisting names and locations on maps
+private val MAP_STYLE_JSON = """
+    [
+      {
+        "featureType": "poi",
+        "stylers": [
+          { "visibility": "off" }
+        ]
+      },
+      {
+        "featureType": "poi.business",
+        "elementType": "labels",
+        "stylers": [
+          { "visibility": "off" }
+        ]
+      },
+      {
+        "featureType": "poi.school",
+        "elementType": "labels",
+        "stylers": [
+          { "visibility": "off" }
+        ]
+      },
+      {
+        "featureType": "poi.park",
+        "elementType": "labels",
+        "stylers": [
+          { "visibility": "off" }
+        ]
+      }
+    ]
+""".trimIndent()
+
+// Location categories for filtering, called in actual location itself
+enum class LocationType { BUILDING, PARKING }
+
+// we have a few data classes for each campus location, customizable
+data class CampusLocation(
+    val name: String,
+    val position: LatLng,
+    val description: String,
+    val type: LocationType,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val color: Color
+)
+
+// List of all campus locations including buildings, food and parking lots
+val campusLocations = listOf(
+    // Buildings
+    CampusLocation("Bell Tower", LatLng(34.1614, -119.0428), "Center of Campus", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("John Spoor Broome Library", LatLng(34.1624, -119.0434), "Main Library", LocationType.BUILDING, Icons.AutoMirrored.Filled.MenuBook, Color(0xFF1976D2)),
+    CampusLocation("Student Union", LatLng(34.1610, -119.0436), "Dining and Lounge", LocationType.BUILDING, Icons.Default.Groups, Color(0xFF388E3C)),
+    CampusLocation("Marin Hall", LatLng(34.164528096869034, -119.04507117740494), "Faculty Offices for Mathematics and Data Science", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Shasta Hall", LatLng(34.164576865185516, -119.04472618829523), "Faculty Offices for Computer Science and Engineering", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Gateway Hall", LatLng(34.16483652693463, -119.04547452459948), "Large building with classrooms and study rooms", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Napa Hall", LatLng(34.16377605025435, -119.04540741204008), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Solano Hall", LatLng(34.16340620613301, -119.0450085042822), "Offices for faculty, Division of Technology and Innovation", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Martin V. Smith Hall", LatLng(34.162909062826785, -119.04476226672068), "Houses Nursing Program", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Sierra Hall", LatLng(34.16229510038971, -119.04461124101422), "Multimode lecture halls, classrooms and faculty offices.", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Del Norte Hall", LatLng(34.163180726190696, -119.04410235004629), "Lecture classrooms", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Madera Hall", LatLng(34.1629335125641, -119.04394147483745), "Lecture classrooms", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Placer Hall", LatLng(34.163344972360754, -119.04300312204607), "Offices of University Police and Parking Services", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Richard R. Rush Hall", LatLng(34.162673963555044, -119.04342008432133), "Houses the University President and other administrative functions for the campus.", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Chaparral Hall", LatLng(34.162096255189496, -119.04560917381353), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Ironwood Hall", LatLng(34.16245544107054, -119.04645265103974), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("El Dorado Hall", LatLng(34.16423447296913, -119.04710369220899), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Aliso Hall", LatLng(34.16133147263596, -119.04535150727516), "8 Science Labs and 16 Faculty Offices", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Yuba Hall", LatLng(34.16407767205871, -119.04109248173509), "Houses the Student Health Center", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Sage Hall", LatLng(34.164167218645936, -119.04222881533492), "The Enrollment Center.", LocationType.BUILDING, Icons.Default.School, Color(0xFF388E3C)),
+    CampusLocation("Malibu Hall", LatLng(34.16126160533967, -119.04086506383092), "", LocationType.BUILDING, Icons.Default.School, Color(0xFF388E3C)),
+    CampusLocation("Topanga Hall", LatLng(34.16019137315942, -119.04169333763335), "Serves the Art Program, labs and other art facilities.", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Arroyo Hall", LatLng(34.160354318454424, -119.04489629947327), "Wellness and Athletics Office. Recreation Center.", LocationType.BUILDING, Icons.Default.School, Color(0xFF388E3C)),
+    CampusLocation("Trinity Hall", LatLng(34.15934671289535, -119.0423644726643), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Lindero Hall", LatLng(34.15956619235504, -119.04141202350661), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Ojai Hall", LatLng(34.16173923354911, -119.04257933412188), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    
+    // Parking Lots, in blue
+    CampusLocation("Parking Lot A3", LatLng(34.166606172710715, -119.04703678095836), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
+    CampusLocation("Parking Lot A4", LatLng(34.164244290933254, -119.04646170905023), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
+    CampusLocation("Parking Lot A11", LatLng(34.164126287402695, -119.04786350249398), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
+    CampusLocation("Parking Lot A2", LatLng(34.16410868093253, -119.04164009131796), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
+    CampusLocation("Parking Lot A6", LatLng(34.16325952040607, -119.04202460036679), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
+    CampusLocation("Parking Lot A1", LatLng(34.163586436668446, -119.04267748158364), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
+    CampusLocation("Parking Lot A8", LatLng(34.16309446392495, -119.04030380989158), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
+    CampusLocation("Parking Lot A/E", LatLng(34.16186741815617, -119.04156570455609), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
+    CampusLocation("Parking Lot A7", LatLng(34.160649977624885, -119.04118719083276), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
+    CampusLocation("Parking Lot A10", LatLng(34.15940842843663, -119.04062564402817), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
+    CampusLocation("Parking Lot SH1", LatLng(34.15912561853075, -119.04537811915849), SH_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF00BCD4)),
+    CampusLocation("Parking Lot R1", LatLng(34.1630169076814, -119.04316226033373), RESTRICTED_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF673AB7)),
+    CampusLocation("Parking Lot A5", LatLng(34.16050864644475, -119.04463491964691), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2))
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// map screen function
 fun MapScreen(navController: NavHostController) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -51,8 +152,21 @@ fun MapScreen(navController: NavHostController) {
     var isLoadingLocation by remember { mutableStateOf(false) }
     var hasLocationPermission by remember { mutableStateOf(false) }
 
+    // Search and Filtering State
+    var searchQuery by remember { mutableStateOf("") }
+    var filterType by remember { mutableStateOf<LocationType?>(null) }
+
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(CSUCI_CENTER, 17f)
+    }
+
+    // Filter locations based on search query and selected filter type
+    val filteredLocations = remember(searchQuery, filterType) {
+        val trimmedQuery = searchQuery.trim()
+        campusLocations.filter { 
+            (trimmedQuery.isEmpty() || it.name.contains(trimmedQuery, ignoreCase = true)) && 
+            (filterType == null || it.type == filterType)
+        }
     }
 
     // Permission launcher logic
@@ -83,9 +197,63 @@ fun MapScreen(navController: NavHostController) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("CSUCI Campus Map", fontSize = 20.sp) }
-            )
+            Surface(shadowElevation = 4.dp) {
+                Column {
+                    TopAppBar(
+                        title = { Text("CSUCI Campus Map", fontSize = 20.sp) }
+                    )
+                    // Search Bar
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        placeholder = { Text("Search campus...") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = null)
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    // Filter Chips
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = filterType == null,
+                                onClick = { filterType = null },
+                                label = { Text("All") }
+                            )
+                        }
+                        item {
+                            FilterChip(
+                                selected = filterType == LocationType.BUILDING,
+                                onClick = { filterType = LocationType.BUILDING },
+                                label = { Text("Buildings") },
+                                leadingIcon = { Icon(Icons.Default.Business, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                            )
+                        }
+                        item {
+                            FilterChip(
+                                selected = filterType == LocationType.PARKING,
+                                onClick = { filterType = LocationType.PARKING },
+                                label = { Text("Parking Only") },
+                                leadingIcon = { Icon(Icons.Default.LocalParking, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                            )
+                        }
+                    }
+                }
+            }
         }
     ) { paddingValues ->
         Box(
@@ -100,8 +268,9 @@ fun MapScreen(navController: NavHostController) {
                 hasLocationPermission = hasLocationPermission,
                 userLocation = userLocation,
                 selectedDestination = selectedDestination,
-                onLandmarkClick = { selectedDestination = it },
-                onMapClick = { selectedDestination = null }
+                onLocationClick = { selectedDestination = it },
+                onMapClick = { selectedDestination = null },
+                displayLocations = filteredLocations
             )
 
             // Refactored UI Overlays
@@ -123,17 +292,19 @@ fun MapScreen(navController: NavHostController) {
 }
 
 @Composable
+// content of the map
 fun MapContent(
     cameraPositionState: CameraPositionState,
     hasLocationPermission: Boolean,
     userLocation: LatLng?,
     selectedDestination: LatLng?,
-    onLandmarkClick: (LatLng) -> Unit,
-    onMapClick: (LatLng) -> Unit
+    onLocationClick: (LatLng) -> Unit,
+    onMapClick: (LatLng) -> Unit,
+    displayLocations: List<CampusLocation>
 ) {
     val uiSettings = remember {
         MapUiSettings(
-            myLocationButtonEnabled = false, // Custom FAB used instead
+            myLocationButtonEnabled = false, // Custom back to location button used
             zoomControlsEnabled = true,
             compassEnabled = true,
             mapToolbarEnabled = false
@@ -143,7 +314,8 @@ fun MapContent(
     val mapProperties = remember(hasLocationPermission) {
         MapProperties(
             isMyLocationEnabled = hasLocationPermission,
-            latLngBoundsForCameraTarget = CSUCI_BOUNDS // Strict restriction to campus
+            latLngBoundsForCameraTarget = CSUCI_BOUNDS, // Strict restriction to campus
+            mapStyleOptions = MapStyleOptions(MAP_STYLE_JSON) // Hides preset POIs and labels
         )
     }
 
@@ -152,21 +324,37 @@ fun MapContent(
         cameraPositionState = cameraPositionState,
         properties = mapProperties,
         uiSettings = uiSettings,
-        onMapClick = onMapClick
+        onMapClick = { 
+            onMapClick(it)
+        }
     ) {
-        // User Location Marker
+        // User Location Marker with custom icon
         if (userLocation != null) {
             UserLocationMarker(userLocation)
         }
         
-        // Landmark Markers
-        CampusLandmarks(onLandmarkClick = onLandmarkClick)
+        // Render filtered markers (landmarks and parking lots)
+        displayLocations.forEach { location ->
+            key(location.name) {
+                MarkerComposable(
+                    state = rememberMarkerState(key = location.name, position = location.position),
+                    title = location.name,
+                    snippet = location.description,
+                    onClick = {
+                        onLocationClick(it.position)
+                        false // return false to show info window
+                    }
+                ) {
+                    LandmarkIcon(icon = location.icon, contentDescription = location.name, color = location.color)
+                }
+            }
+        }
 
-        // Draw walking path (straight line for now as a mock)
+        // Draw walking path, a straight line
         if (userLocation != null && selectedDestination != null) {
             Polyline(
                 points = listOf(userLocation, selectedDestination),
-                color = Color(0xFF1A73E8), // Google Maps Blue
+                color = Color(0xFF1A73E8), // a blue line
                 width = 8f,
                 geodesic = true
             )
@@ -175,53 +363,53 @@ fun MapContent(
 }
 
 @Composable
-fun CampusLandmarks(onLandmarkClick: (LatLng) -> Unit) {
-    Marker(
-        state = rememberMarkerState(position = BELL_TOWER),
-        title = "Bell Tower",
-        snippet = "Center of Campus",
-        onClick = {
-            onLandmarkClick(it.position)
-            false // return false to show info window
-        }
-    )
-    Marker(
-        state = rememberMarkerState(position = BROOME_LIBRARY),
-        title = "John Spoor Broome Library",
-        snippet = "Main Library",
-        onClick = {
-            onLandmarkClick(it.position)
-            false
-        }
-    )
-    Marker(
-        state = rememberMarkerState(position = STUDENT_UNION),
-        title = "Student Union",
-        snippet = "Dining and Lounge",
-        onClick = {
-            onLandmarkClick(it.position)
-            false
-        }
-    )
+fun LandmarkIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector, 
+    contentDescription: String,
+    color: Color
+) {
+    Box(
+        modifier = Modifier
+            .size(27.dp) // size of the icon
+            .background(color, CircleShape) // we set this individually
+            .padding(4.dp), // padding of icons
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = Color.White, // default, icon is set
+            modifier = Modifier.size(20.dp)
+        )
+    }
 }
 
 @Composable
 fun UserLocationMarker(position: LatLng) {
-    Marker(
+    MarkerComposable(
         state = rememberMarkerState(position = position),
-        title = "You are here!",
-        snippet = "Your approximate location"
-    )
+        title = "You are here!" // current location
+    ) {
+        Icon(
+            imageVector = Icons.Default.PersonPinCircle,
+            contentDescription = "User Location", // current location
+            tint = Color.Gray,
+            modifier = Modifier.size(36.dp)
+        )
+    }
+    
+    // Accuracy circle
     Circle(
         center = position,
-        radius = 25.0,
-        fillColor = Color(0, 150, 255, 80),
-        strokeColor = Color.Blue,
+        radius = 20.0, // size of circle
+        fillColor = Color.Gray.copy(alpha = 0.2f),
+        strokeColor = Color.Gray.copy(alpha = 0.5f),
         strokeWidth = 2f
     )
 }
 
 @Composable
+// overlays, handles icons
 fun MapOverlays(
     hasLocationPermission: Boolean,
     isLoadingLocation: Boolean,
@@ -233,7 +421,7 @@ fun MapOverlays(
                 .align(Alignment.BottomStart)
                 .padding(16.dp)
         ) {
-            // The 'my location' button
+            // My Location Button
             if (hasLocationPermission) {
                 MyLocationFab(onClick = onLocationRequest)
             }
@@ -250,7 +438,8 @@ fun MapOverlays(
 }
 
 @Composable
-fun MyLocationFab(onClick: () -> Unit) { // ui that handles the location tab
+// the custom location button
+fun MyLocationFab(onClick: () -> Unit) { 
     FloatingActionButton(
         onClick = onClick,
         modifier = Modifier.systemBarsPadding()
@@ -263,11 +452,13 @@ fun MyLocationFab(onClick: () -> Unit) { // ui that handles the location tab
 }
 
 @Composable
-fun PermissionCard(modifier: Modifier) { // permission check for location services
+// function for the location services permission
+fun PermissionCard(modifier: Modifier) { 
     Card(
         modifier = modifier.padding(32.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
     ) {
+        @Suppress("DEPRECATION")
         Text(
             text = "Location permission is required to show your position on the map.",
             modifier = Modifier.padding(16.dp),
@@ -276,7 +467,7 @@ fun PermissionCard(modifier: Modifier) { // permission check for location servic
     }
 }
 
-// the logic to fetch user location, camera animations
+// fetch user location logic
 suspend fun fetchLocation(
     client: FusedLocationProviderClient,
     cameraState: CameraPositionState,
@@ -304,7 +495,7 @@ suspend fun resetCameraToCampus(cameraState: CameraPositionState) {
     cameraState.animate(CameraUpdateFactory.newLatLngZoom(CSUCI_CENTER, 17f))
 }
 
-// move to a certain landmark when searched or clicked
+// move to a certain landmark
 suspend fun moveToLandmark(cameraState: CameraPositionState, landmark: LatLng) {
     cameraState.animate(CameraUpdateFactory.newLatLngZoom(landmark, 18f))
 }
@@ -312,9 +503,9 @@ suspend fun moveToLandmark(cameraState: CameraPositionState, landmark: LatLng) {
 /**
  * Quick jump to Bell Tower
  */
-suspend fun jumpToBellTower(cameraState: CameraPositionState) = moveToLandmark(cameraState, BELL_TOWER)
+suspend fun jumpToBellTower(cameraState: CameraPositionState) = moveToLandmark(cameraState, campusLocations[0].position)
 
 /**
  * Quick jump to Broome Library
  */
-suspend fun jumpToLibrary(cameraState: CameraPositionState) = moveToLandmark(cameraState, BROOME_LIBRARY)
+suspend fun jumpToLibrary(cameraState: CameraPositionState) = moveToLandmark(cameraState, campusLocations[1].position)
