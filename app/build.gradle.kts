@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.sprint1homeui"
+    namespace = "com.example.cicompanion"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -17,7 +17,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.sprint1homeui"
+        applicationId = "com.example.cicompanion"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
