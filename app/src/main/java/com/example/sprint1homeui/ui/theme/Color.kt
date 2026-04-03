@@ -22,5 +22,18 @@ val TealAccent = Color(0xFF00ACC1)
 val YellowAccent = Color(0xFFFFB300)
 
 //Background Colors
-val AppBackground = Color(0xFFF0F0F0)
+val AppBackground = Color(0xFFFFF5EF)
 val ContentBlack = Color(0xFF000000)
+
+//bottom nav bar color
+val NavBackground = Color(0xFFFFFFFF)
+
+
+
+//red, orange, pink gradients for buttons, etc.
+val BrandRedDark = Color(0xFFE9001B)
+val BrandRedLighter = Color(0xFFE9004B)
+val BrandRedLight = Color(0xFFE9002B)
+val BrandOrange = Color(0xFFFF672B)
+val BrandPink = Color(0xFFFB2776)
+val BrandCrimson = Color(0xFFF21631)

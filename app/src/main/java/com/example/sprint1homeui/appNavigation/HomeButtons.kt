@@ -1,2 +1,65 @@
 package com.example.sprint1homeui.appNavigation
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.example.sprint1homeui.ui.Routes
+import com.example.sprint1homeui.ui.theme.*
+
+data class FeatureItem(val route: String, val icon: ImageVector, val label: String)
+
+val featureItems = listOf(
+    FeatureItem(Routes.CALENDAR, Icons.Default.DateRange, "Calendar"),
+    FeatureItem(Routes.STUDY_ROOM, Icons.Default.Build, "Study Room")
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FeatureCard(feature: FeatureItem, onClick: () -> Unit) {
+    val buttonGradient = Brush.linearGradient(
+        colors = listOf(BrandOrange, BrandCrimson, BrandPink)
+    )
+
+    Card(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(110.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(buttonGradient),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = feature.icon,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(30.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = feature.label,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}

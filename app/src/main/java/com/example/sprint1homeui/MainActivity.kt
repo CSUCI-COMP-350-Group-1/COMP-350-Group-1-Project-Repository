@@ -17,18 +17,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,6 +51,14 @@ import com.example.sprint1homeui.studyRoom.LegendItem
 import com.example.sprint1homeui.studyRoom.RoomItem
 import com.example.sprint1homeui.studyRoom.RoomViewModel
 import com.example.sprint1homeui.ui.NavBar
+import com.example.sprint1homeui.appNavigation.DrawerProfileContent
+import com.example.sprint1homeui.appNavigation.TopBar
+import com.example.sprint1homeui.social.NotificationScreen
+import com.example.sprint1homeui.ui.Routes
+import com.example.sprint1homeui.ui.theme.AppBackground
+import com.example.sprint1homeui.ui.theme.BrandRedDark
+import kotlinx.coroutines.launch
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,39 +76,62 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController() // Create navigation controller
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
-    Scaffold(
-        bottomBar = { NavBar(navController) }
-    ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues)) {
-            NavHost(navController = navController, startDestination = "home") {
-                composable("home") {
-                    HomeScreen(navController)
-                }
-                composable("map") {
-                    MapScreen(navController)
-                }
-                composable("calendar") {
-                    CalendarScreen(navController)
-                }
-                // ADDED: for study room
-                composable("studyRoom") {
-                    RoomListScreen(viewModel = viewModel(), navController = navController)
-                }
-                composable("search") {
-                    SearchScreen(navController)
-                }
-                composable("profile") {
-                    ProfileScreen(navController)
+    ModalNavigationDrawer(
+        drawerState =
+            drawerState,
+        drawerContent = {
+            DrawerProfileContent(
+                navController,
+                drawerState,
+                scope)
+        }
+    ){
+        Scaffold(
+            containerColor = AppBackground,
+            topBar = {
+                TopBar(
+                    onHamburgerClick = {
+                        scope.launch{drawerState.open()}},
+                    onNotificationClick = {
+                        navController.navigate("notifications")
+                    }
+                )},
+            bottomBar = { NavBar(navController) }
+        ) { paddingValues ->
+            Box(modifier = Modifier.padding(paddingValues)) {
+                NavHost(navController = navController, startDestination = "home") {
+                    composable(Routes.HOME) {
+                        HomeScreen(navController)
+                    }
+                    composable(Routes.MAP) {
+                        MapScreen(navController)
+                    }
+                    composable(Routes.CALENDAR) {
+                        CalendarScreen(navController)
+                    }
+                    composable(Routes.STUDY_ROOM) {
+                        RoomListScreen(viewModel = viewModel(), navController = navController)
+                    }
+                    composable(Routes.SEARCH) {
+                        SearchScreen(navController)
+                    }
+                    composable(Routes.PROFILE) {
+                        ProfileScreen(navController)
+                    }
+                    composable(Routes.NOTIFICATIONS) {
+                        NotificationScreen(navController)
+
+                    }
                 }
             }
         }
-
     }
-
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/*@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainApp() {
     val navController = rememberNavController()
@@ -119,7 +154,7 @@ fun MainApp() {
             }
         }
     }
-}
+}*/
 
 
 // *****IMPORTANT******
