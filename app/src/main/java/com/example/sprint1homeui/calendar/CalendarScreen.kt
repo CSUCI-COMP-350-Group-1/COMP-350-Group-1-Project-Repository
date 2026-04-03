@@ -76,19 +76,6 @@ fun CalendarScreen(navController: NavHostController) {
                     viewModel = calendarViewModel,
                     onConnectCalendar = ::connectGoogleCalendar
                 )
-
-                // navigation at the bottom
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Button(onClick = { navController.navigate("home") }) {
-                        Text("Back to Home")
-                    }
-                }
             }
         }
     )

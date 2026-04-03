@@ -99,10 +99,7 @@ fun ProfileScreen(navController: NavHostController) {
                     .background(Color(0xFFE0E0E0)), // Light gray background
                 contentAlignment = Alignment.Center
             ) {
-                // probably removable, but leaving for now
-                Button(onClick = { navController.navigate("home") }) {
-                    Text("Back to Home")
-                }
+
             }
         }
     }

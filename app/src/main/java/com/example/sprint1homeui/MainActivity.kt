@@ -189,14 +189,6 @@ fun RoomListScreen(viewModel: RoomViewModel, navController: NavHostController) {
                     }
                 }
             }
-            // ADDED: Home button at the bottom, matching teammate's UI
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = { navController.navigate("home") }, // Change from onBackClicked()
-                modifier = Modifier.padding(bottom = 16.dp)
-            ) {
-                Text("Back to Home")
-            }
         }
     }
 }
