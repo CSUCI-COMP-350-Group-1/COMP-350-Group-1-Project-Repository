@@ -156,17 +156,6 @@ fun MapScreen(navController: NavHostController) {
                     }
                 }
 
-                // ui navigation, has lorenzo's back button here
-                Column(
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(top = 20.dp), // moves the button to the top
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Button(onClick = { navController.navigate("home") }) {
-                        Text("Back to Home")
-                    }
-                }
-
                 // overlaying my location button
                 // location button using a floating action button
                 if (hasLocationPermission) {
