@@ -6,10 +6,12 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -18,7 +20,16 @@ import com.example.sprint1homeui.ui.theme.DarkBackground
 import com.example.sprint1homeui.ui.theme.AppWhite
 import com.example.sprint1homeui.ui.theme.GrayIcon
 
-
+//For easy mapping in other files
+object Routes {
+    const val HOME = "home"
+    const val SEARCH = "search"
+    const val MAP = "map"
+    const val CALENDAR = "calendar"
+    const val STUDY_ROOM = "studyRoom"
+    const val PROFILE = "profile"
+    const val NOTIFICATIONS = "notifications"
+}
 
 @Composable
 fun NavBar(navController: NavHostController) {
@@ -39,14 +50,15 @@ fun NavBar(navController: NavHostController) {
             val isSelected = currentRoute == item.route
 
             NavigationBarItem(
-                icon = { Icon(imageVector = item.icon, contentDescription = item.title) },
-                label = { Text(item.title) },
-                selected = currentRoute == item.route,
+                icon = { Icon(imageVector = item.icon, contentDescription = item.title, tint = if(isSelected) AppWhite else GrayIcon) },
+                label = null,
+                selected = isSelected,
+                colors = NavigationBarItemDefaults.colors(
+                    indicatorColor = Color.Transparent
+                ),
                 onClick = {
                     val currentRoute = navController.currentBackStackEntry?.destination?.route
-
                     val homeRoutes = listOf("home", "map", "calendar", "studyRoom")
-
                     val isOnTab = when (item.route) {
                         "home" -> currentRoute in homeRoutes
                         else -> currentRoute == item.route
