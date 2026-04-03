@@ -82,7 +82,7 @@ private val MAP_STYLE_JSON = """
 """.trimIndent()
 
 // Class is called for filtering services
-enum class LocationType { BUILDING, PARKING, FOOD, AREA }
+enum class LocationType { BUILDING, PARKING, FOOD, AREA, HOUSING }
 
 // we have a few data classes for each campus location
 data class CampusLocation(
@@ -138,6 +138,18 @@ val campusLocations = listOf(
     CampusLocation("Central Mall", LatLng(34.16182005886744, -119.04344776363348), "", LocationType.AREA, Icons.Default.People, Color(0xFF9C27B0)),
     CampusLocation("Potrero Fields", LatLng(34.159887809784415, -119.04743204832411), "", LocationType.AREA, Icons.Default.Park, Color(0xFF9C27B0)),
     CampusLocation("South Quad", LatLng(34.160229605621325, -119.04270063156984), "", LocationType.AREA, Icons.Default.People, Color(0xFF9C27B0)),
+
+    // Housing category, maroon
+    CampusLocation("Santa Cruz Village", LatLng(34.15909088586997, -119.04255249590989), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
+    CampusLocation("Santa Cruz Village D", LatLng(34.16012344365498, -119.04398722341813), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
+    CampusLocation("Santa Cruz Village E", LatLng(34.15991620770629, -119.04397330984331), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
+    CampusLocation("Santa Cruz Village F", LatLng(34.1597406324177, -119.04394896107382), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
+    CampusLocation("Santa Cruz Village G", LatLng(34.15951036919081, -119.04383417401763), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
+    CampusLocation("Santa Cruz Village H", LatLng(34.1592628355215, -119.04385504439146), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
+    CampusLocation("Anacapa Village A", LatLng(34.15935494115949, -119.04437332533838), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
+    CampusLocation("Anacapa Village B", LatLng(34.1597665369933, -119.04473507848517), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
+    CampusLocation("Anacapa Village C", LatLng(34.15958520481026, -119.04532292734869), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
+    CampusLocation("Anacapa Village Commons Building", LatLng(34.159208147754384, -119.04492291184982), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
 
     // Parking Lots, in blue
     CampusLocation("Parking Lot A3", LatLng(34.166606172710715, -119.04703678095836), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
@@ -277,6 +289,14 @@ fun MapScreen(navController: NavHostController) {
                         }
                         item {
                             FilterChip(
+                                selected = filterType == LocationType.HOUSING,
+                                onClick = { filterType = LocationType.HOUSING },
+                                label = { Text("Housing") },
+                                leadingIcon = { Icon(Icons.Default.Home, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                            )
+                        }
+                        item {
+                            FilterChip(
                                 selected = filterType == LocationType.PARKING,
                                 onClick = { filterType = LocationType.PARKING },
                                 label = { Text("Parking") },
@@ -294,7 +314,7 @@ fun MapScreen(navController: NavHostController) {
                 .padding(paddingValues),
             contentAlignment = Alignment.Center
         ) {
-            // Map content
+            // Refactored Map Content
             MapContent(
                 cameraPositionState = cameraPositionState,
                 hasLocationPermission = hasLocationPermission,
@@ -486,11 +506,11 @@ fun MyLocationFab(onClick: () -> Unit) {
 @Composable
 // function for the location services permission
 fun PermissionCard(modifier: Modifier) { 
+    @Suppress("DEPRECATION")
     Card(
         modifier = modifier.padding(32.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
     ) {
-        @Suppress("DEPRECATION")
         Text(
             text = "Location permission is required to show your position on the map.",
             modifier = Modifier.padding(16.dp),
@@ -540,4 +560,4 @@ suspend fun jumpToBellTower(cameraState: CameraPositionState) = moveToLandmark(c
 /**
  * Quick jump to Broome Library
  */
-suspend fun jumpToLibrary(cameraState: CameraPositionState) = moveToLandmark(cameraState, campusLocations[1].position)
+suspend fun jumpToLibrary(cameraState: CameraPositionState) = moveToLandmark(cameraState, campusLocations[3].position)
