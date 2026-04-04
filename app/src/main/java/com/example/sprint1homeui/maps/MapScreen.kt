@@ -36,20 +36,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 // sets the boundaries, preventing user from scrolling away from CSUCI
-// the center default is in the middle of the campus
+// tightened the bounds to stay strictly on the campus area in Camarillo
 private val CSUCI_BOUNDS = LatLngBounds(
-    LatLng(34.155, -119.055), // Southwest corner
-    LatLng(34.170, -119.030)  // Northeast corner
+    LatLng(34.157, -119.050), // Southwest corner
+    LatLng(34.168, -119.035)  // Northeast corner
 )
-private val CSUCI_CENTER = LatLng(34.16222772570257, -119.0435017637274)
+// Middle of CSUCI campus as requested
+private val CSUCI_CENTER = LatLng(34.16174111410685, -119.04342498111538)
 
-// Parking lot descriptions, called here since it's not ethical to copy-paste them for each
+// Parking lot descriptions
 private const val SH_PARKING_DESC = "Student housing parking (only for SH permit holders)"
 private const val GENERAL_PARKING_DESC = "General parking (A, F, E or Visitor permit required)"
 private const val RESTRICTED_PARKING_DESC = "Restricted parking lot (only for R or RV permit holders)"
 
-// Google maps customizations, to get rid of preexisting names and locations on maps
-// Only works like this, since it can't be called with basic classes (because of how google maps works)
+// Google maps customizations to hide preset locations and labels
 private val MAP_STYLE_JSON = """
     [
       {
@@ -82,10 +82,10 @@ private val MAP_STYLE_JSON = """
     ]
 """.trimIndent()
 
-// Class is called for filtering services
+// Location categories for filtering
 enum class LocationType { BUILDING, PARKING, FOOD, AREA, HOUSING }
 
-// we have a few data classes for each campus location
+// Data class for each campus location
 data class CampusLocation(
     val name: String,
     val position: LatLng,
@@ -95,7 +95,7 @@ data class CampusLocation(
     val color: Color
 )
 
-// Campus locations. Goes in list of name, pos, latitude, longitude, description, type, icon, color
+// Master list of all campus locations
 val campusLocations = listOf(
     // Buildings
     CampusLocation("Bell Tower", LatLng(34.16138604361421, -119.0432651672823), "Center of Campus", LocationType.BUILDING, Icons.Default.Business, Color(0xFFD32F2F)),
@@ -113,7 +113,7 @@ val campusLocations = listOf(
     CampusLocation("Del Norte Hall", LatLng(34.163180726190696, -119.04410235004629), "Lecture classrooms", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Madera Hall", LatLng(34.1629335125641, -119.04394147483745), "Lecture classrooms", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Placer Hall", LatLng(34.163344972360754, -119.04300312204607), "Offices of University Police and Parking Services", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Richard R. Rush Hall", LatLng(34.162673963555044, -119.04342008432133), "Houses the University President and other administrative functions for the campus.", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Richard R. Rush Hall", LatLng(34.162673963555044, -119.04342008432133), "Houses the University President and administration.", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Chaparral Hall", LatLng(34.162096255189496, -119.04560917381353), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Ironwood Hall", LatLng(34.16245544107054, -119.04645265103974), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("El Dorado Hall", LatLng(34.16423447296913, -119.04710369220899), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
@@ -121,13 +121,13 @@ val campusLocations = listOf(
     CampusLocation("Yuba Hall", LatLng(34.16407767205871, -119.04109248173509), "Houses the Student Health Center", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Sage Hall", LatLng(34.164167218645936, -119.04222881533492), "The Enrollment Center.", LocationType.BUILDING, Icons.Default.School, Color(0xFF388E3C)),
     CampusLocation("Malibu Hall", LatLng(34.16126160533967, -119.04086506383092), "", LocationType.BUILDING, Icons.Default.School, Color(0xFF388E3C)),
-    CampusLocation("Topanga Hall", LatLng(34.16019137315942, -119.04169333763335), "Serves the Art Program, labs and other art facilities.", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Topanga Hall", LatLng(34.16019137315942, -119.04169333763335), "Art Program facilities and labs.", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Arroyo Hall", LatLng(34.160354318454424, -119.04489629947327), "Wellness and Athletics Office. Recreation Center.", LocationType.BUILDING, Icons.Default.School, Color(0xFF388E3C)),
     CampusLocation("Trinity Hall", LatLng(34.15934671289535, -119.0423644726643), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Lindero Hall", LatLng(34.15956619235504, -119.04141202350661), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Ojai Hall", LatLng(34.16173923354911, -119.04257933412188), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-
-    // Food category, orange
+    
+    // Food category
     CampusLocation("Islands Cafe", LatLng(34.16046259918211, -119.04156950739008), "Dining commons for students and employees.", LocationType.FOOD, Icons.Default.Restaurant, Color(0xFFFF9800)),
     CampusLocation("Coastal Cup", LatLng(34.16517607999232, -119.04492439787398), "A coffee shop inside Gateway Hall.", LocationType.FOOD, Icons.Default.Restaurant, Color(0xFFFF9800)),
     CampusLocation("Mom Wong Kitchen", LatLng(34.162865389467136, -119.03934866185736), "Camarillo’s Premier Chinese Restaurant", LocationType.FOOD, Icons.Default.Restaurant, Color(0xFFFF9800)),
@@ -140,7 +140,7 @@ val campusLocations = listOf(
     CampusLocation("Potrero Fields", LatLng(34.159887809784415, -119.04743204832411), "", LocationType.AREA, Icons.Default.Park, Color(0xFF9C27B0)),
     CampusLocation("South Quad", LatLng(34.160229605621325, -119.04270063156984), "", LocationType.AREA, Icons.Default.People, Color(0xFF9C27B0)),
 
-    // Housing category, maroon
+    // Housing category
     CampusLocation("Santa Cruz Village", LatLng(34.15909088586997, -119.04255249590989), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
     CampusLocation("Santa Cruz Village D", LatLng(34.16012344365498, -119.04398722341813), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
     CampusLocation("Santa Cruz Village E", LatLng(34.15991620770629, -119.04397330984331), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
@@ -152,7 +152,7 @@ val campusLocations = listOf(
     CampusLocation("Anacapa Village C", LatLng(34.15958520481026, -119.04532292734869), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
     CampusLocation("Anacapa Village Commons Building", LatLng(34.159208147754384, -119.04492291184982), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
 
-    // Parking Lots, in blue
+    // Parking Lots
     CampusLocation("Parking Lot A3", LatLng(34.166606172710715, -119.04703678095836), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
     CampusLocation("Parking Lot A4", LatLng(34.164244290933254, -119.04646170905023), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
     CampusLocation("Parking Lot A11", LatLng(34.164126287402695, -119.04786350249398), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
@@ -186,10 +186,11 @@ fun MapScreen(navController: NavHostController) {
     var filterType by remember { mutableStateOf<LocationType?>(null) }
 
     val cameraPositionState = rememberCameraPositionState {
+        // Default camera position set to requested CSUCI center
         position = CameraPosition.fromLatLngZoom(CSUCI_CENTER, 17f)
     }
 
-    // Filter locations based on search, and selected filter type
+    // Filter locations based on search and selected filter type
     val filteredLocations = remember(searchQuery, filterType) {
         val trimmedQuery = searchQuery.trim()
         campusLocations.filter {
@@ -218,7 +219,9 @@ fun MapScreen(navController: NavHostController) {
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasLocationPermission) {
-            fetchLocation(fusedLocationClient, cameraPositionState) { userLocation = it }
+            // Get location for the marker, but don't force a camera move on start
+            // This prevents jumping to emulator default (e.g. Mountain View)
+            fetchLocation(fusedLocationClient, cameraPositionState, shouldAnimate = false) { userLocation = it }
         } else {
             permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
@@ -250,7 +253,7 @@ fun MapScreen(navController: NavHostController) {
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp)
                     )
-                    // Chips on the filter (select buildings, food, etc.)
+                    // Chips on the filter
                     LazyRow(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -315,7 +318,7 @@ fun MapScreen(navController: NavHostController) {
                 .padding(paddingValues),
             contentAlignment = Alignment.Center
         ) {
-            // refactored in this state for readability, since it was very confusing beforehand
+            // content of the map
             MapContent(
                 cameraPositionState = cameraPositionState,
                 hasLocationPermission = hasLocationPermission,
@@ -326,15 +329,14 @@ fun MapScreen(navController: NavHostController) {
                 displayLocations = filteredLocations
             )
 
-            // Using these calls we made, we can call it's settings
-            // Much better than the previous version since it was unreadable
+            // Overlays (location button, indicators)
             MapOverlays(
                 hasLocationPermission = hasLocationPermission,
                 isLoadingLocation = isLoadingLocation,
                 onLocationRequest = {
                     scope.launch {
                         isLoadingLocation = true
-                        fetchLocation(fusedLocationClient, cameraPositionState) {
+                        fetchLocation(fusedLocationClient, cameraPositionState, shouldAnimate = true) {
                             userLocation = it
                             isLoadingLocation = false
                         }
@@ -358,7 +360,7 @@ fun MapContent(
 ) {
     val uiSettings = remember {
         MapUiSettings(
-            myLocationButtonEnabled = false, // Custom back to location button used
+            myLocationButtonEnabled = false,
             zoomControlsEnabled = true,
             compassEnabled = true,
             mapToolbarEnabled = false
@@ -368,8 +370,8 @@ fun MapContent(
     val mapProperties = remember(hasLocationPermission) {
         MapProperties(
             isMyLocationEnabled = hasLocationPermission,
-            latLngBoundsForCameraTarget = CSUCI_BOUNDS, // Strict restriction to campus
-            mapStyleOptions = MapStyleOptions(MAP_STYLE_JSON) // Hides preset locations and labels
+            latLngBoundsForCameraTarget = CSUCI_BOUNDS, // Restrict panning strictly to campus
+            mapStyleOptions = MapStyleOptions(MAP_STYLE_JSON) // Hides preset locations
         )
     }
 
@@ -382,12 +384,12 @@ fun MapContent(
             onMapClick(it)
         }
     ) {
-        // User Location Marker with custom icon
+        // User Location Marker
         if (userLocation != null) {
             UserLocationMarker(userLocation)
         }
 
-        // Show filtered markers (for all filters)
+        // Show filtered markers
         displayLocations.forEach { location ->
             key(location.name) {
                 MarkerComposable(
@@ -404,11 +406,11 @@ fun MapContent(
             }
         }
 
-        // Draw walking path, a straight line
+        // Draw walking path
         if (userLocation != null && selectedDestination != null) {
             Polyline(
                 points = listOf(userLocation, selectedDestination),
-                color = Color(0xFF1A73E8), // a blue line
+                color = Color(0xFF1A73E8),
                 width = 8f,
                 geodesic = true
             )
@@ -424,15 +426,15 @@ fun LandmarkIcon(
 ) {
     Box(
         modifier = Modifier
-            .size(27.dp) // size of the icon
-            .background(color, CircleShape) // we set this individually
-            .padding(4.dp), // padding of icons
+            .size(27.dp)
+            .background(color, CircleShape)
+            .padding(4.dp),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = Color.White, // default, icon is set
+            tint = Color.White,
             modifier = Modifier.size(20.dp)
         )
     }
@@ -442,11 +444,11 @@ fun LandmarkIcon(
 fun UserLocationMarker(position: LatLng) {
     MarkerComposable(
         state = rememberMarkerState(position = position),
-        title = "You are here!" // current location
+        title = "You are here!"
     ) {
         Icon(
             imageVector = Icons.Default.PersonPinCircle,
-            contentDescription = "User Location", // current location
+            contentDescription = "User Location",
             tint = Color.Gray,
             modifier = Modifier.size(36.dp)
         )
@@ -455,7 +457,7 @@ fun UserLocationMarker(position: LatLng) {
     // Accuracy circle
     Circle(
         center = position,
-        radius = 20.0, // size of circle
+        radius = 20.0,
         fillColor = Color.Gray.copy(alpha = 0.2f),
         strokeColor = Color.Gray.copy(alpha = 0.5f),
         strokeWidth = 2f
@@ -463,7 +465,6 @@ fun UserLocationMarker(position: LatLng) {
 }
 
 @Composable
-// overlays, handles icons
 fun MapOverlays(
     hasLocationPermission: Boolean,
     isLoadingLocation: Boolean,
@@ -475,7 +476,6 @@ fun MapOverlays(
                 .align(Alignment.BottomStart)
                 .padding(16.dp)
         ) {
-            // My Location Button
             if (hasLocationPermission) {
                 MyLocationFab(onClick = onLocationRequest)
             }
@@ -492,7 +492,6 @@ fun MapOverlays(
 }
 
 @Composable
-// the custom location button
 fun MyLocationFab(onClick: () -> Unit) {
     FloatingActionButton(
         onClick = onClick,
@@ -506,7 +505,6 @@ fun MyLocationFab(onClick: () -> Unit) {
 }
 
 @Composable
-// function for the location services permission
 fun PermissionCard(modifier: Modifier) {
     @Suppress("DEPRECATION")
     Card(
@@ -525,6 +523,7 @@ fun PermissionCard(modifier: Modifier) {
 suspend fun fetchLocation(
     client: FusedLocationProviderClient,
     cameraState: CameraPositionState,
+    shouldAnimate: Boolean = true,
     onResult: (LatLng) -> Unit
 ) {
     try {
@@ -535,7 +534,10 @@ suspend fun fetchLocation(
         location?.let {
             val latLng = LatLng(it.latitude, it.longitude)
             onResult(latLng)
-            cameraState.animate(CameraUpdateFactory.newLatLngZoom(latLng, 17f))
+            // Only move the camera if requested
+            if (shouldAnimate) {
+                cameraState.animate(CameraUpdateFactory.newLatLngZoom(latLng, 17f))
+            }
         }
     } catch (e: SecurityException) {
         // Handle no permissions
