@@ -49,6 +49,7 @@ private const val GENERAL_PARKING_DESC = "General parking (A, F, E or Visitor pe
 private const val RESTRICTED_PARKING_DESC = "Restricted parking lot (only for R or RV permit holders)"
 
 // Google maps customizations, to get rid of preexisting names and locations on maps
+// Only works like this, since it can't be called with basic classes (because of how google maps works)
 private val MAP_STYLE_JSON = """
     [
       {
@@ -314,7 +315,7 @@ fun MapScreen(navController: NavHostController) {
                 .padding(paddingValues),
             contentAlignment = Alignment.Center
         ) {
-            // Refactored Map Content
+            // refactored in this state for readability, since it was very confusing beforehand
             MapContent(
                 cameraPositionState = cameraPositionState,
                 hasLocationPermission = hasLocationPermission,
@@ -325,7 +326,8 @@ fun MapScreen(navController: NavHostController) {
                 displayLocations = filteredLocations
             )
 
-            // Refactored UI Overlays
+            // Using these calls we made, we can call it's settings
+            // Much better than the previous version since it was unreadable
             MapOverlays(
                 hasLocationPermission = hasLocationPermission,
                 isLoadingLocation = isLoadingLocation,
@@ -367,7 +369,7 @@ fun MapContent(
         MapProperties(
             isMyLocationEnabled = hasLocationPermission,
             latLngBoundsForCameraTarget = CSUCI_BOUNDS, // Strict restriction to campus
-            mapStyleOptions = MapStyleOptions(MAP_STYLE_JSON) // Hides preset POIs and labels
+            mapStyleOptions = MapStyleOptions(MAP_STYLE_JSON) // Hides preset locations and labels
         )
     }
 
@@ -385,7 +387,7 @@ fun MapContent(
             UserLocationMarker(userLocation)
         }
         
-        // Render filtered markers (landmarks and parking lots)
+        // Show filtered markers (for all filters)
         displayLocations.forEach { location ->
             key(location.name) {
                 MarkerComposable(
@@ -542,22 +544,3 @@ suspend fun fetchLocation(
     }
 }
 
-// reset camera to CSUCI center
-suspend fun resetCameraToCampus(cameraState: CameraPositionState) {
-    cameraState.animate(CameraUpdateFactory.newLatLngZoom(CSUCI_CENTER, 17f))
-}
-
-// move to a certain landmark
-suspend fun moveToLandmark(cameraState: CameraPositionState, landmark: LatLng) {
-    cameraState.animate(CameraUpdateFactory.newLatLngZoom(landmark, 18f))
-}
-
-/**
- * Quick jump to Bell Tower
- */
-suspend fun jumpToBellTower(cameraState: CameraPositionState) = moveToLandmark(cameraState, campusLocations[0].position)
-
-/**
- * Quick jump to Broome Library
- */
-suspend fun jumpToLibrary(cameraState: CameraPositionState) = moveToLandmark(cameraState, campusLocations[3].position)
