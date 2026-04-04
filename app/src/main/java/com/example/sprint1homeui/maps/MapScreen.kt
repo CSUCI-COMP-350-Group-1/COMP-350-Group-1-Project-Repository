@@ -36,12 +36,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 // sets the boundaries, preventing user from scrolling away from CSUCI
-// tightened the bounds to stay strictly on the campus area in Camarillo
 private val CSUCI_BOUNDS = LatLngBounds(
     LatLng(34.157, -119.050), // Southwest corner
     LatLng(34.168, -119.035)  // Northeast corner
 )
-// Middle of CSUCI campus as requested
+// Middle of CSUCI
 private val CSUCI_CENTER = LatLng(34.16174111410685, -119.04342498111538)
 
 // Parking lot descriptions
