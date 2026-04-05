@@ -29,6 +29,16 @@ android {
         }
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // Unify team SHA-1 by using the shared keystore file
+            storeFile = file("../keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -36,6 +46,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        debug {
+            // Force debug build to use the shared keystore
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
