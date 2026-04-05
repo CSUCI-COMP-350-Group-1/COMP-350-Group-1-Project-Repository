@@ -43,12 +43,12 @@ private val CSUCI_BOUNDS = LatLngBounds(
 // Middle of CSUCI
 private val CSUCI_CENTER = LatLng(34.16174111410685, -119.04342498111538)
 
-// Parking lot descriptions
+// Parking lot descriptions, called here since it's not ethical to copy-paste them for each
 private const val SH_PARKING_DESC = "Student housing parking (only for SH permit holders)"
 private const val GENERAL_PARKING_DESC = "General parking (A, F, E or Visitor permit required)"
 private const val RESTRICTED_PARKING_DESC = "Restricted parking lot (only for R or RV permit holders)"
 
-// Google maps customizations to hide preset locations and labels
+// Google maps customizations, to get rid of preexisting names and locations on maps
 private val MAP_STYLE_JSON = """
     [
       {
@@ -81,10 +81,10 @@ private val MAP_STYLE_JSON = """
     ]
 """.trimIndent()
 
-// Location categories for filtering
+// Location categories for filtering, called in actual location itself
 enum class LocationType { BUILDING, PARKING, FOOD, AREA, HOUSING }
 
-// Data class for each campus location
+// we have a few data classes for each campus location, customizable
 data class CampusLocation(
     val name: String,
     val position: LatLng,
@@ -94,7 +94,7 @@ data class CampusLocation(
     val color: Color
 )
 
-// Master list of all campus locations
+// List of all campus locations including buildings, food and parking lots
 val campusLocations = listOf(
     // Buildings
     CampusLocation("Bell Tower", LatLng(34.16138604361421, -119.0432651672823), "Center of Campus", LocationType.BUILDING, Icons.Default.Business, Color(0xFFD32F2F)),
@@ -112,7 +112,7 @@ val campusLocations = listOf(
     CampusLocation("Del Norte Hall", LatLng(34.163180726190696, -119.04410235004629), "Lecture classrooms", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Madera Hall", LatLng(34.1629335125641, -119.04394147483745), "Lecture classrooms", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Placer Hall", LatLng(34.163344972360754, -119.04300312204607), "Offices of University Police and Parking Services", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Richard R. Rush Hall", LatLng(34.162673963555044, -119.04342008432133), "Houses the University President and administration.", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Richard R. Rush Hall", LatLng(34.162673963555044, -119.04342008432133), "Houses the University President and other administrative functions for the campus.", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Chaparral Hall", LatLng(34.162096255189496, -119.04560917381353), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Ironwood Hall", LatLng(34.16245544107054, -119.04645265103974), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("El Dorado Hall", LatLng(34.16423447296913, -119.04710369220899), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
@@ -120,13 +120,13 @@ val campusLocations = listOf(
     CampusLocation("Yuba Hall", LatLng(34.16407767205871, -119.04109248173509), "Houses the Student Health Center", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Sage Hall", LatLng(34.164167218645936, -119.04222881533492), "The Enrollment Center.", LocationType.BUILDING, Icons.Default.School, Color(0xFF388E3C)),
     CampusLocation("Malibu Hall", LatLng(34.16126160533967, -119.04086506383092), "", LocationType.BUILDING, Icons.Default.School, Color(0xFF388E3C)),
-    CampusLocation("Topanga Hall", LatLng(34.16019137315942, -119.04169333763335), "Art Program facilities and labs.", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Topanga Hall", LatLng(34.16019137315942, -119.04169333763335), "Serves the Art Program, labs and other art facilities.", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Arroyo Hall", LatLng(34.160354318454424, -119.04489629947327), "Wellness and Athletics Office. Recreation Center.", LocationType.BUILDING, Icons.Default.School, Color(0xFF388E3C)),
     CampusLocation("Trinity Hall", LatLng(34.15934671289535, -119.0423644726643), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Lindero Hall", LatLng(34.15956619235504, -119.04141202350661), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Ojai Hall", LatLng(34.16173923354911, -119.04257933412188), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     
-    // Food category
+    // Food category, orange
     CampusLocation("Islands Cafe", LatLng(34.16046259918211, -119.04156950739008), "Dining commons for students and employees.", LocationType.FOOD, Icons.Default.Restaurant, Color(0xFFFF9800)),
     CampusLocation("Coastal Cup", LatLng(34.16517607999232, -119.04492439787398), "A coffee shop inside Gateway Hall.", LocationType.FOOD, Icons.Default.Restaurant, Color(0xFFFF9800)),
     CampusLocation("Mom Wong Kitchen", LatLng(34.162865389467136, -119.03934866185736), "Camarillo’s Premier Chinese Restaurant", LocationType.FOOD, Icons.Default.Restaurant, Color(0xFFFF9800)),
@@ -139,7 +139,7 @@ val campusLocations = listOf(
     CampusLocation("Potrero Fields", LatLng(34.159887809784415, -119.04743204832411), "", LocationType.AREA, Icons.Default.Park, Color(0xFF9C27B0)),
     CampusLocation("South Quad", LatLng(34.160229605621325, -119.04270063156984), "", LocationType.AREA, Icons.Default.People, Color(0xFF9C27B0)),
 
-    // Housing category
+    // Housing category, maroon
     CampusLocation("Santa Cruz Village", LatLng(34.15909088586997, -119.04255249590989), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
     CampusLocation("Santa Cruz Village D", LatLng(34.16012344365498, -119.04398722341813), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
     CampusLocation("Santa Cruz Village E", LatLng(34.15991620770629, -119.04397330984331), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
@@ -151,7 +151,7 @@ val campusLocations = listOf(
     CampusLocation("Anacapa Village C", LatLng(34.15958520481026, -119.04532292734869), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
     CampusLocation("Anacapa Village Commons Building", LatLng(34.159208147754384, -119.04492291184982), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
 
-    // Parking Lots
+    // Parking Lots, in blue
     CampusLocation("Parking Lot A3", LatLng(34.166606172710715, -119.04703678095836), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
     CampusLocation("Parking Lot A4", LatLng(34.164244290933254, -119.04646170905023), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
     CampusLocation("Parking Lot A11", LatLng(34.164126287402695, -119.04786350249398), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
@@ -448,7 +448,7 @@ fun UserLocationMarker(position: LatLng) {
         Icon(
             imageVector = Icons.Default.PersonPinCircle,
             contentDescription = "User Location",
-            tint = Color.Gray,
+            tint = Color(0xFFE11D48),
             modifier = Modifier.size(36.dp)
         )
     }
@@ -457,8 +457,8 @@ fun UserLocationMarker(position: LatLng) {
     Circle(
         center = position,
         radius = 20.0,
-        fillColor = Color.Gray.copy(alpha = 0.2f),
-        strokeColor = Color.Gray.copy(alpha = 0.5f),
+        fillColor = Color(0xFF1A73E8).copy(alpha = 0.2f),
+        strokeColor = Color(0xFF1A73E8).copy(alpha = 0.5f),
         strokeWidth = 2f
     )
 }
