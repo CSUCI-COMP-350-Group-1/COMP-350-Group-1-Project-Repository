@@ -66,24 +66,3 @@ fun HomeScreen(navController: NavHostController) {
         }
     }
 }
-
-@Composable
-fun ButtonMap(navController: NavHostController) {
-    Button(onClick = { navController.navigate("map") }) {
-        Text("Map")
-    }
-}
-
-@Composable
-fun ButtonCalendar(navController: NavHostController) {
-    Button(onClick = { navController.navigate("calendar") }) {
-        Text("Calendar")
-    }
-}
-
-@Composable
-fun ButtonStudyRoom(navController: NavHostController) {
-    Button(onClick =  { navController.navigate("studyRoom") }) {
-        Text("Study Room")
-    }
-}
