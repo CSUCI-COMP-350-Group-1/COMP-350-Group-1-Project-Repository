@@ -38,17 +38,18 @@ fun CalendarWidget(events: List<CalendarEvent>) {
         color = NavBackground,
         shape = RoundedCornerShape(8.dp)
     ) {
+        //Inner widget
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 20.dp),
+                .padding(horizontal = 10.dp, vertical = 20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             VerticalPager(
                 state = pagerState,
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 20.dp, end = 20.dp),
+                    .padding(start = 10.dp, end = 20.dp),
                 userScrollEnabled = true,
                 horizontalAlignment = Alignment.Start
             ) { page ->
@@ -118,7 +119,6 @@ private fun EventWidgetCard(event: CalendarEvent) {
 
 
 //Dummy data for dev of widget
-
 fun getDummyCalendarEvents(): List<CalendarEvent> {
     val now = ZonedDateTime.now()
     return listOf(
