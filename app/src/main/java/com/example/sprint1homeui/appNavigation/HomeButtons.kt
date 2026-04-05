@@ -4,8 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -22,7 +25,7 @@ data class FeatureItem(val route: String, val icon: ImageVector, val label: Stri
 
 val featureItems = listOf(
     FeatureItem(Routes.CALENDAR, Icons.Default.DateRange, "Calendar"),
-    FeatureItem(Routes.STUDY_ROOM, Icons.Default.Build, "Study Room")
+    FeatureItem(Routes.STUDY_ROOM, Icons.Default.MenuBook, "Study Room")
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
