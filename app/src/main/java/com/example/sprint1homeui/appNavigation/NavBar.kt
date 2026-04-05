@@ -77,27 +77,7 @@ fun NavBar(navController: NavHostController) {
                 colors = NavigationBarItemDefaults.colors(
                     indicatorColor = Color.Transparent
                 ),
-                /*onClick = {
-                    val currentRoute = navController.currentBackStackEntry?.destination?.route
-                    val homeRoutes = listOf("home", "map", "calendar", "studyRoom", "notifications","profile")
-                    val isOnTab = when (item.route) {
-                        "home" -> currentRoute in homeRoutes
-                        else -> currentRoute == item.route
-                    }
 
-                    if (isOnTab) {
-                        navController.popBackStack(item.route, inclusive = false)
-                    } else {
-                        navController.navigate(item.route) {
-                            popUpTo(navController.graph.startDestinationId) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-
-                }*/
                 onClick = {
                     val currentDestination = navController.currentBackStackEntry?.destination?.route
 
