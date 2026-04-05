@@ -12,25 +12,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = CoralRed,
+    onPrimary = WarmWhite,
+    secondary = HotPink,
+    onSecondary = WarmWhite,
+    tertiary = SunsetOrange,
+    onTertiary = WarmWhite,
+    background = WarmPeach,
+    onBackground = Ink,
+    surface = WarmWhite,
+    onSurface = Ink,
+    surfaceVariant = SoftBlush,
+    onSurfaceVariant = Ink,
+    outlineVariant = SoftBorder,
+    errorContainer = ErrorFill,
+    onErrorContainer = Ink
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primary = CoralRed,
+    secondary = HotPink,
+    tertiary = SunsetOrange,
+    background = Ink,
+    surface = ColorFallbackDarkSurface,
+    onSurface = WarmWhite,
+    onBackground = WarmWhite
 )
 
 @Composable
@@ -51,7 +57,7 @@ fun Sprint1HomeUITheme(
     }
 
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
         typography = Typography,
         content = content
     )

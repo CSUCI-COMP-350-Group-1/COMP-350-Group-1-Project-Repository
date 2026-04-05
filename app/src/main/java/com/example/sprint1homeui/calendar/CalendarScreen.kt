@@ -21,62 +21,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
-import com.example.sprint1homeui.calendar.auth.GoogleCalendarAuthManager
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(navController: NavHostController) {
-    val context = LocalContext.current
     val calendarViewModel: CalendarViewModel = viewModel()
-    val authManager = GoogleCalendarAuthManager(context)
-
-    val authorizationLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-            authManager.extractAccessToken(result.data)
-                .onSuccess { token ->
-                    calendarViewModel.onAuthorized(token)
-                }
-                .onFailure { error ->
-                    calendarViewModel.setError(error.message ?: "Authorization failed.")
-                }
-        }
-
-    fun connectGoogleCalendar() {
-        authManager.requestCalendarAccess(
-            onResolutionRequired = { pendingIntent ->
-                authorizationLauncher.launch(
-                    IntentSenderRequest.Builder(pendingIntent.intentSender).build()
-                )
-            },
-            onAccessToken = { token ->
-                calendarViewModel.onAuthorized(token)
-            },
-            onError = { message ->
-                calendarViewModel.setError(message)
-            }
-        )
-    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Calendar", fontSize = 20.sp) }
             )
-        },
-        content = { paddingValues ->
-            // Main content
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues), // apply scaffold padding
-                contentAlignment = Alignment.Center
-            ) {
-                // calender ui
-                CalendarApp(
-                    viewModel = calendarViewModel,
-                    onConnectCalendar = ::connectGoogleCalendar
-                )
-            }
         }
-    )
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            contentAlignment = Alignment.Center
+        ) {
+            CalendarApp(viewModel = calendarViewModel)
+        }
+    }
 }
