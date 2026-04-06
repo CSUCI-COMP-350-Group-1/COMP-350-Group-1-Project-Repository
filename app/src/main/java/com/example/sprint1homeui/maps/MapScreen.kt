@@ -205,7 +205,7 @@ fun MapScreen(navController: NavHostController) {
         hasLocationPermission = isGranted
         if (isGranted) {
             scope.launch {
-                fetchLocation(fusedLocationClient, cameraPositionState) { userLocation = it }
+                fetchLocation(fusedLocationProviderClient = fusedLocationClient, cameraState = cameraPositionState) { userLocation = it }
             }
         }
     }
@@ -219,8 +219,7 @@ fun MapScreen(navController: NavHostController) {
 
         if (hasLocationPermission) {
             // Get location for the marker, but don't force a camera move on start
-            // This prevents jumping to emulator default (e.g. Mountain View)
-            fetchLocation(fusedLocationClient, cameraPositionState, shouldAnimate = false) { userLocation = it }
+            fetchLocation(fusedLocationProviderClient = fusedLocationClient, cameraState = cameraPositionState, shouldAnimate = false) { userLocation = it }
         } else {
             permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
@@ -335,7 +334,7 @@ fun MapScreen(navController: NavHostController) {
                 onLocationRequest = {
                     scope.launch {
                         isLoadingLocation = true
-                        fetchLocation(fusedLocationClient, cameraPositionState, shouldAnimate = true) {
+                        fetchLocation(fusedLocationProviderClient = fusedLocationClient, cameraState = cameraPositionState, shouldAnimate = true) {
                             userLocation = it
                             isLoadingLocation = false
                         }
@@ -369,7 +368,8 @@ fun MapContent(
     val mapProperties = remember(hasLocationPermission) {
         MapProperties(
             isMyLocationEnabled = false, // Disable default blue dot to use our custom red one
-            latLngBoundsForCameraTarget = CSUCI_BOUNDS, minZoomPreference = 16f, // Restrict panning strictly to campus
+            latLngBoundsForCameraTarget = CSUCI_BOUNDS, 
+            minZoomPreference = 15f, // Limits how much the user can zoom out
             mapStyleOptions = MapStyleOptions(MAP_STYLE_JSON) // Hides preset locations
         )
     }
@@ -446,14 +446,14 @@ fun UserLocationMarker(position: LatLng) {
         title = "You are here!"
     ) {
         Box(contentAlignment = Alignment.Center) {
-            // Reverted pointer to Gray as requested
+            // pointer reverted to Gray
             Icon(
                 imageVector = Icons.Default.PersonPinCircle,
                 contentDescription = "User Location",
                 tint = Color.Gray,
                 modifier = Modifier.size(36.dp)
             )
-            // Actual solid circle in E11D48FF
+            // Actual solid circle
             Box(
                 modifier = Modifier
                     .size(10.dp)
@@ -463,7 +463,7 @@ fun UserLocationMarker(position: LatLng) {
         }
     }
 
-    // Accuracy circle: Back to original blue
+    // Accuracy circle
     Circle(
         center = position,
         radius = 20.0,
@@ -530,15 +530,15 @@ fun PermissionCard(modifier: Modifier) {
 
 // fetch user location logic
 suspend fun fetchLocation(
-    client: FusedLocationProviderClient,
+    fusedLocationProviderClient: FusedLocationProviderClient,
     cameraState: CameraPositionState,
     shouldAnimate: Boolean = true,
     onResult: (LatLng) -> Unit
 ) {
     try {
-        var location = client.lastLocation.await()
+        var location = fusedLocationProviderClient.lastLocation.await()
         if (location == null || location.accuracy > 100) {
-            location = client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null).await()
+            location = fusedLocationProviderClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null).await()
         }
         location?.let {
             val latLng = LatLng(it.latitude, it.longitude)
