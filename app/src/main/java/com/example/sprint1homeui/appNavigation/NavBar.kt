@@ -29,7 +29,7 @@ fun NavBar(navController: NavHostController) {
         items.forEach { item ->
             NavigationBarItem(
                 icon = { Icon(imageVector = item.icon, contentDescription = item.title) },
-                label = { Text(item.title) },
+                /* label = { Text(item.title) }, */
                 selected = currentRoute == item.route,
                 onClick = {
                     val currentRoute = navController.currentBackStackEntry?.destination?.route

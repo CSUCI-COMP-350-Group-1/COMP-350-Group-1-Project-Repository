@@ -36,7 +36,10 @@ import java.util.*
 
 /** Shows the full calendar screen and routes state into smaller UI pieces. */
 @Composable
-fun CalendarApp(viewModel: CalendarViewModel) {
+fun CalendarApp(
+    viewModel: CalendarViewModel,
+    modifier: Modifier = Modifier
+) {
     val selectedDateEvents = remember(viewModel.events, viewModel.selectedDate) {
         buildSelectedDateEvents(viewModel.events, viewModel.selectedDate)
     }
@@ -44,34 +47,30 @@ fun CalendarApp(viewModel: CalendarViewModel) {
     val eventCountByDate = remember(viewModel.events) {
         buildEventCountMap(viewModel.events)
     }
-
-    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
-        PullToRefreshContainer(
-            isRefreshing = viewModel.isLoading,
-            onRefresh = viewModel::loadOnlineCalendar,
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-        ) {
-            CalendarScreenBody(
-                mode = viewModel.mode,
-                visibleMonth = viewModel.visibleMonth,
-                selectedDate = viewModel.selectedDate,
-                selectedDateEvents = selectedDateEvents,
-                eventCountByDate = eventCountByDate,
-                totalEventCount = viewModel.events.size,
-                errorMessage = viewModel.errorMessage,
-                onDismissError = viewModel::clearError,
-                onModeSelected = viewModel::updateMode,
-                onDateSelected = viewModel::onDateSelected,
-                onPreviousDay = viewModel::previousDay,
-                onNextDay = viewModel::nextDay,
-                onPreviousWeek = viewModel::previousWeek,
-                onNextWeek = viewModel::nextWeek,
-                onPreviousMonth = viewModel::previousMonth,
-                onNextMonth = viewModel::nextMonth
-            )
-        }
+    
+    PullToRefreshContainer(
+        isRefreshing = viewModel.isLoading,
+        onRefresh = viewModel::loadOnlineCalendar,
+        modifier = modifier
+    ) {
+        CalendarScreenBody(
+            mode = viewModel.mode,
+            visibleMonth = viewModel.visibleMonth,
+            selectedDate = viewModel.selectedDate,
+            selectedDateEvents = selectedDateEvents,
+            eventCountByDate = eventCountByDate,
+            totalEventCount = viewModel.events.size,
+            errorMessage = viewModel.errorMessage,
+            onDismissError = viewModel::clearError,
+            onModeSelected = viewModel::updateMode,
+            onDateSelected = viewModel::onDateSelected,
+            onPreviousDay = viewModel::previousDay,
+            onNextDay = viewModel::nextDay,
+            onPreviousWeek = viewModel::previousWeek,
+            onNextWeek = viewModel::nextWeek,
+            onPreviousMonth = viewModel::previousMonth,
+            onNextMonth = viewModel::nextMonth
+        )
     }
 }
 
