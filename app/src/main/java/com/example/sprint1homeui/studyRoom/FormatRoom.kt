@@ -37,7 +37,7 @@ fun RoomItem(room: StudyRoom) {
         ,
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) { //Background here changes center of study room card
 
             // Display room name
             Text(text = room.name, style = MaterialTheme.typography.titleLarge)
@@ -46,7 +46,7 @@ fun RoomItem(room: StudyRoom) {
             // Display row of time slots
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 2.dp)
+                contentPadding = PaddingValues(horizontal = 2.dp), //background for center card
             ) {
                 items(room.slots) { slot ->
                     // Format the time from 24h to 12h time
