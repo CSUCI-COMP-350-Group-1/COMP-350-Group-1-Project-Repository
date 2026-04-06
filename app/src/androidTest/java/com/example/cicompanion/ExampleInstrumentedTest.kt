@@ -1,4 +1,4 @@
-package com.example.sprint1homeui
+package com.example.cicompanion
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4

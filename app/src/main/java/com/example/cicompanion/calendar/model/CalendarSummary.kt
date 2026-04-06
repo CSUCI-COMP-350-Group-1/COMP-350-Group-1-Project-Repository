@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.calendar.model
+package com.example.cicompanion.calendar.model
 
 data class CalendarSummary(
     val id: String,

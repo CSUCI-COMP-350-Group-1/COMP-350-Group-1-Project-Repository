@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.calendar
+package com.example.cicompanion.calendar
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,8 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.sprint1homeui.calendar.model.CalendarEvent
-import com.example.sprint1homeui.calendar.model.EventDraft
+import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.calendar.model.EventDraft
 import java.time.*
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle

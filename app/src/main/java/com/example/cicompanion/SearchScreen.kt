@@ -1,4 +1,4 @@
-package com.example.sprint1homeui
+package com.example.cicompanion
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import com.example.sprint1homeui.ui.theme.Sprint1HomeUITheme
+import com.example.cicompanion.ui.theme.CICompanionTheme
 
 data class AppFeature(
     val name: String,
@@ -131,7 +131,7 @@ fun SearchResultItem(feature: AppFeature, onClick: () -> Unit) {
 @Preview(showBackground = true)
 @Composable
 fun SearchScreenPreview() {
-    Sprint1HomeUITheme {
+    CICompanionTheme {
         val navController = rememberNavController()
         SearchScreen(navController = navController)
     }

@@ -1,15 +1,15 @@
-package com.example.sprint1homeui.calendar
+package com.example.cicompanion.calendar
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.sprint1homeui.calendar.data.repository.CalendarRepository
-import com.example.sprint1homeui.calendar.model.CalendarEvent
-import com.example.sprint1homeui.calendar.model.CalendarSummary
-import com.example.sprint1homeui.calendar.model.EventDraft
-import com.example.sprint1homeui.calendar.model.EventsPage
+import com.example.cicompanion.calendar.data.repository.CalendarRepository
+import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.calendar.model.CalendarSummary
+import com.example.cicompanion.calendar.model.EventDraft
+import com.example.cicompanion.calendar.model.EventsPage
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth

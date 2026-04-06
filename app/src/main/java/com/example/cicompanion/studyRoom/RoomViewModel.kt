@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.studyRoom
+package com.example.cicompanion.studyRoom
 
 // Imports for VIEWMODEL
 import androidx.lifecycle.ViewModel

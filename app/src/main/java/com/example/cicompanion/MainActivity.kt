@@ -1,4 +1,4 @@
-package com.example.sprint1homeui
+package com.example.cicompanion
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -8,14 +8,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
@@ -34,26 +31,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.sprint1homeui.ui.theme.Sprint1HomeUITheme
+import com.example.cicompanion.ui.theme.CICompanionTheme
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.sprint1homeui.calendar.CalendarScreen
-import com.example.sprint1homeui.home.HomeScreen
-import com.example.sprint1homeui.maps.MapScreen
-import com.example.sprint1homeui.social.ProfileScreen
-import com.example.sprint1homeui.studyRoom.LegendItem
-import com.example.sprint1homeui.studyRoom.RoomItem
-import com.example.sprint1homeui.studyRoom.RoomViewModel
-import com.example.sprint1homeui.ui.NavBar
+import com.example.cicompanion.calendar.CalendarScreen
+import com.example.cicompanion.home.HomeScreen
+import com.example.cicompanion.maps.MapScreen
+import com.example.cicompanion.social.ProfileScreen
+import com.example.cicompanion.studyRoom.LegendItem
+import com.example.cicompanion.studyRoom.RoomItem
+import com.example.cicompanion.studyRoom.RoomViewModel
+import com.example.cicompanion.ui.NavBar
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            Sprint1HomeUITheme {
+            CICompanionTheme {
                 AppNavigation()
             }
         }

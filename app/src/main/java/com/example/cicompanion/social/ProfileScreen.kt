@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.social
+package com.example.cicompanion.social
 
 // unused imports are for the yet-to-be-implemented, fleshed-out top bar
 import androidx.compose.foundation.background
@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -29,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import com.example.sprint1homeui.ui.theme.Sprint1HomeUITheme
+import com.example.cicompanion.ui.theme.CICompanionTheme
 import androidx.compose.material3.TopAppBar
 
 
@@ -169,7 +168,7 @@ fun ProfileHeader(modifier: Modifier = Modifier) {
 @Preview(showBackground = true)
 @Composable
 fun ProfileScreenPreview() {
-    Sprint1HomeUITheme {
+    CICompanionTheme() {
         val navController = rememberNavController()
         ProfileScreen(navController = navController)
     }

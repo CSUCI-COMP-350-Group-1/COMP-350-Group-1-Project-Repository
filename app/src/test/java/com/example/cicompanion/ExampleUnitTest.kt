@@ -1,4 +1,4 @@
-package com.example.sprint1homeui
+package com.example.cicompanion
 
 import org.junit.Test
 

@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.calendar.auth
+package com.example.cicompanion.calendar.auth
 
 import android.app.PendingIntent
 import android.content.Context

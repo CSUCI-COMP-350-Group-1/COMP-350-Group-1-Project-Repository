@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.home
+package com.example.cicompanion.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box

@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.ui
+package com.example.cicompanion.ui
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*

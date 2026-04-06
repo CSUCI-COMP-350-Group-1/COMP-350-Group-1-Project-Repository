@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.ui.theme
+package com.example.cicompanion.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

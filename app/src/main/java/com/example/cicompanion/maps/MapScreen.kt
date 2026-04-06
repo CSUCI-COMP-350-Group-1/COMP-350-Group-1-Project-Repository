@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.maps
+package com.example.cicompanion.maps
 
 import android.Manifest
 import android.R

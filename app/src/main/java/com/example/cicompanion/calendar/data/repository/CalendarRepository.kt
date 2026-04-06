@@ -1,9 +1,9 @@
-package com.example.sprint1homeui.calendar.data.repository
+package com.example.cicompanion.calendar.data.repository
 
-import com.example.sprint1homeui.calendar.model.CalendarSummary
-import com.example.sprint1homeui.calendar.model.EventDraft
-import com.example.sprint1homeui.calendar.model.EventsPage
-import com.example.sprint1homeui.calendar.data.api.CalendarApiService
+import com.example.cicompanion.calendar.model.CalendarSummary
+import com.example.cicompanion.calendar.model.EventDraft
+import com.example.cicompanion.calendar.model.EventsPage
+import com.example.cicompanion.calendar.data.api.CalendarApiService
 import java.time.YearMonth
 import java.time.ZoneId
 
