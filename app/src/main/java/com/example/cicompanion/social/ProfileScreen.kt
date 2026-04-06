@@ -96,8 +96,9 @@ fun ProfileScreen(navController: NavHostController) {
         ) {
             // Pass the current user's name and email to the header
             ProfileHeader(
-                name = currentUser?.displayName ?: "Guest",
-                email = currentUser?.email ?: "Not signed in",
+                userDisplayName = currentUser?.displayName ?: "User Name",
+                userEmail = currentUser?.email ?: "user@example.com",
+                photoUrl = currentUser?.photoUrl?.toString(),
                 modifier = Modifier
                     .padding(horizontal = 24.dp, vertical = 32.dp)
                     .fillMaxWidth()
@@ -137,8 +138,9 @@ fun ProfileScreen(navController: NavHostController) {
 
 @Composable
 fun ProfileHeader(
-    name: String,
-    email: String,
+    userDisplayName: String,
+    userEmail: String,
+    photoUrl: String?,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -154,24 +156,26 @@ fun ProfileHeader(
             contentAlignment = Alignment.Center
         ) {
             // Silhouette
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF6750A4)) // Darker purple
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Box(
-                    modifier = Modifier
-                        .size(80.dp, 40.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF6750A4))
-                )
+            if (photoUrl != null) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF6750A4)) // Darker purple
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp, 40.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF6750A4))
+                    )
+                }
             }
         }
 
@@ -179,13 +183,13 @@ fun ProfileHeader(
 
         Column {
             Text(
-                text = name,
+                text = userDisplayName,
                 fontWeight = FontWeight.Bold,
                 fontSize = 24.sp,
                 color = Color.Black
             )
             Text(
-                text = email,
+                text = userEmail,
                 color = Color.Gray,
                 fontSize = 16.sp
             )
