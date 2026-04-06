@@ -19,16 +19,29 @@ import com.example.sprint1homeui.ui.theme.BrandRedLighter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
+fun screenTitleForRoute(route: String?): String {
+    return when (route) {
+        Routes.HOME -> "Home"
+        Routes.SEARCH -> "Search"
+        Routes.MAP -> "Map"
+        Routes.CALENDAR -> "Calendar"
+        Routes.STUDY_ROOM -> "Study Room"
+        Routes.PROFILE -> "Profile"
+        Routes.NOTIFICATIONS -> "Notifications"
+        else -> "CI Companion"
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TopBar(onHamburgerClick: () -> Unit, onNotificationClick: () -> Unit) {
+fun TopBar(title: String, onHamburgerClick: () -> Unit, onNotificationClick: () -> Unit) {
     val topBarGradient = Brush.linearGradient(
         colors = listOf(BrandRedLighter, BrandRedDark)
     )
 
     Box(modifier = Modifier.background(topBarGradient)) {
         CenterAlignedTopAppBar(
-            title = { Text("CI Companion", color = Color.White) },
+            title = { Text(title, color = Color.White) },
             colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                 containerColor = Color.Transparent,
                 navigationIconContentColor = Color.White,

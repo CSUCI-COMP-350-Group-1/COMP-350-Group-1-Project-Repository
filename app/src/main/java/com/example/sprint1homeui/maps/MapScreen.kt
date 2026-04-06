@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
+import com.example.sprint1homeui.ui.theme.AppBackground
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -116,11 +117,7 @@ fun MapScreen(navController: NavHostController) {
 
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Map", fontSize = 20.sp) }
-            )
-        },
+        containerColor = AppBackground,
         content = { paddingValues ->
             // Main content
             Box(

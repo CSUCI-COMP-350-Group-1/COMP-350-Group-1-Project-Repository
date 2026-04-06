@@ -79,6 +79,8 @@ dependencies {
     // Calendar implementation
     implementation("com.google.android.gms:play-services-auth:21.5.1")
     implementation(libs.androidx.ui.graphics)
+    implementation(libs.androidx.compose.ui.text)
+    implementation(libs.places)
 
     // core library needed
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")

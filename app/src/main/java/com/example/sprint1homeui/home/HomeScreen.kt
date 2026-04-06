@@ -16,18 +16,30 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.sprint1homeui.appNavigation.FeatureCard
 import com.example.sprint1homeui.appNavigation.featureItems
+import com.example.sprint1homeui.calendar.CalendarViewModel
+import com.example.sprint1homeui.calendar.model.CalendarEvent
 import com.example.sprint1homeui.ui.theme.AppBackground
+import java.time.ZonedDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavHostController) {
+
+    val calendarViewModel: CalendarViewModel = viewModel()
+
+    val widgetEvents = remember(calendarViewModel.events) {
+        upcomingHomeWidgetEvents(calendarViewModel.events)
+    }
+
 
 
     Column(
@@ -37,7 +49,10 @@ fun HomeScreen(navController: NavHostController) {
             .padding(top = 16.dp)
     ) {
         //dummy events for widget
-        CalendarWidget(events = getDummyCalendarEvents())
+        CalendarWidget(
+            events = widgetEvents,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
 
         Text(
             text = "Quick Access",
@@ -65,4 +80,13 @@ fun HomeScreen(navController: NavHostController) {
             }
         }
     }
+}
+
+private fun upcomingHomeWidgetEvents(events: List<CalendarEvent>): List<CalendarEvent> {
+    val now = ZonedDateTime.now()
+
+    return events
+        .filter { event -> event.endExclusive.isAfter(now) }
+        .sortedBy { event -> event.start }
+        .take(3)
 }

@@ -1,22 +1,30 @@
 package com.example.sprint1homeui.calendar
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.sprint1homeui.calendar.model.CalendarEvent
-import com.example.sprint1homeui.calendar.model.EventDraft
+import com.example.sprint1homeui.ui.theme.AppBackground
+import com.example.sprint1homeui.ui.theme.BrandCrimson
+import com.example.sprint1homeui.ui.theme.BrandOrange
+import com.example.sprint1homeui.ui.theme.BrandPink
+import com.example.sprint1homeui.ui.theme.GrayIcon
 import java.time.*
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -24,101 +32,372 @@ import java.time.temporal.TemporalAdjusters
 import java.time.temporal.WeekFields
 import java.util.*
 
+/** Shows the full calendar screen and routes state into smaller UI pieces. */
 @Composable
-fun CalendarApp(
-    viewModel: CalendarViewModel,
-    onConnectCalendar: () -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun CalendarApp(viewModel: CalendarViewModel) {
     val selectedDateEvents = remember(viewModel.events, viewModel.selectedDate) {
-        viewModel.events
-            .filter { it.occursOn(viewModel.selectedDate) }
-            .sortedBy { it.start }
+        buildSelectedDateEvents(viewModel.events, viewModel.selectedDate)
     }
 
     val eventCountByDate = remember(viewModel.events) {
         buildEventCountMap(viewModel.events)
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        Text(
-            text = "Google Calendar Viewer",
-            style = MaterialTheme.typography.headlineSmall
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (viewModel.isLoading) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Loading…")
-        }
-
-        viewModel.errorMessage?.let { message ->
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.error
+    Scaffold(
+        containerColor = AppBackground
+    ) { padding ->
+        PullToRefreshContainer(
+            isRefreshing = viewModel.isLoading,
+            onRefresh = viewModel::loadOnlineCalendar,
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+        ) {
+            CalendarScreenBody(
+                mode = viewModel.mode,
+                visibleMonth = viewModel.visibleMonth,
+                selectedDate = viewModel.selectedDate,
+                selectedDateEvents = selectedDateEvents,
+                eventCountByDate = eventCountByDate,
+                totalEventCount = viewModel.events.size,
+                errorMessage = viewModel.errorMessage,
+                onDismissError = viewModel::clearError,
+                onModeSelected = viewModel::updateMode,
+                onDateSelected = viewModel::onDateSelected,
+                onPreviousDay = viewModel::previousDay,
+                onNextDay = viewModel::nextDay,
+                onPreviousWeek = viewModel::previousWeek,
+                onNextWeek = viewModel::nextWeek,
+                onPreviousMonth = viewModel::previousMonth,
+                onNextMonth = viewModel::nextMonth
             )
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(12.dp))
+/** Shows the scrollable page content that sits inside pull-to-refresh. */
+@Composable
+private fun CalendarScreenBody(
+    mode: CalendarMode,
+    visibleMonth: YearMonth,
+    selectedDate: LocalDate,
+    selectedDateEvents: List<CalendarEvent>,
+    eventCountByDate: Map<LocalDate, Int>,
+    totalEventCount: Int,
+    errorMessage: String?,
+    onDismissError: () -> Unit,
+    onModeSelected: (CalendarMode) -> Unit,
+    onDateSelected: (LocalDate) -> Unit,
+    onPreviousDay: () -> Unit,
+    onNextDay: () -> Unit,
+    onPreviousWeek: () -> Unit,
+    onNextWeek: () -> Unit,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit
+) {
+    ScrollablePage(
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp)
+    ) {
+        Spacer(modifier = Modifier.height(4.dp))
 
-        TabRow(selectedTabIndex = viewModel.mode.ordinal) {
-            CalendarMode.entries.forEach { tab ->
-                Tab(
-                    selected = viewModel.mode == tab,
-                    onClick = { viewModel.updateMode(tab) },
-                    text = { Text(tab.name) }
+        CalendarHeroHeader(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            totalEventCount = totalEventCount,
+            selectedDate = selectedDate,
+            mode = mode,
+            activeDateCount = eventCountByDate.size
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            errorMessage?.let { message ->
+                ErrorMessage(
+                    message = message,
+                    onDismiss = onDismissError
                 )
             }
-        }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Box(modifier = Modifier.weight(1f)) {
-            when (viewModel.mode) {
-                CalendarMode.DAY -> DayView(
-                    selectedDate = viewModel.selectedDate,
-                    events = selectedDateEvents,
-                    onPreviousDay = viewModel::previousDay,
-                    onNextDay = viewModel::nextDay
-                )
-
-                CalendarMode.WEEK -> WeekView(
-                    selectedDate = viewModel.selectedDate,
-                    eventCountByDate = eventCountByDate,
-                    eventsForSelectedDate = selectedDateEvents,
-                    onDateSelected = viewModel::onDateSelected,
-                    onPreviousWeek = viewModel::previousWeek,
-                    onNextWeek = viewModel::nextWeek
-                )
-
-                CalendarMode.MONTH -> MonthView(
-                    visibleMonth = viewModel.visibleMonth,
-                    selectedDate = viewModel.selectedDate,
-                    eventCountByDate = eventCountByDate,
-                    selectedDateEvents = selectedDateEvents,
-                    onDateSelected = viewModel::onDateSelected,
-                    onPreviousMonth = viewModel::previousMonth,
-                    onNextMonth = viewModel::nextMonth
+            SectionCard {
+                SectionHeading(text = "Choose a view")
+                Spacer(modifier = Modifier.height(12.dp))
+                CalendarModeTabs(
+                    selectedMode = mode,
+                    onModeSelected = onModeSelected
                 )
             }
+
+            CalendarContent(
+                mode = mode,
+                visibleMonth = visibleMonth,
+                selectedDate = selectedDate,
+                selectedDateEvents = selectedDateEvents,
+                eventCountByDate = eventCountByDate,
+                onDateSelected = onDateSelected,
+                onPreviousDay = onPreviousDay,
+                onNextDay = onNextDay,
+                onPreviousWeek = onPreviousWeek,
+                onNextWeek = onNextWeek,
+                onPreviousMonth = onPreviousMonth,
+                onNextMonth = onNextMonth
+            )
         }
     }
+}
 
-    if (viewModel.showCreateDialog) {
-        CreateEventDialog(
-            initialDate = viewModel.selectedDate,
-            onDismiss = { viewModel.closeCreateDialog() },
-            onCreate = { draft -> viewModel.createEvent(draft) }
+/** Shows the large top header that sets the new visual style for the screen. */
+@Composable
+private fun CalendarHeroHeader(
+    modifier: Modifier = Modifier, // CHANGED
+    totalEventCount: Int,
+    selectedDate: LocalDate,
+    mode: CalendarMode,
+    activeDateCount: Int
+) {
+    val subtitleFormatter = remember { DateTimeFormatter.ofPattern("MMMM yyyy") }
+
+    Box(
+        modifier = modifier // CHANGED
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        BrandOrange,
+                        BrandCrimson,
+                        BrandPink
+                    )
+                )
+            )
+            .padding(20.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(
+                text = "CSUCI Calendar",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+
+            Text(
+                text = selectedDate.format(subtitleFormatter),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
+            )
+
+            StatsCard(
+                totalEventCount = totalEventCount,
+                activeDateCount = activeDateCount,
+                mode = mode
+            )
+        }
+    }
+}
+
+/** Shows the small summary card that sits inside the hero header. */
+@Composable
+private fun StatsCard(
+    totalEventCount: Int,
+    activeDateCount: Int,
+    mode: CalendarMode
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = 0.18f))
+            .padding(horizontal = 12.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        HeroStat(
+            label = "Events",
+            value = totalEventCount.toString(),
+            modifier = Modifier.weight(1f)
+        )
+
+        HeroStat(
+            label = "Active Days",
+            value = activeDateCount.toString(),
+            modifier = Modifier.weight(1f)
+        )
+
+        HeroStat(
+            label = "View",
+            value = mode.name,
+            modifier = Modifier.weight(1f)
         )
     }
 }
 
+/** Shows one stat item in the hero summary card. */
+@Composable
+private fun HeroStat(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
+        )
+
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onPrimary,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+/** Shows the current error and a button that clears it. */
+@Composable
+private fun ErrorMessage(
+    message: String,
+    onDismiss: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Text(
+                text = "Dismiss",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onDismiss)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            )
+        }
+    }
+}
+
+/** Shows the Day, Week, and Month tabs as rounded cards. */
+@Composable
+private fun CalendarModeTabs(
+    selectedMode: CalendarMode,
+    onModeSelected: (CalendarMode) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        CalendarMode.entries.forEach { mode ->
+            ModeCard(
+                mode = mode,
+                isSelected = selectedMode == mode,
+                modifier = Modifier.weight(1f),
+                onClick = { onModeSelected(mode) }
+            )
+        }
+    }
+}
+
+/** Shows one clickable card used to change the current calendar mode. */
+@Composable
+private fun ModeCard(
+    mode: CalendarMode,
+    isSelected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val accentColor = modeAccentColor(mode)
+    val containerColor = if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceVariant
+    val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else accentColor
+    val borderColor = if (isSelected) Color.Transparent else accentColor.copy(alpha = 0.25f)
+
+    Box(
+        modifier = modifier
+            .shadow(elevation = if (isSelected) 6.dp else 0.dp, shape = RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(containerColor)
+            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = mode.name,
+            color = textColor,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+/** Chooses which calendar layout to show for the current mode. */
+@Composable
+private fun CalendarContent(
+    mode: CalendarMode,
+    visibleMonth: YearMonth,
+    selectedDate: LocalDate,
+    selectedDateEvents: List<CalendarEvent>,
+    eventCountByDate: Map<LocalDate, Int>,
+    onDateSelected: (LocalDate) -> Unit,
+    onPreviousDay: () -> Unit,
+    onNextDay: () -> Unit,
+    onPreviousWeek: () -> Unit,
+    onNextWeek: () -> Unit,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit
+) {
+    when (mode) {
+        CalendarMode.DAY -> DayView(
+            selectedDate = selectedDate,
+            events = selectedDateEvents,
+            onPreviousDay = onPreviousDay,
+            onNextDay = onNextDay
+        )
+
+        CalendarMode.WEEK -> WeekView(
+            selectedDate = selectedDate,
+            eventCountByDate = eventCountByDate,
+            eventsForSelectedDate = selectedDateEvents,
+            onDateSelected = onDateSelected,
+            onPreviousWeek = onPreviousWeek,
+            onNextWeek = onNextWeek
+        )
+
+        CalendarMode.MONTH -> MonthView(
+            visibleMonth = visibleMonth,
+            selectedDate = selectedDate,
+            eventCountByDate = eventCountByDate,
+            selectedDateEvents = selectedDateEvents,
+            onDateSelected = onDateSelected,
+            onPreviousMonth = onPreviousMonth,
+            onNextMonth = onNextMonth
+        )
+    }
+}
+
+/** Shows the selected day and the events that fall on that day. */
 @Composable
 private fun DayView(
     selectedDate: LocalDate,
@@ -128,22 +407,23 @@ private fun DayView(
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy") }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        HeaderWithArrows(
-            title = selectedDate.format(formatter),
-            onPrevious = onPreviousDay,
-            onNext = onNextDay
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        SectionCard {
+            HeaderWithArrows(
+                title = selectedDate.format(formatter),
+                onPrevious = onPreviousDay,
+                onNext = onNextDay
+            )
+        }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        EventsList(
-            modifier = Modifier.weight(1f),
+        EventsSection(
+            title = "Events",
             events = events
         )
     }
 }
 
+/** Shows the current week grid and the events for the selected day. */
 @Composable
 private fun WeekView(
     selectedDate: LocalDate,
@@ -154,45 +434,37 @@ private fun WeekView(
     onNextWeek: () -> Unit
 ) {
     val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
-    val weekStart = selectedDate.with(TemporalAdjusters.previousOrSame(firstDayOfWeek))
-    val dates = (0..6).map { weekStart.plusDays(it.toLong()) }
+    val weekDates = remember(selectedDate, firstDayOfWeek) {
+        buildWeekDates(selectedDate, firstDayOfWeek)
+    }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        HeaderWithArrows(
-            title = "Week of ${weekStart.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))}",
-            onPrevious = onPreviousWeek,
-            onNext = onNextWeek
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        SectionCard {
+            HeaderWithArrows(
+                title = buildWeekTitle(weekDates.first()),
+                onPrevious = onPreviousWeek,
+                onNext = onNextWeek
+            )
 
-        Spacer(modifier = Modifier.height(12.dp))
-        WeekdayHeader(firstDayOfWeek = firstDayOfWeek)
-
-        Row(modifier = Modifier.fillMaxWidth()) {
-            dates.forEach { date ->
-                DateCell(
-                    modifier = Modifier.weight(1f),
-                    date = date,
-                    isSelected = date == selectedDate,
-                    eventCount = eventCountByDate[date] ?: 0,
-                    onClick = { onDateSelected(date) }
-                )
-            }
+            Spacer(modifier = Modifier.height(12.dp))
+            WeekdayHeader(firstDayOfWeek = firstDayOfWeek)
+            Spacer(modifier = Modifier.height(10.dp))
+            WeekRow(
+                dates = weekDates,
+                selectedDate = selectedDate,
+                eventCountByDate = eventCountByDate,
+                onDateSelected = onDateSelected
+            )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Selected day",
-            style = MaterialTheme.typography.titleMedium
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        EventsList(
-            modifier = Modifier.weight(1f),
+        EventsSection(
+            title = "Selected day",
             events = eventsForSelectedDate
         )
     }
 }
 
+/** Shows the current month grid and the events for the selected day. */
 @Composable
 private fun MonthView(
     visibleMonth: YearMonth,
@@ -208,26 +480,203 @@ private fun MonthView(
         buildMonthCells(visibleMonth, firstDayOfWeek)
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        HeaderWithArrows(
-            title = visibleMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
-            onPrevious = onPreviousMonth,
-            onNext = onNextMonth
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        SectionCard {
+            HeaderWithArrows(
+                title = visibleMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+                onPrevious = onPreviousMonth,
+                onNext = onNextMonth
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+            WeekdayHeader(firstDayOfWeek = firstDayOfWeek)
+            Spacer(modifier = Modifier.height(10.dp))
+            MonthGrid(
+                monthCells = monthCells,
+                selectedDate = selectedDate,
+                eventCountByDate = eventCountByDate,
+                onDateSelected = onDateSelected
+            )
+        }
+
+        EventsSection(
+            title = "Selected day",
+            events = selectedDateEvents
+        )
+    }
+}
+
+/** Wraps content in the rounded white card style used throughout the screen. */
+@Composable
+private fun SectionCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            content = content
+        )
+    }
+}
+
+/** Shows a section title in the calendar body. */
+@Composable
+private fun SectionHeading(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurface,
+        fontWeight = FontWeight.Bold
+    )
+}
+
+/** Shows a title with left and right navigation buttons. */
+@Composable
+private fun HeaderWithArrows(
+    title: String,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        NavigationCircleButton(
+            symbol = "‹",
+            onClick = onPrevious
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
-        WeekdayHeader(firstDayOfWeek = firstDayOfWeek)
+        Text(
+            text = title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleLarge,
+            textAlign = TextAlign.Center,
+            fontWeight = FontWeight.Bold
+        )
 
+        NavigationCircleButton(
+            symbol = "›",
+            onClick = onNext
+        )
+    }
+}
+
+/** Shows one circular previous or next button. */
+@Composable
+private fun NavigationCircleButton(
+    symbol: String,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = symbol,
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+/** Shows the weekday names in the current locale order. */
+@Composable
+private fun WeekdayHeader(firstDayOfWeek: DayOfWeek) {
+    val orderedDays = remember(firstDayOfWeek) {
+        buildOrderedDays(firstDayOfWeek)
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        orderedDays.forEach { day ->
+            WeekdayChip(
+                text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+/** Shows one small label for a weekday in the calendar grid header. */
+@Composable
+private fun WeekdayChip(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+/** Shows one row of seven dates for the week view. */
+@Composable
+private fun WeekRow(
+    dates: List<LocalDate>,
+    selectedDate: LocalDate,
+    eventCountByDate: Map<LocalDate, Int>,
+    onDateSelected: (LocalDate) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        dates.forEach { date ->
+            DateCell(
+                modifier = Modifier.weight(1f),
+                date = date,
+                isSelected = date == selectedDate,
+                eventCount = eventCountByDate[date] ?: 0,
+                onClick = { onDateSelected(date) }
+            )
+        }
+    }
+}
+
+/** Shows all rows needed for the month grid. */
+@Composable
+private fun MonthGrid(
+    monthCells: List<LocalDate?>,
+    selectedDate: LocalDate,
+    eventCountByDate: Map<LocalDate, Int>,
+    onDateSelected: (LocalDate) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         monthCells.chunked(7).forEach { week ->
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 week.forEach { date ->
                     if (date == null) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(68.dp)
-                                .padding(2.dp)
-                        )
+                        EmptyDateCell(modifier = Modifier.weight(1f))
                     } else {
                         DateCell(
                             modifier = Modifier.weight(1f),
@@ -240,65 +689,20 @@ private fun MonthView(
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Selected day",
-            style = MaterialTheme.typography.titleMedium
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        EventsList(
-            modifier = Modifier.weight(1f),
-            events = selectedDateEvents
-        )
     }
 }
 
+/** Shows one empty placeholder cell in the month grid. */
 @Composable
-private fun HeaderWithArrows(
-    title: String,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        TextButton(onClick = onPrevious) {
-            Text("<")
-        }
-
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center
-        )
-
-        TextButton(onClick = onNext) {
-            Text(">")
-        }
-    }
+private fun EmptyDateCell(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .height(68.dp)
+            .padding(2.dp)
+    )
 }
 
-@Composable
-private fun WeekdayHeader(firstDayOfWeek: DayOfWeek) {
-    val orderedDays = (0..6).map { firstDayOfWeek.plus(it.toLong()) }
-
-    Row(modifier = Modifier.fillMaxWidth()) {
-        orderedDays.forEach { day ->
-            Text(
-                text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(vertical = 4.dp),
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
+/** Shows one clickable date cell with a day number and event count. */
 @Composable
 private fun DateCell(
     modifier: Modifier = Modifier,
@@ -307,19 +711,18 @@ private fun DateCell(
     eventCount: Int,
     onClick: () -> Unit
 ) {
-    val borderColor = if (isSelected) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.outlineVariant
-    }
-
     Box(
         modifier = modifier
             .height(68.dp)
             .padding(2.dp)
-            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .background(resolveDateCellBackgroundColor(isSelected), RoundedCornerShape(8.dp))
+            .border(
+                width = 1.dp,
+                color = resolveDateCellBorderColor(isSelected),
+                shape = RoundedCornerShape(8.dp)
+            )
             .clickable(onClick = onClick)
-            .padding(6.dp)
+            .padding(4.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -327,198 +730,231 @@ private fun DateCell(
         ) {
             Text(
                 text = date.dayOfMonth.toString(),
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge,
+                color = resolveDateCellTextColor(isSelected),
+                fontWeight = FontWeight.Bold
             )
 
-            if (eventCount > 0) {
-                Text(
-                    text = "$eventCount event${if (eventCount == 1) "" else "s"}",
-                    style = MaterialTheme.typography.labelSmall
-                )
-            }
+            EventCountLabel(
+                eventCount = eventCount,
+                isSelected = isSelected
+            )
         }
     }
 }
 
+/** Shows the event count text only when a date has at least one event. */
 @Composable
-private fun EventsList(
-    modifier: Modifier = Modifier,
+private fun EventCountLabel(
+    eventCount: Int,
+    isSelected: Boolean
+) {
+    if (eventCount > 0) {
+        Text(
+            text = if (eventCount == 1) "1\nevent" else "$eventCount\nevents",
+            style = MaterialTheme.typography.labelSmall,
+            color = resolveEventCountTextColor(isSelected),
+            fontWeight = FontWeight.SemiBold,
+            lineHeight = 12.sp,
+            textAlign = TextAlign.Start
+        )
+    }
+}
+
+/** Shows a section title and the list of events below it. */
+@Composable
+private fun EventsSection(
+    title: String,
     events: List<CalendarEvent>
 ) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionHeading(text = title)
+        EventsList(events = events)
+    }
+}
+
+/** Shows either an empty state or the full list of event cards. */
+@Composable
+private fun EventsList(events: List<CalendarEvent>) {
     if (events.isEmpty()) {
-        Box(
-            modifier = modifier
-                .fillMaxWidth(),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Text("No events.")
-        }
+        EmptyEventsMessage()
         return
     }
 
-    LazyColumn(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(items = events, key = { it.id }) { event ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = event.title,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(event.timeLabel())
-
-                    event.location?.let {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("Location: $it")
-                    }
-
-                    event.description?.let {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(it)
-                    }
-                }
-            }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        events.forEach { event ->
+            EventCard(event = event)
         }
     }
 }
 
+/** Shows the message used when no events are available for the selected day. */
 @Composable
-private fun CreateEventDialog(
-    initialDate: LocalDate,
-    onDismiss: () -> Unit,
-    onCreate: (EventDraft) -> Unit
-) {
-    var title by rememberSaveable { mutableStateOf("") }
-    var description by rememberSaveable { mutableStateOf("") }
-    var location by rememberSaveable { mutableStateOf("") }
-    var dateText by rememberSaveable { mutableStateOf(initialDate.toString()) }
-    var startTimeText by rememberSaveable { mutableStateOf("09:00") }
-    var endTimeText by rememberSaveable { mutableStateOf("10:00") }
-    var isAllDay by rememberSaveable { mutableStateOf(false) }
-    var validationMessage by rememberSaveable { mutableStateOf<String?>(null) }
+private fun EmptyEventsMessage() {
+    SectionCard {
+        Text(
+            text = "No events for this date.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = GrayIcon
+        )
+    }
+}
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text("Create Event")
-        },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Title") },
-                    singleLine = true
-                )
+/** Shows one event card. */
+@Composable
+private fun EventCard(event: CalendarEvent) {
+    val displayTitle = formatEventTextForDisplay(event.title)
+    val displayLocation = event.location?.let(::formatEventTextForDisplay)
+    val displayDescription = event.description?.let(::formatEventTextForDisplay)
 
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Description") }
-                )
-
-                OutlinedTextField(
-                    value = location,
-                    onValueChange = { location = it },
-                    label = { Text("Location") }
-                )
-
-                OutlinedTextField(
-                    value = dateText,
-                    onValueChange = { dateText = it },
-                    label = { Text("Date (yyyy-MM-dd)") },
-                    singleLine = true
-                )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("All day")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Switch(
-                        checked = isAllDay,
-                        onCheckedChange = { isAllDay = it }
-                    )
-                }
-
-                if (!isAllDay) {
-                    OutlinedTextField(
-                        value = startTimeText,
-                        onValueChange = { startTimeText = it },
-                        label = { Text("Start (HH:mm)") },
-                        singleLine = true
-                    )
-
-                    OutlinedTextField(
-                        value = endTimeText,
-                        onValueChange = { endTimeText = it },
-                        label = { Text("End (HH:mm)") },
-                        singleLine = true
-                    )
-                }
-
-                validationMessage?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    try {
-                        if (title.isBlank()) {
-                            validationMessage = "Title is required."
-                            return@Button
-                        }
-
-                        val parsedDate = LocalDate.parse(dateText)
-                        val parsedStart =
-                            if (isAllDay) LocalTime.MIDNIGHT else LocalTime.parse(startTimeText)
-                        val parsedEnd =
-                            if (isAllDay) LocalTime.MIDNIGHT else LocalTime.parse(endTimeText)
-
-                        if (!isAllDay && !parsedEnd.isAfter(parsedStart)) {
-                            validationMessage = "End time must be after start time."
-                            return@Button
-                        }
-
-                        onCreate(
-                            EventDraft(
-                                title = title.trim(),
-                                description = description.trim(),
-                                location = location.trim(),
-                                date = parsedDate,
-                                startTime = parsedStart,
-                                endTime = parsedEnd,
-                                isAllDay = isAllDay
-                            )
-                        )
-                    } catch (_: Exception) {
-                        validationMessage = "Please check the date and time format."
-                    }
-                }
-            ) {
-                Text("Create")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            EventCardHeader(title = displayTitle)
+            EventMetaLine(text = event.timeLabel())
+            displayLocation?.let { EventMetaLine(text = "Location: $it") }
+            displayDescription?.let { EventDescription(text = it) }
         }
+    }
+}
+
+/** Shows the top row of an event card. */
+@Composable
+private fun EventCardHeader(title: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        EventBadge()
+    }
+}
+
+/** Shows the small badge on the right side of an event card. */
+@Composable
+private fun EventBadge() {
+    Box(
+        modifier = Modifier
+            .padding(start = 12.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "Event",
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+/** Shows one short line of metadata inside an event card. */
+@Composable
+private fun EventMetaLine(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = GrayIcon
     )
 }
 
+/** Shows the longer description text inside an event card. */
+@Composable
+private fun EventDescription(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurface
+    )
+}
+
+/** Returns only the events that overlap the selected date. */
+private fun buildSelectedDateEvents(
+    events: List<CalendarEvent>,
+    selectedDate: LocalDate
+): List<CalendarEvent> {
+    return events.filter { it.occursOn(selectedDate) }.sortedBy { it.start }
+}
+
+/** Builds the title used in week view. */
+private fun buildWeekTitle(weekStart: LocalDate): String {
+    val formatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
+    return "Week of ${weekStart.format(formatter)}"
+}
+
+/** Builds the seven dates that belong to the selected week. */
+private fun buildWeekDates(
+    selectedDate: LocalDate,
+    firstDayOfWeek: DayOfWeek
+): List<LocalDate> {
+    val weekStart = selectedDate.with(TemporalAdjusters.previousOrSame(firstDayOfWeek))
+    return (0..6).map { weekStart.plusDays(it.toLong()) }
+}
+
+/** Builds the ordered list of weekday names used in calendar headers. */
+private fun buildOrderedDays(firstDayOfWeek: DayOfWeek): List<DayOfWeek> {
+    return (0..6).map { firstDayOfWeek.plus(it.toLong()) }
+}
+
+/** Chooses the accent color for each calendar mode card. */
+private fun modeAccentColor(mode: CalendarMode): Color {
+    return when (mode) {
+        CalendarMode.DAY -> BrandOrange
+        CalendarMode.WEEK -> BrandCrimson
+        CalendarMode.MONTH -> BrandPink
+    }
+}
+
+/** Chooses the background color for a date cell. */
+@Composable
+private fun resolveDateCellBackgroundColor(isSelected: Boolean): Color {
+    return if (isSelected) BrandCrimson else MaterialTheme.colorScheme.surface
+}
+
+/** Chooses the border color for a date cell. */
+@Composable
+private fun resolveDateCellBorderColor(isSelected: Boolean): Color {
+    return if (isSelected) BrandCrimson else GrayIcon.copy(alpha = 0.25f)
+}
+
+/** Chooses the main text color for a date cell. */
+@Composable
+private fun resolveDateCellTextColor(isSelected: Boolean): Color {
+    return if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+}
+
+/** Chooses the badge fill color used by the event count label. */
+@Composable
+private fun resolveEventCountBadgeColor(isSelected: Boolean): Color {
+    return if (isSelected) Color.White.copy(alpha = 0.22f) else BrandCrimson.copy(alpha = 0.12f)
+}
+
+/** Chooses the badge text color used by the event count label. */
+@Composable
+private fun resolveEventCountTextColor(isSelected: Boolean): Color {
+    return if (isSelected) MaterialTheme.colorScheme.onPrimary else BrandCrimson
+}
+
+/** Counts how many events fall on each date in the loaded month. */
 private fun buildEventCountMap(events: List<CalendarEvent>): Map<LocalDate, Int> {
     val counts = mutableMapOf<LocalDate, Int>()
 
@@ -535,6 +971,7 @@ private fun buildEventCountMap(events: List<CalendarEvent>): Map<LocalDate, Int>
     return counts
 }
 
+/** Builds the month grid with leading and trailing empty cells. */
 private fun buildMonthCells(
     month: YearMonth,
     firstDayOfWeek: DayOfWeek

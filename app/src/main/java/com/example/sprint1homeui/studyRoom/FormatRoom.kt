@@ -2,10 +2,12 @@ package com.example.sprint1homeui.studyRoom
 
 //Imports for the VIEW
 
+import android.R.attr.textColor
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -13,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import com.example.sprint1homeui.ui.theme.GrayIcon
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -51,9 +54,9 @@ fun RoomItem(room: StudyRoom) {
                     val color = if (slot.isAvailable) Color(0xFF2E7D32) else Color(0xFFD32F2F)
 
                     Surface(
-                        shape = MaterialTheme.shapes.small,
-                        color = color.copy(alpha = 0.12f),
-                        border = BorderStroke(1.dp, color.copy(alpha = 0.5f))
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, GrayIcon.copy(alpha = 0.25f))
                     ) {
                         Text(
                             text = displayTime,
