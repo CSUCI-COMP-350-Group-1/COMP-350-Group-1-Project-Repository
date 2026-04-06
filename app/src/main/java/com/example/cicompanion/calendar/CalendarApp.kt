@@ -52,28 +52,6 @@ fun CalendarApp(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        if (viewModel.accessToken == null) {
-            Button(onClick = onConnectCalendar) {
-                Text("Connect Google Calendar")
-            }
-        } else {
-            Row {
-                Button(onClick = { viewModel.refresh() }) {
-                    Text("Refresh")
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = { viewModel.openCreateDialog() }) {
-                    Text("New Event")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Calendar: ${viewModel.activeCalendarTitle}",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-
         if (viewModel.isLoading) {
             Spacer(modifier = Modifier.height(8.dp))
             Text("Loading…")
