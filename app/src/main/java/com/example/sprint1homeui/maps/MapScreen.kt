@@ -368,8 +368,8 @@ fun MapContent(
 
     val mapProperties = remember(hasLocationPermission) {
         MapProperties(
-            isMyLocationEnabled = hasLocationPermission,
-            latLngBoundsForCameraTarget = CSUCI_BOUNDS, // Restrict panning strictly to campus
+            isMyLocationEnabled = false, // Disable default blue dot to use our custom red one
+            latLngBoundsForCameraTarget = CSUCI_BOUNDS, minZoomPreference = 16f, // Restrict panning strictly to campus
             mapStyleOptions = MapStyleOptions(MAP_STYLE_JSON) // Hides preset locations
         )
     }
@@ -383,7 +383,7 @@ fun MapContent(
             onMapClick(it)
         }
     ) {
-        // User Location Marker
+        // User Location Marker with solid red dot inside grey pin
         if (userLocation != null) {
             UserLocationMarker(userLocation)
         }
@@ -445,15 +445,25 @@ fun UserLocationMarker(position: LatLng) {
         state = rememberMarkerState(position = position),
         title = "You are here!"
     ) {
-        Icon(
-            imageVector = Icons.Default.PersonPinCircle,
-            contentDescription = "User Location",
-            tint = Color(0xFFE11D48),
-            modifier = Modifier.size(36.dp)
-        )
+        Box(contentAlignment = Alignment.Center) {
+            // Reverted pointer to Gray as requested
+            Icon(
+                imageVector = Icons.Default.PersonPinCircle,
+                contentDescription = "User Location",
+                tint = Color.Gray,
+                modifier = Modifier.size(36.dp)
+            )
+            // Actual solid circle in E11D48FF
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .offset(y = (-2).dp)
+                    .background(Color(0xFFE11D48), CircleShape)
+            )
+        }
     }
 
-    // Accuracy circle
+    // Accuracy circle: Back to original blue
     Circle(
         center = position,
         radius = 20.0,
