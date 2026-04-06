@@ -4,6 +4,7 @@ package com.example.sprint1homeui.studyRoom
 
 import android.R.attr.textColor
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -15,7 +16,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import com.example.sprint1homeui.ui.theme.AppBackground
 import com.example.sprint1homeui.ui.theme.GrayIcon
+import com.example.sprint1homeui.ui.theme.GreenAccent
+import com.example.sprint1homeui.ui.theme.NavBackground
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -27,7 +31,10 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun RoomItem(room: StudyRoom) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp) //Background changes back box color of room card
+        ,
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -55,7 +62,7 @@ fun RoomItem(room: StudyRoom) {
 
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surface,
+                        color = NavBackground, //Changes color of time box
                         border = BorderStroke(1.dp, GrayIcon.copy(alpha = 0.25f))
                     ) {
                         Text(

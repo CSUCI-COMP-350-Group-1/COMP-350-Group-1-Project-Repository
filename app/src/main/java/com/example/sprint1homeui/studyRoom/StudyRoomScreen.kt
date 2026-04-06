@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.example.sprint1homeui.ui.theme.AppBackground
 import com.example.sprint1homeui.ui.theme.GrayIcon
+import com.example.sprint1homeui.ui.theme.GreenAccent
+import com.example.sprint1homeui.ui.theme.NavBackground
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -47,7 +49,6 @@ import java.time.format.DateTimeFormatter
 // Communicates with VIEWMODEL
 @OptIn(ExperimentalMaterial3Api::class) // Required for TopAppBars in Material3
 @Composable
-// Updated to match Lorenzo's navigation
 fun RoomListScreen(viewModel: RoomViewModel, navController: NavHostController) {
     val weeklyData by viewModel.weeklyData.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -63,24 +64,28 @@ fun RoomListScreen(viewModel: RoomViewModel, navController: NavHostController) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(AppBackground)
+                .background(AppBackground) // Changes top and bottom of background
                 .padding(paddingValues)
-                .padding(bottom = 16.dp), // For back bottom button
+                .padding(bottom = 16.dp)
+                .background(AppBackground), //Changes background of study room
             horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
         ) {
             if (isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                Box(modifier = Modifier.fillMaxSize() //Don't add background here, does nothing
+                    , contentAlignment =
+                        androidx.compose.ui.Alignment.Center) {
                     CircularProgressIndicator()
                 }
             } else {
                 val sortedDates = weeklyData.keys.sorted()
 
                 // Legend and Tabs
-                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(modifier = Modifier.fillMaxWidth()
+                    .padding(16.dp) //background here changes legends box color
+                    , horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     LegendItem(Color(0xFF2E7D32), "Available")
                     LegendItem(Color(0xFFD32F2F), "Booked")
                 }
-
 
                 if (sortedDates.isNotEmpty()) {
                     if (selectedDate.isBlank() || selectedDate !in sortedDates) {
@@ -94,7 +99,8 @@ fun RoomListScreen(viewModel: RoomViewModel, navController: NavHostController) {
                     )
                 }
 
-                LazyColumn(modifier = Modifier.padding(16.dp)) {
+                LazyColumn(modifier = Modifier
+                    .padding(16.dp)) { //Don't add background here
                     items(weeklyData[selectedDate] ?: emptyList()) { room ->
                         RoomItem(room)
                     }
@@ -116,7 +122,9 @@ private fun StudyRoomDaySelector(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .background(AppBackground), // Changes day select box background
+        //TODO Add round corners to this ^^^
         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -152,7 +160,7 @@ private fun StudyRoomNavigationButton(
         modifier = Modifier
             .size(40.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(NavBackground) // Changes color of day select arrow buttons
             .border(
                 width = 1.dp,
                 color = GrayIcon.copy(alpha = 0.25f),
