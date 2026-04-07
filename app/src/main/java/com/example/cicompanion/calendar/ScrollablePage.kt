@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.calendar
+package com.example.cicompanion.calendar
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

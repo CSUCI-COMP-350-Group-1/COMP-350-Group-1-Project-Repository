@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.appNavigation
+package com.example.cicompanion.appNavigation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -18,8 +18,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.sprint1homeui.ui.Routes
-import com.example.sprint1homeui.ui.theme.*
+import com.example.cicompanion.ui.Routes
+import com.example.cicompanion.ui.theme.*
 
 data class FeatureItem(val route: String, val icon: ImageVector, val label: String)
 

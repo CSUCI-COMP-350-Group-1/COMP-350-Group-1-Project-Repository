@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.appNavigation
+package com.example.cicompanions.appNavigation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -13,9 +13,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.sprint1homeui.ui.Routes
-import com.example.sprint1homeui.ui.theme.BrandRedDark
-import com.example.sprint1homeui.ui.theme.BrandRedLighter
+import com.example.cicompanion.ui.Routes
+import com.example.cicompanion.ui.theme.BrandRedDark
+import com.example.cicompanion.ui.theme.BrandRedLighter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 

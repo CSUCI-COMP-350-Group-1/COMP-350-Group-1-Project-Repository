@@ -30,7 +30,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.example.cicompanion.ui.theme.CICompanionTheme
 import androidx.compose.material3.TopAppBar
-import com.example.sprint1homeui.ui.theme.AppBackground
+import com.example.cicompanion.ui.theme.AppBackground
 
 
 @OptIn(ExperimentalMaterial3Api::class)

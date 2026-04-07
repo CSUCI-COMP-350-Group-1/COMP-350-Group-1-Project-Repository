@@ -18,11 +18,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
-import com.example.sprint1homeui.ui.theme.DarkBackground
-import com.example.sprint1homeui.ui.theme.AppWhite
-import com.example.sprint1homeui.ui.theme.BrandRedLight
-import com.example.sprint1homeui.ui.theme.GrayIcon
-import com.example.sprint1homeui.ui.theme.NavBackground
+import com.example.cicompanion.ui.theme.DarkBackground
+import com.example.cicompanion.ui.theme.AppWhite
+import com.example.cicompanion.ui.theme.BrandRedLight
+import com.example.cicompanion.ui.theme.GrayIcon
+import com.example.cicompanion.ui.theme.NavBackground
 
 //For easy mapping in other files
 object Routes {

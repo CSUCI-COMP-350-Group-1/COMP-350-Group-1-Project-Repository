@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.studyRoom
+package com.example.cicompanion.studyRoom
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,10 +33,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import com.example.sprint1homeui.ui.theme.AppBackground
-import com.example.sprint1homeui.ui.theme.GrayIcon
-import com.example.sprint1homeui.ui.theme.GreenAccent
-import com.example.sprint1homeui.ui.theme.NavBackground
+import com.example.cicompanion.ui.theme.AppBackground
+import com.example.cicompanion.ui.theme.GrayIcon
+import com.example.cicompanion.ui.theme.GreenAccent
+import com.example.cicompanion.ui.theme.NavBackground
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 

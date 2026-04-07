@@ -16,10 +16,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import com.example.sprint1homeui.ui.theme.AppBackground
-import com.example.sprint1homeui.ui.theme.GrayIcon
-import com.example.sprint1homeui.ui.theme.GreenAccent
-import com.example.sprint1homeui.ui.theme.NavBackground
+import com.example.cicompanion.ui.theme.AppBackground
+import com.example.cicompanion.ui.theme.GrayIcon
+import com.example.cicompanion.ui.theme.GreenAccent
+import com.example.cicompanion.ui.theme.NavBackground
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 

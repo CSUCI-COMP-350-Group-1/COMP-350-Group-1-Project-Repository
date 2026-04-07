@@ -9,7 +9,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
-import com.example.cicompanion.calendar.auth.GoogleCalendarAuthManager
 
 @Composable
 fun CalendarScreen(navController: NavHostController) {

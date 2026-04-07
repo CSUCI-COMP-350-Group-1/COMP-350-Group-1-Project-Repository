@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.calendar
+package com.example.cicompanion.calendar
 
 import android.text.Html
 

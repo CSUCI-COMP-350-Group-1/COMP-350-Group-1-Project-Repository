@@ -23,11 +23,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
-import com.example.sprint1homeui.appNavigation.FeatureCard
-import com.example.sprint1homeui.appNavigation.featureItems
-import com.example.sprint1homeui.calendar.CalendarViewModel
-import com.example.sprint1homeui.calendar.model.CalendarEvent
-import com.example.sprint1homeui.ui.theme.AppBackground
+import com.example.cicompanion.appNavigation.FeatureCard
+import com.example.cicompanion.appNavigation.featureItems
+import com.example.cicompanion.calendar.CalendarViewModel
+import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.ui.theme.AppBackground
+import com.example.cicompanion.home.CalendarWidget
 import java.time.ZonedDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)

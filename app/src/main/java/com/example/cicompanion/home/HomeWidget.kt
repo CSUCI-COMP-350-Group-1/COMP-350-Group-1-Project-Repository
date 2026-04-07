@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.home
+package com.example.cicompanion.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,10 +16,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.sprint1homeui.calendar.model.CalendarEvent
-import com.example.sprint1homeui.ui.theme.BrandRedLight
-import com.example.sprint1homeui.ui.theme.GrayIcon
-import com.example.sprint1homeui.ui.theme.NavBackground
+import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.ui.theme.BrandRedLight
+import com.example.cicompanion.ui.theme.GrayIcon
+import com.example.cicompanion.ui.theme.NavBackground
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 

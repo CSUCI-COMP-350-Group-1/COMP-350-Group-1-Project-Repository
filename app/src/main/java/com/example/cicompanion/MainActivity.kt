@@ -27,14 +27,14 @@ import com.example.cicompanion.home.HomeScreen
 import com.example.cicompanion.maps.MapScreen
 import com.example.cicompanion.social.ProfileScreen
 import com.example.cicompanion.ui.NavBar
-import com.example.cicompanion.appNavigation.DrawerProfileContent
-import com.example.cicompanion.appNavigation.TopBar
-import com.example.cicompanion.appNavigation.screenTitleForRoute
 import com.example.cicompanion.social.NotificationScreen
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import kotlinx.coroutines.launch
 import com.example.cicompanion.studyRoom.RoomListScreen
+import com.example.cicompanions.appNavigation.DrawerProfileContent
+import com.example.cicompanions.appNavigation.TopBar
+import com.example.cicompanions.appNavigation.screenTitleForRoute
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

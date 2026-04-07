@@ -1,4 +1,4 @@
-package com.example.sprint1homeui.social
+package com.example.cicompanion.social
 
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
