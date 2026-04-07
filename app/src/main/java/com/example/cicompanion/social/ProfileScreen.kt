@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import com.example.cicompanion.ui.theme.Sprint1HomeUITheme
+import com.example.cicompanion.ui.theme.CICompanionTheme
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -207,7 +207,7 @@ fun ProfileHeader(
 @Preview(showBackground = true)
 @Composable
 fun ProfileScreenPreview() {
-    Sprint1HomeUITheme {
+    CICompanionTheme() {
         val navController = rememberNavController()
         ProfileScreen(navController = navController)
     }
