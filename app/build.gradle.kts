@@ -87,6 +87,9 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation(libs.coil.compose)
 
+    // Firestore implementation
+    implementation("com.google.firebase:firebase-firestore")
+
     // core library needed
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 

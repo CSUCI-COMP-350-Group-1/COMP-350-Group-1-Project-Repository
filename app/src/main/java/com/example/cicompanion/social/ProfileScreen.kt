@@ -97,7 +97,7 @@ fun ProfileScreen(navController: NavHostController) {
         ) {
             // Pass the current user's name and email to the header
             ProfileHeader(
-                userDisplayName = currentUser?.displayName ?: "User Name",
+                userDisplayName = currentUser?.displayName ?: "Signed out",
                 userEmail = currentUser?.email ?: "user@example.com",
                 photoUrl = currentUser?.photoUrl?.toString(),
                 modifier = Modifier
@@ -148,7 +148,6 @@ fun ProfileHeader(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Profile image placeholder
         Box(
             modifier = Modifier
                 .size(120.dp)
@@ -156,7 +155,6 @@ fun ProfileHeader(
                 .background(Color(0xFFE6E0F8)), // Light purple background
             contentAlignment = Alignment.Center
         ) {
-            // Silhouette
             if (photoUrl != null) {
                 AsyncImage(
                     model = photoUrl,
@@ -179,7 +177,7 @@ fun ProfileHeader(
             )
             Text(
                 text = userEmail,
-                color = Color.Gray,
+                color = Color.DarkGray,
                 fontSize = 16.sp
             )
             Spacer(modifier = Modifier.height(20.dp))
