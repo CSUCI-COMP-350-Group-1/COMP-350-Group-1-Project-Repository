@@ -85,6 +85,7 @@ dependencies {
 
     // Use the main Firebase Auth library (KTX features are included by default)
     implementation("com.google.firebase:firebase-auth")
+    implementation(libs.coil.compose)
 
     // core library needed
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")

@@ -43,6 +43,7 @@ import com.example.cicompanion.firebase.FirebaseAuthManager
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
+import coil.compose.AsyncImage
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -157,25 +158,13 @@ fun ProfileHeader(
         ) {
             // Silhouette
             if (photoUrl != null) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF6750A4)) // Darker purple
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp, 40.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF6750A4))
-                    )
-                }
+                AsyncImage(
+                    model = photoUrl,
+                    contentDescription = "Profile Picture",
+                    modifier = Modifier.fillMaxSize()
+                )
+                } else {
+                DisplayDefaultAvatar()
             }
         }
 
@@ -201,6 +190,29 @@ fun ProfileHeader(
                 color = Color.Black
             )
         }
+    }
+}
+
+@Composable
+fun DisplayDefaultAvatar() {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Spacer(modifier = Modifier.height(10.dp))
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF6750A4)) // Darker purple
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .size(80.dp, 40.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF6750A4))
+        )
     }
 }
 
