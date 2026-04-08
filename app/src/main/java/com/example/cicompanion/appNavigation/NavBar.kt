@@ -1,10 +1,13 @@
 package com.example.cicompanion.ui
 
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
@@ -23,6 +26,7 @@ import com.example.cicompanion.ui.theme.AppWhite
 import com.example.cicompanion.ui.theme.BrandRedLight
 import com.example.cicompanion.ui.theme.GrayIcon
 import com.example.cicompanion.ui.theme.NavBackground
+import kotlin.math.min
 
 //For easy mapping in other files
 object Routes {
@@ -48,8 +52,9 @@ fun NavBar(navController: NavHostController) {
 
     NavigationBar(
         containerColor = navBarBackground,
+        windowInsets = NavigationBarDefaults.windowInsets,
         modifier = Modifier
-            .height(72.dp)
+            .heightIn(min = 72.dp)
             .drawWithContent {
                 drawContent()
                 drawLine(color =

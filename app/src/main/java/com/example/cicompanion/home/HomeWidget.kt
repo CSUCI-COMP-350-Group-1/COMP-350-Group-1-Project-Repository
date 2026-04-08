@@ -29,7 +29,7 @@ fun CalendarWidget(events: List<CalendarEvent>,
         Surface(
             modifier = modifier
                 .fillMaxWidth()
-                .height(140.dp)
+                .height(160.dp)
                 .border(
                     width = 1.dp,
                     color = GrayIcon.copy(alpha = 0.3f),
