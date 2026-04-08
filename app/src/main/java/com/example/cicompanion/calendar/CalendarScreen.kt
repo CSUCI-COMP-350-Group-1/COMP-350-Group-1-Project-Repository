@@ -9,12 +9,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.example.cicompanion.ui.theme.AppBackground
 
 @Composable
 fun CalendarScreen(navController: NavHostController) {
     val calendarViewModel: CalendarViewModel = viewModel()
 
-    Scaffold { paddingValues ->
+    Scaffold (
+        containerColor = AppBackground
+    ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
