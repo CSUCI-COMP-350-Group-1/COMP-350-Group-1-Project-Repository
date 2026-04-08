@@ -1,9 +1,7 @@
 package com.example.cicompanion.calendar.data.repository
 
-import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.calendar.data.api.CalendarApiService
-import java.time.YearMonth
-import java.time.ZoneId
+import com.example.cicompanion.calendar.model.CalendarEvent
 
 class CalendarRepository(
     private val api: CalendarApiService = CalendarApiService()

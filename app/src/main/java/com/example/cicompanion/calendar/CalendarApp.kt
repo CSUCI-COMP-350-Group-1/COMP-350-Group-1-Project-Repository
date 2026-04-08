@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -20,18 +19,25 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cicompanion.calendar.model.CalendarEvent
-import com.example.cicompanion.ui.theme.AppBackground
-import com.example.cicompanion.ui.theme.BrandCrimson
-import com.example.cicompanion.ui.theme.BrandOrange
-import com.example.cicompanion.ui.theme.BrandPink
-import com.example.cicompanion.ui.theme.GrayIcon
-import com.example.cicompanion.calendar.PullToRefreshContainer
-import java.time.*
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.time.temporal.WeekFields
-import java.util.*
+import java.util.Locale
+
+private val CoralRed = Color(0xFFEF3347)
+private val HotPink = Color(0xFFF21F63)
+private val SoftText = Color(0xFF6E5555)
+private val SoftBorder = Color(0xFFE7C2B8)
+private val SelectedDateFill = Color(0xFFFFE2E7)
+private val CardOffWhite = Color(0xFFF6E6D8)
+private val DateCellWhite = Color(0xFFF7F4F8)
+private val DateCellBorder = Color(0xFFE2BFB7)
+
+
 
 /** Shows the full calendar screen and routes state into smaller UI pieces. */
 @Composable
@@ -44,9 +50,7 @@ fun CalendarApp(viewModel: CalendarViewModel) {
         buildEventCountMap(viewModel.events)
     }
 
-    Scaffold(
-        containerColor = AppBackground
-    ) { padding ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         PullToRefreshContainer(
             isRefreshing = viewModel.isLoading,
             onRefresh = viewModel::loadOnlineCalendar,
@@ -96,17 +100,9 @@ private fun CalendarScreenBody(
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit
 ) {
-    ScrollablePage(
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp)
-    ) {
-        Spacer(modifier = Modifier.height(4.dp))
-
+    ScrollablePage(contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
         CalendarHeroHeader(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            totalEventCount = totalEventCount,
-            selectedDate = selectedDate,
-            mode = mode,
-            activeDateCount = eventCountByDate.size
+            selectedDate = selectedDate
         )
 
         Column(
@@ -152,110 +148,35 @@ private fun CalendarScreenBody(
 /** Shows the large top header that sets the new visual style for the screen. */
 @Composable
 private fun CalendarHeroHeader(
-    modifier: Modifier = Modifier, // CHANGED
-    totalEventCount: Int,
     selectedDate: LocalDate,
-    mode: CalendarMode,
-    activeDateCount: Int
+    modifier: Modifier = Modifier
 ) {
-    val subtitleFormatter = remember { DateTimeFormatter.ofPattern("MMMM yyyy") }
-
     Box(
-        modifier = modifier // CHANGED
+        modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        BrandOrange,
-                        BrandCrimson,
-                        BrandPink
-                    )
+                Brush.horizontalGradient(
+                    colors = listOf(CoralRed, HotPink)
                 )
             )
             .padding(20.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column {
             Text(
-                text = "CSUCI Calendar",
+                text = "Spring 2026 Semester",
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onPrimary
             )
 
-            Text(
-                text = selectedDate.format(subtitleFormatter),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
-            )
+            Spacer(modifier = Modifier.height(8.dp))
 
-            StatsCard(
-                totalEventCount = totalEventCount,
-                activeDateCount = activeDateCount,
-                mode = mode
+            Text(
+                text = selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onPrimary
             )
         }
-    }
-}
-
-/** Shows the small summary card that sits inside the hero header. */
-@Composable
-private fun StatsCard(
-    totalEventCount: Int,
-    activeDateCount: Int,
-    mode: CalendarMode
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = 0.18f))
-            .padding(horizontal = 12.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        HeroStat(
-            label = "Events",
-            value = totalEventCount.toString(),
-            modifier = Modifier.weight(1f)
-        )
-
-        HeroStat(
-            label = "Active Days",
-            value = activeDateCount.toString(),
-            modifier = Modifier.weight(1f)
-        )
-
-        HeroStat(
-            label = "View",
-            value = mode.name,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-/** Shows one stat item in the hero summary card. */
-@Composable
-private fun HeroStat(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
-        )
-
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onPrimary,
-            fontWeight = FontWeight.Bold
-        )
     }
 }
 
@@ -329,9 +250,9 @@ private fun ModeCard(
     onClick: () -> Unit
 ) {
     val accentColor = modeAccentColor(mode)
-    val containerColor = if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceVariant
+    val containerColor = if (isSelected) accentColor else DateCellWhite
     val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else accentColor
-    val borderColor = if (isSelected) Color.Transparent else accentColor.copy(alpha = 0.25f)
+    val borderColor = if (isSelected) Color.Transparent else DateCellBorder
 
     Box(
         modifier = modifier
@@ -516,7 +437,7 @@ private fun SectionCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = CardOffWhite),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
@@ -581,7 +502,7 @@ private fun NavigationCircleButton(
         modifier = Modifier
             .size(40.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(DateCellWhite)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -623,7 +544,8 @@ private fun WeekdayChip(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(DateCellWhite)
+            .border(1.dp, DateCellBorder, RoundedCornerShape(14.dp))
             .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -796,7 +718,7 @@ private fun EmptyEventsMessage() {
         Text(
             text = "No events for this date.",
             style = MaterialTheme.typography.bodyLarge,
-            color = GrayIcon
+            color = SoftText
         )
     }
 }
@@ -811,7 +733,7 @@ private fun EventCard(event: CalendarEvent) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = CardOffWhite),
         elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
     ) {
         Column(
@@ -855,7 +777,7 @@ private fun EventBadge() {
         modifier = Modifier
             .padding(start = 12.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+            .background(DateCellWhite)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -874,7 +796,7 @@ private fun EventMetaLine(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodyMedium,
-        color = GrayIcon
+        color = SoftText
     )
 }
 
@@ -919,22 +841,22 @@ private fun buildOrderedDays(firstDayOfWeek: DayOfWeek): List<DayOfWeek> {
 /** Chooses the accent color for each calendar mode card. */
 private fun modeAccentColor(mode: CalendarMode): Color {
     return when (mode) {
-        CalendarMode.DAY -> BrandOrange
-        CalendarMode.WEEK -> BrandCrimson
-        CalendarMode.MONTH -> BrandPink
+        CalendarMode.DAY -> CoralRed
+        CalendarMode.WEEK -> CoralRed
+        CalendarMode.MONTH -> CoralRed
     }
 }
 
 /** Chooses the background color for a date cell. */
 @Composable
 private fun resolveDateCellBackgroundColor(isSelected: Boolean): Color {
-    return if (isSelected) BrandCrimson else MaterialTheme.colorScheme.surface
+    return if (isSelected) CoralRed else MaterialTheme.colorScheme.surface
 }
 
 /** Chooses the border color for a date cell. */
 @Composable
 private fun resolveDateCellBorderColor(isSelected: Boolean): Color {
-    return if (isSelected) BrandCrimson else GrayIcon.copy(alpha = 0.25f)
+    return if (isSelected) CoralRed else SoftBorder
 }
 
 /** Chooses the main text color for a date cell. */
@@ -946,13 +868,13 @@ private fun resolveDateCellTextColor(isSelected: Boolean): Color {
 /** Chooses the badge fill color used by the event count label. */
 @Composable
 private fun resolveEventCountBadgeColor(isSelected: Boolean): Color {
-    return if (isSelected) Color.White.copy(alpha = 0.22f) else BrandCrimson.copy(alpha = 0.12f)
+    return if (isSelected) Color.White.copy(alpha = 0.22f) else SelectedDateFill
 }
 
 /** Chooses the badge text color used by the event count label. */
 @Composable
 private fun resolveEventCountTextColor(isSelected: Boolean): Color {
-    return if (isSelected) MaterialTheme.colorScheme.onPrimary else BrandCrimson
+    return if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
 }
 
 /** Counts how many events fall on each date in the loaded month. */
