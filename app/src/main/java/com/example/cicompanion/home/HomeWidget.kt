@@ -29,7 +29,7 @@ fun CalendarWidget(events: List<CalendarEvent>,
         Surface(
             modifier = modifier
                 .fillMaxWidth()
-                .height(160.dp)
+                .height(140.dp)
                 .border(
                     width = 1.dp,
                     color = GrayIcon.copy(alpha = 0.3f),
@@ -69,14 +69,14 @@ fun CalendarWidget(events: List<CalendarEvent>,
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 10.dp, vertical = 20.dp),
+                .padding(horizontal = 10.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             VerticalPager(
                 state = pagerState,
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 10.dp, end = 20.dp),
+                    .padding(start = 10.dp, end = 14.dp),
                 userScrollEnabled = true,
                 horizontalAlignment = Alignment.Start
             ) { page ->
