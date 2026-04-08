@@ -102,7 +102,10 @@ private fun CalendarScreenBody(
 ) {
     ScrollablePage(contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
         CalendarHeroHeader(
-            selectedDate = selectedDate
+            selectedDate = selectedDate,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
         )
 
         Column(
