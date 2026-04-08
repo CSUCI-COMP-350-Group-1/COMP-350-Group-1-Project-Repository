@@ -54,9 +54,9 @@ fun UserSearchScreen(navController: NavHostController) {
     }
 
     var searchQuery by remember { mutableStateOf("") }
-
+    //Commented out for sprint 2, uncomment for future
     //Dummy state for now, add firebase functionality
-    val addedUsers = remember { mutableStateMapOf<String, Boolean>() }
+    //val addedUsers = remember { mutableStateMapOf<String, Boolean>() }
 
     val filteredUsers = if (searchQuery.isBlank()) {
         emptyList()
@@ -94,7 +94,8 @@ fun UserSearchScreen(navController: NavHostController) {
                     .padding(top = 16.dp)
             ) {
                 items(filteredUsers) { user ->
-                    UserSearchResultItem(
+                    //Commented out for sprint 2, uncomment for future
+                    /*UserSearchResultItem(
                         user = user,
                         isAdded = addedUsers[user.id] == true, //Dummy feature, local state only
                         onClick = {
@@ -108,6 +109,15 @@ fun UserSearchScreen(navController: NavHostController) {
                             // Replace with Firebase add friend / request logic later
                             addedUsers[user.id] = true
                         }
+                    )*/
+                    UserSearchResultItem(
+                        user = user,
+                        onClick = {
+                            // Placeholder for future Firebase/user profile navigation
+                            // Example later:
+                            // navController.navigate("user_profile/${user.id}")
+                            // Maybe
+                        }
                     )
                     HorizontalDivider()
                 }
@@ -119,9 +129,11 @@ fun UserSearchScreen(navController: NavHostController) {
 @Composable
 fun UserSearchResultItem(
     user: DummyUser,
-    isAdded: Boolean,
+    //Commented out for sprint 2, uncomment for future
+    //isAdded: Boolean,
     onClick: () -> Unit,
-    onAddClick: () -> Unit
+    //Commented out for sprint 2, uncomment for future
+    //onAddClick: () -> Unit
 ) {
     ListItem(
         headlineContent = {
@@ -137,7 +149,8 @@ fun UserSearchResultItem(
                 style = MaterialTheme.typography.bodySmall
             )
         },
-        trailingContent = {
+        //Commented out for sprint 2, uncomment for future
+        /*trailingContent = {
             Button(
                 onClick = onAddClick,
                 enabled = !isAdded
@@ -145,7 +158,7 @@ fun UserSearchResultItem(
                 //Dummy UI, only reflects local dummy state, not persistent
                 Text(if (isAdded) "Added" else "Add")
             }
-        },
+        },*/
         modifier = Modifier.clickable { onClick() }
     )
 }
