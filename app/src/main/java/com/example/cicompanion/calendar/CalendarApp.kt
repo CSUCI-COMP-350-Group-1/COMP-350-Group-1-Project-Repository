@@ -148,32 +148,33 @@ private fun CalendarScreenBody(
 /** Shows the large top header that sets the new visual style for the screen. */
 @Composable
 private fun CalendarHeroHeader(
-    selectedDate: LocalDate
+    selectedDate: LocalDate,
+    modifier: Modifier = Modifier
 ) {
-    val subtitleFormatter = remember { DateTimeFormatter.ofPattern("MMMM yyyy") }
-
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(
-                brush = Brush.horizontalGradient(
+                Brush.horizontalGradient(
                     colors = listOf(CoralRed, HotPink)
                 )
             )
             .padding(20.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column {
             Text(
                 text = "Spring 2026 Semester",
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onPrimary
             )
 
+            Spacer(modifier = Modifier.height(8.dp))
+
             Text(
-                text = selectedDate.format(subtitleFormatter),
+                text = selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
+                color = MaterialTheme.colorScheme.onPrimary
             )
         }
     }
