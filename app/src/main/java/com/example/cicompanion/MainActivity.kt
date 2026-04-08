@@ -40,6 +40,7 @@ import com.example.cicompanion.calendar.CalendarScreen
 import com.example.cicompanion.home.HomeScreen
 import com.example.cicompanion.maps.MapScreen
 import com.example.cicompanion.social.ProfileScreen
+import com.example.cicompanion.social.UserSearchScreen
 import com.example.cicompanion.studyRoom.LegendItem
 import com.example.cicompanion.studyRoom.RoomItem
 import com.example.cicompanion.studyRoom.RoomViewModel
@@ -85,6 +86,9 @@ fun AppNavigation() {
                 }
                 composable("profile") {
                     ProfileScreen(navController)
+                }
+                composable("userSearch") {
+                    UserSearchScreen(navController)
                 }
             }
         }
