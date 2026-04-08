@@ -11,10 +11,10 @@ object FirestoreManager {
 
         val userProfile = hashMapOf(
             "uid" to user.uid,
-            "displayName" to (user.displayName ?: ""),
+            "username" to (user.displayName ?: ""),
             "email" to (user.email ?: ""),
-            "photoUrl" to (user.photoUrl?.toString() ?: ""),
-            "lastSignIn" to System.currentTimeMillis()
+            "profileImageUrl" to (user.photoUrl?.toString() ?: ""),
+            "lastSignInAt" to System.currentTimeMillis()
         )
 
         userRef.set(userProfile, SetOptions.merge())
