@@ -5,5 +5,5 @@ data class UserProfile(
     val displayName: String = "",
     val email: String = "",
     val photoUrl: String = "",
-    val lastSignIn: Long = System.currentTimeMillis()
+    val lastSignInAt: Long = System.currentTimeMillis()
 )

@@ -1,7 +1,9 @@
 package com.example.cicompanion.firebase
 
 import android.content.Context
+import android.util.Log
 import com.example.cicompanion.social.FirestoreManager
+import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.firebase.auth.FirebaseAuth
@@ -9,8 +11,10 @@ import com.google.firebase.auth.GoogleAuthProvider
 
 object FirebaseAuthManager {
 
+    private const val TAG = "FirebaseAuthManager"
+
     /**
-     * Builds and returns the Google sign-in client used by the profile screen.
+     * Builds and returns the Google Sign-In client used by the app.
      */
     fun getGoogleSignInClient(context: Context): GoogleSignInClient {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -18,11 +22,12 @@ object FirebaseAuthManager {
             .requestEmail()
             .build()
 
-        return com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(context, gso)
+        return GoogleSignIn.getClient(context, gso)
     }
 
     /**
-     * Signs the Google user into Firebase and saves the user profile to Firestore.
+     * Signs the user into Firebase with the Google ID token.
+     * If sign-in succeeds, the user's profile is also saved to Firestore.
      */
     fun firebaseAuthWithGoogle(idToken: String) {
         val credential = GoogleAuthProvider.getCredential(idToken, null)
@@ -33,12 +38,14 @@ object FirebaseAuthManager {
                 if (task.isSuccessful) {
                     val user = FirebaseAuth.getInstance().currentUser
 
-                    user?.let { signedInUser ->
-                        FirestoreManager.saveUserToFirestore(signedInUser)
+                    if (user != null) {
+                        FirestoreManager.saveUserToFirestore(user)
+                        Log.d(TAG, "Signed in successfully as: ${user.email}")
+                    } else {
+                        Log.e(TAG, "Sign-in succeeded, but currentUser was null.")
                     }
-                    println("Signed in as: ${user?.email}")
                 } else {
-                    println("Sign in failed")
+                    Log.e(TAG, "Firebase sign-in failed.", task.exception)
                 }
             }
     }

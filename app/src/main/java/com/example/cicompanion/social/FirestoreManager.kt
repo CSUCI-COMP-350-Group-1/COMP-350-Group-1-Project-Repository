@@ -1,13 +1,17 @@
 package com.example.cicompanion.social
 
+import android.util.Log
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 
 object FirestoreManager {
 
+    private const val TAG = "FirestoreManager"
+
     /**
      * Saves the signed-in user's profile data to Firestore.
+     * The document ID is the user's Firebase UID.
      */
     fun saveUserToFirestore(user: FirebaseUser) {
         val db = FirebaseFirestore.getInstance()
@@ -24,10 +28,10 @@ object FirestoreManager {
 
         userRef.set(userProfile, SetOptions.merge())
             .addOnSuccessListener {
-                println("User saved to Firestore")
+                Log.d(TAG, "User profile saved to Firestore for uid=${user.uid}")
             }
             .addOnFailureListener { exception ->
-                println("Failed to save user: ${exception.message}")
+                Log.e(TAG, "Failed to save user profile to Firestore.", exception)
             }
     }
 }
