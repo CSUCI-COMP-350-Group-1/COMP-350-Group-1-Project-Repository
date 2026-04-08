@@ -20,7 +20,6 @@ import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.ui.theme.BrandRedLight
 import com.example.cicompanion.ui.theme.GrayIcon
 import com.example.cicompanion.ui.theme.NavBackground
-import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 @Composable

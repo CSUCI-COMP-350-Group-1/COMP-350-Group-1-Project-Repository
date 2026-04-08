@@ -26,7 +26,8 @@ import com.example.cicompanion.home.HomeScreen
 import com.example.cicompanion.maps.MapScreen
 import com.example.cicompanion.social.ProfileScreen
 import com.example.cicompanion.ui.NavBar
-import com.example.cicompanion.social.NotificationScreen
+//Commented out for this sprint 2, needed for notifications in future
+//import com.example.cicompanion.social.NotificationScreen
 import com.example.cicompanion.social.UserSearchScreen
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
@@ -84,8 +85,9 @@ fun AppNavigation() {
                             launchSingleTop = true
                         }
                     },
+                    //Commented out for this sprint 2, needed for notifications page in future
                     onNotificationClick = {
-                        navController.navigate("notifications")
+                        //navController.navigate("notifications")
                     }
                 )},
             bottomBar = { NavBar(navController) }
@@ -110,10 +112,11 @@ fun AppNavigation() {
                     composable(Routes.PROFILE) {
                         ProfileScreen(navController)
                     }
-                    composable(Routes.NOTIFICATIONS) {
+                    //Commented out for this sprint 2, uncomment for future notification
+                    /*composable(Routes.NOTIFICATIONS) {
                         NotificationScreen(navController)
 
-                    }
+                    }*/
                     composable(Routes.USER_SEARCH) {
                         UserSearchScreen(navController)
                     }
