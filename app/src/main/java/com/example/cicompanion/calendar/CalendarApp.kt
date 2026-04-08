@@ -155,7 +155,7 @@ private fun CalendarHeroHeader(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(
                 brush = Brush.horizontalGradient(
                     colors = listOf(CoralRed, HotPink)
