@@ -33,6 +33,7 @@ object Routes {
     const val STUDY_ROOM = "studyRoom"
     const val PROFILE = "profile"
     const val NOTIFICATIONS = "notifications"
+    const val USER_SEARCH = "user_search"
 }
 
 @Composable

@@ -3,6 +3,7 @@ package com.example.cicompanions.appNavigation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
@@ -28,13 +29,19 @@ fun screenTitleForRoute(route: String?): String {
         Routes.STUDY_ROOM -> "Study Room"
         Routes.PROFILE -> "Profile"
         Routes.NOTIFICATIONS -> "Notifications"
+        Routes.USER_SEARCH -> "User Search"
         else -> "CI Companion"
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TopBar(title: String, onHamburgerClick: () -> Unit, onNotificationClick: () -> Unit) {
+fun TopBar(
+    title: String,
+    showBackButton: Boolean,
+    onHamburgerClick: () -> Unit,
+    onBackClick: () -> Unit,
+    onNotificationClick: () -> Unit) {
     val topBarGradient = Brush.linearGradient(
         colors = listOf(BrandRedLighter, BrandRedDark)
     )
@@ -48,8 +55,20 @@ fun TopBar(title: String, onHamburgerClick: () -> Unit, onNotificationClick: () 
                 actionIconContentColor = Color.White
             ),
             navigationIcon = {
-                IconButton(onClick = onHamburgerClick) {
-                    Icon(Icons.Default.Menu, contentDescription = null)
+                if (showBackButton) {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                } else {
+                    IconButton(onClick = onHamburgerClick) {
+                        Icon(
+                            Icons.Default.Menu,
+                            contentDescription = "Menu"
+                        )
+                    }
                 }
             },
             actions = {

@@ -16,7 +16,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -33,6 +37,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.example.cicompanion.ui.theme.CICompanionTheme
 import androidx.compose.material3.TopAppBar
+import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.GrayIcon
 import com.example.cicompanion.ui.theme.GreenAccent
@@ -43,7 +48,20 @@ import com.example.cicompanion.ui.theme.NavBackground
 @Composable
 fun ProfileScreen(navController: NavHostController) {
     Scaffold (
-        containerColor = AppBackground
+        containerColor = AppBackground,
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { navController.navigate(Routes.USER_SEARCH) },
+                shape = CircleShape,
+                containerColor = NavBackground,
+                contentColor = Color.Black
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Search Users"
+                )
+            }
+        }
     ){ innerPadding ->
         Column(
             modifier = Modifier

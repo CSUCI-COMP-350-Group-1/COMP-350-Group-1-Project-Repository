@@ -17,7 +17,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cicompanion.ui.theme.CICompanionTheme
-import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -28,6 +27,7 @@ import com.example.cicompanion.maps.MapScreen
 import com.example.cicompanion.social.ProfileScreen
 import com.example.cicompanion.ui.NavBar
 import com.example.cicompanion.social.NotificationScreen
+import com.example.cicompanion.social.UserSearchScreen
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import kotlinx.coroutines.launch
@@ -56,7 +56,8 @@ fun AppNavigation() {
     val scope = rememberCoroutineScope()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentScreenTitle = screenTitleForRoute(navBackStackEntry?.destination?.route)
+    val currentRoute = navBackStackEntry?.destination?.route
+    val currentScreenTitle = screenTitleForRoute(currentRoute)
 
 
     ModalNavigationDrawer(
@@ -74,8 +75,15 @@ fun AppNavigation() {
             topBar = {
                 TopBar(
                     title = currentScreenTitle,
+                    showBackButton = currentRoute == Routes.USER_SEARCH,
                     onHamburgerClick = {
-                        scope.launch{drawerState.open()}},
+                        scope.launch{drawerState.open()} },
+                    onBackClick = {
+                        navController.navigate(Routes.PROFILE) {
+                            popUpTo(Routes.PROFILE) { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    },
                     onNotificationClick = {
                         navController.navigate("notifications")
                     }
@@ -105,6 +113,9 @@ fun AppNavigation() {
                     composable(Routes.NOTIFICATIONS) {
                         NotificationScreen(navController)
 
+                    }
+                    composable(Routes.USER_SEARCH) {
+                        UserSearchScreen(navController)
                     }
                 }
             }
