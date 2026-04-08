@@ -62,8 +62,8 @@ fun AppNavigation() {
 
 
     ModalNavigationDrawer(
-        drawerState =
-            drawerState,
+        drawerState = drawerState,
+        gesturesEnabled = drawerState.isOpen, //Stop hamburger menu from opening when swiped
         drawerContent = {
             DrawerProfileContent(
                 navController,
