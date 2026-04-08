@@ -30,12 +30,14 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun RoomItem(room: StudyRoom) {
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp) //Background changes back box color of room card
-        ,
-        elevation = CardDefaults.cardElevation(2.dp)
+            .padding(vertical = 6.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = NavBackground,
+        tonalElevation = 2.dp,
+        shadowElevation = 2.dp
     ) {
         Column(modifier = Modifier.padding(16.dp)) { //Background here changes center of study room card
 
@@ -62,7 +64,7 @@ fun RoomItem(room: StudyRoom) {
 
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = NavBackground, //Changes color of time box
+                        color = AppBackground, //Changes color of time box
                         border = BorderStroke(1.dp, GrayIcon.copy(alpha = 0.25f))
                     ) {
                         Text(
