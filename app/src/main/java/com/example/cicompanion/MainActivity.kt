@@ -26,6 +26,7 @@ import com.example.cicompanion.appNavigation.screenTitleForRoute
 import com.example.cicompanion.calendar.CalendarScreen
 import com.example.cicompanion.home.HomeScreen
 import com.example.cicompanion.maps.MapScreen
+import com.example.cicompanion.social.FriendRequestsScreen
 import com.example.cicompanion.social.ProfileScreen
 import com.example.cicompanion.social.UserSearchScreen
 import com.example.cicompanion.studyRoom.RoomListScreen
@@ -74,7 +75,7 @@ fun AppNavigation() {
             topBar = {
                 TopBar(
                     title = currentScreenTitle,
-                    showBackButton = currentRoute == Routes.USER_SEARCH,
+                    showBackButton = currentRoute == Routes.USER_SEARCH || currentRoute == Routes.FRIEND_REQUESTS,
                     onHamburgerClick = {
                         scope.launch { drawerState.open() }
                     },
@@ -116,7 +117,7 @@ fun AppNavigation() {
                         UserSearchScreen(navController)
                     }
                     composable(Routes.FRIEND_REQUESTS) {
-                        UserSearchScreen(navController)
+                        FriendRequestsScreen(navController)
                     }
                 }
             }

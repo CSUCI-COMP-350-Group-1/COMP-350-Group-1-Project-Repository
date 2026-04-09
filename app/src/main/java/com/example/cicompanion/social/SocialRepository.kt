@@ -270,6 +270,22 @@ object SocialRepository {
     }
 
     /**
+     * Declines a pending friend request by updating its status.
+     */
+    fun declineFriendRequest(
+        request: FriendRequest,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        updateFriendRequestStatus(
+            requestId = request.id,
+            newStatus = "declined",
+            onSuccess = onSuccess,
+            onError = onError
+        )
+    }
+
+    /**
      * Updates the status field for one friend request document.
      */
     private fun updateFriendRequestStatus(

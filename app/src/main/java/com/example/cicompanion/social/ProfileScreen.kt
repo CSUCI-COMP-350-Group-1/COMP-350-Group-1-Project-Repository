@@ -128,7 +128,7 @@ fun ProfileScreen(navController: NavHostController) {
                         navController.navigate(Routes.USER_SEARCH)
                     },
                     onViewFriendRequests = {
-                         navController.navigate("friendRequests")
+                        navController.navigate(Routes.FRIEND_REQUESTS)
                     },
                     onSignOut = {
                         FirebaseAuth.getInstance().signOut()
