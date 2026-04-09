@@ -80,8 +80,8 @@ fun ProfileScreen(navController: NavHostController) {
             FloatingActionButton(
                 onClick = { navController.navigate(Routes.USER_SEARCH) },
                 shape = CircleShape,
-                containerColor = NavBackground,
-                contentColor = Color.Black
+                containerColor = Color.Red,
+                contentColor = Color.White
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
@@ -168,9 +168,11 @@ private fun ProfileActionArea(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            /* Commented out: Plus button replaces this
             Button(onClick = onFindFriends) {
                 Text("Find Friends")
             }
+             */
             Spacer(modifier = Modifier.height(16.dp))
             /* Commented out Friend Requests button
             Button(onClick = onViewFriendRequests) {
@@ -178,7 +180,13 @@ private fun ProfileActionArea(
             }
             Spacer(modifier = Modifier.height(16.dp))
             */
-            Button(onClick = onSignOut) {
+            Button(
+                onClick = onSignOut,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Red,
+                    contentColor = Color.White
+                )
+            ) {
                 Text("Sign Out")
             }
         }
