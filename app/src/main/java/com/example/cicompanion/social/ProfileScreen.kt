@@ -172,10 +172,12 @@ private fun ProfileActionArea(
                 Text("Find Friends")
             }
             Spacer(modifier = Modifier.height(16.dp))
+            /* Commented out Friend Requests button
             Button(onClick = onViewFriendRequests) {
                 Text("Friend Requests")
             }
             Spacer(modifier = Modifier.height(16.dp))
+            */
             Button(onClick = onSignOut) {
                 Text("Sign Out")
             }

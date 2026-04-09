@@ -86,7 +86,8 @@ fun AppNavigation() {
                     },
                     onNotificationClick = {
                         // navController.navigate(Routes.NOTIFICATIONS)
-                    }
+                    },
+                    navController = navController
                 )
             },
             bottomBar = { NavBar(navController) }
