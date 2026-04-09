@@ -9,10 +9,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -21,7 +25,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -34,9 +38,6 @@ import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 
-/**
- * Displays a searchable list of users and lets the current user send friend requests.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserSearchScreen(_navController: NavHostController) {
@@ -46,7 +47,7 @@ fun UserSearchScreen(_navController: NavHostController) {
     var isLoading by remember { mutableStateOf(currentUser != null) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val sentRequestUserIds = remember { mutableStateListOf<String>() }
+    val requestStatuses = remember { mutableStateMapOf<String, String>() }
 
     LaunchedEffect(currentUser?.uid) {
         if (currentUser == null) {
@@ -58,6 +59,15 @@ fun UserSearchScreen(_navController: NavHostController) {
             currentUserId = currentUser.uid,
             onLoadingChanged = { isLoading = it },
             onUsersLoaded = { users = it },
+            onError = { errorMessage = it }
+        )
+
+        loadOutgoingRequestStatuses(
+            currentUserId = currentUser.uid,
+            onStatusesLoaded = { statuses ->
+                requestStatuses.clear()
+                requestStatuses.putAll(statuses)
+            },
             onError = { errorMessage = it }
         )
     }
@@ -81,11 +91,11 @@ fun UserSearchScreen(_navController: NavHostController) {
                 isLoading = isLoading,
                 statusMessage = statusMessage,
                 errorMessage = errorMessage,
-                sentRequestUserIds = sentRequestUserIds,
+                requestStatuses = requestStatuses,
                 onSendRequest = { targetUser ->
                     sendFriendRequest(
                         targetUser = targetUser,
-                        sentRequestUserIds = sentRequestUserIds,
+                        requestStatuses = requestStatuses,
                         onStatusChanged = {
                             statusMessage = it
                             errorMessage = null
@@ -102,9 +112,6 @@ fun UserSearchScreen(_navController: NavHostController) {
     }
 }
 
-/**
- * Loads the list of users that can appear in the search results.
- */
 private fun loadSearchableUsers(
     currentUserId: String,
     onLoadingChanged: (Boolean) -> Unit,
@@ -126,12 +133,21 @@ private fun loadSearchableUsers(
     )
 }
 
-/**
- * Sends a friend request to the selected user and tracks the request locally.
- */
+private fun loadOutgoingRequestStatuses(
+    currentUserId: String,
+    onStatusesLoaded: (Map<String, String>) -> Unit,
+    onError: (String) -> Unit
+) {
+    SocialRepository.fetchOutgoingFriendRequestStatuses(
+        currentUserId = currentUserId,
+        onSuccess = onStatusesLoaded,
+        onError = onError
+    )
+}
+
 private fun sendFriendRequest(
     targetUser: UserProfile,
-    sentRequestUserIds: MutableList<String>,
+    requestStatuses: MutableMap<String, String>,
     onStatusChanged: (String) -> Unit,
     onError: (String) -> Unit
 ) {
@@ -146,18 +162,13 @@ private fun sendFriendRequest(
         currentUser = currentUser,
         targetUser = targetUser,
         onSuccess = {
-            if (!sentRequestUserIds.contains(targetUser.uid)) {
-                sentRequestUserIds.add(targetUser.uid)
-            }
+            requestStatuses[targetUser.uid] = "pending"
             onStatusChanged("Friend request sent to ${SocialRepository.displayNameOrEmail(targetUser)}.")
         },
         onError = onError
     )
 }
 
-/**
- * Filters the user list by display name or email.
- */
 private fun filterUsers(users: List<UserProfile>, searchQuery: String): List<UserProfile> {
     if (searchQuery.isBlank()) {
         return users
@@ -168,18 +179,12 @@ private fun filterUsers(users: List<UserProfile>, searchQuery: String): List<Use
     }
 }
 
-/**
- * Returns whether the search query matches a user's display name or email.
- */
 private fun matchesSearchQuery(user: UserProfile, searchQuery: String): Boolean {
     val query = searchQuery.trim()
     return user.displayName.contains(query, ignoreCase = true) ||
-        user.email.contains(query, ignoreCase = true)
+            user.email.contains(query, ignoreCase = true)
 }
 
-/**
- * Displays the signed-out message for the friend-search screen.
- */
 @Composable
 private fun SignedOutSearchMessage(modifier: Modifier = Modifier) {
     Column(
@@ -196,9 +201,6 @@ private fun SignedOutSearchMessage(modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * Displays the complete friend-search screen content for signed-in users.
- */
 @Composable
 private fun UserSearchContent(
     searchQuery: String,
@@ -207,7 +209,7 @@ private fun UserSearchContent(
     isLoading: Boolean,
     statusMessage: String?,
     errorMessage: String?,
-    sentRequestUserIds: List<String>,
+    requestStatuses: Map<String, String>,
     onSendRequest: (UserProfile) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -229,16 +231,13 @@ private fun UserSearchContent(
             users.isEmpty() -> EmptyUsersMessage()
             else -> UserResultsList(
                 users = users,
-                sentRequestUserIds = sentRequestUserIds,
+                requestStatuses = requestStatuses,
                 onSendRequest = onSendRequest
             )
         }
     }
 }
 
-/**
- * Displays the text field used to search for users.
- */
 @Composable
 private fun SearchUsersField(
     searchQuery: String,
@@ -253,9 +252,6 @@ private fun SearchUsersField(
     )
 }
 
-/**
- * Displays a status or error message when one is available.
- */
 @Composable
 private fun SearchMessageText(message: String?, color: Color) {
     if (message == null) {
@@ -269,9 +265,6 @@ private fun SearchMessageText(message: String?, color: Color) {
     )
 }
 
-/**
- * Displays the loading state while users are being fetched from Firestore.
- */
 @Composable
 private fun SearchLoadingState() {
     Column(
@@ -284,9 +277,6 @@ private fun SearchLoadingState() {
     }
 }
 
-/**
- * Displays the message shown when there are no matching users.
- */
 @Composable
 private fun EmptyUsersMessage() {
     Text(
@@ -296,13 +286,10 @@ private fun EmptyUsersMessage() {
     )
 }
 
-/**
- * Displays the list of matching user search results.
- */
 @Composable
 private fun UserResultsList(
     users: List<UserProfile>,
-    sentRequestUserIds: List<String>,
+    requestStatuses: Map<String, String>,
     onSendRequest: (UserProfile) -> Unit
 ) {
     LazyColumn(
@@ -314,20 +301,17 @@ private fun UserResultsList(
         items(users, key = { it.uid }) { user ->
             UserSearchResultCard(
                 user = user,
-                requestAlreadySent = sentRequestUserIds.contains(user.uid),
+                requestStatus = requestStatuses[user.uid],
                 onSendRequest = { onSendRequest(user) }
             )
         }
     }
 }
 
-/**
- * Displays one user result with a friend-request button.
- */
 @Composable
 private fun UserSearchResultCard(
     user: UserProfile,
-    requestAlreadySent: Boolean,
+    requestStatus: String?,
     onSendRequest: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -340,19 +324,50 @@ private fun UserSearchResultCard(
         ) {
             UserSummary(user = user)
 
-            Button(
-                onClick = onSendRequest,
-                enabled = !requestAlreadySent
-            ) {
-                Text(if (requestAlreadySent) "Sent" else "Add Friend")
-            }
+            FriendRequestStatusButton(
+                requestStatus = requestStatus,
+                onClick = onSendRequest
+            )
         }
     }
 }
 
-/**
- * Displays the basic information for one user in the result list.
- */
+@Composable
+private fun FriendRequestStatusButton(
+    requestStatus: String?,
+    onClick: () -> Unit
+) {
+    val isAccepted = requestStatus == "accepted"
+    val isPending = requestStatus == "pending"
+
+    val iconTint = when {
+        isAccepted -> Color(0xFF2E7D32)
+        isPending -> Color.Gray
+        else -> Color(0xFF6750A4)
+    }
+
+    IconButton(
+        onClick = onClick,
+        enabled = !isAccepted && !isPending
+    ) {
+        if (isAccepted || isPending) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = "Friend request status",
+                tint = iconTint,
+                modifier = Modifier.size(28.dp)
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Filled.Add,
+                contentDescription = "Add friend",
+                tint = iconTint,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+    }
+}
+
 @Composable
 private fun UserSummary(user: UserProfile) {
     Row(
@@ -375,9 +390,6 @@ private fun UserSummary(user: UserProfile) {
     }
 }
 
-/**
- * Displays the user photo when available.
- */
 @Composable
 private fun UserAvatar(photoUrl: String) {
     if (photoUrl.isBlank()) {
@@ -392,9 +404,6 @@ private fun UserAvatar(photoUrl: String) {
     )
 }
 
-/**
- * Displays a small placeholder avatar for users without a photo.
- */
 @Composable
 private fun EmptyUserAvatar() {
     Card(modifier = Modifier.size(48.dp)) {}

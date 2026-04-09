@@ -2,6 +2,7 @@ package com.example.cicompanion.social
 
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 
 object SocialRepository {
 
@@ -29,7 +30,34 @@ object SocialRepository {
     }
 
     /**
-     * Sends a friend request only when one does not already exist for the same pair of users.
+     * Loads all outgoing friend request statuses for the current user.
+     * The map key is the target user's uid.
+     */
+    fun fetchOutgoingFriendRequestStatuses(
+        currentUserId: String,
+        onSuccess: (Map<String, String>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        friendRequestsCollection()
+            .whereEqualTo("fromUserId", currentUserId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val statuses = snapshot.documents.associate { document ->
+                    val request = document.toObject(FriendRequest::class.java)
+                    val targetUid = request?.toUserId ?: ""
+                    val status = request?.status ?: "pending"
+                    targetUid to status
+                }.filterKeys { it.isNotBlank() }
+
+                onSuccess(statuses)
+            }
+            .addOnFailureListener { exception ->
+                onError(exception.message ?: "Could not load friend request statuses.")
+            }
+    }
+
+    /**
+     * Sends a friend request from the current user to the selected target user.
      */
     fun sendFriendRequest(
         currentUser: FirebaseUser,
@@ -43,17 +71,11 @@ object SocialRepository {
         }
 
         val requestId = createFriendRequestId(currentUser.uid, targetUser.uid)
+        val request = buildFriendRequest(currentUser, targetUser, requestId)
 
-        checkIfRequestExists(
-            requestId = requestId,
-            onComplete = { exists ->
-                if (exists) {
-                    onError("You already sent a friend request to this user.")
-                } else {
-                    val request = buildFriendRequest(currentUser, targetUser, requestId)
-                    saveFriendRequest(request, onSuccess, onError)
-                }
-            },
+        createFriendRequest(
+            request = request,
+            onSuccess = onSuccess,
             onError = onError
         )
     }
@@ -88,28 +110,9 @@ object SocialRepository {
     }
 
     /**
-     * Checks whether a friend request document already exists.
+     * Creates the friend request document in Firestore.
      */
-    private fun checkIfRequestExists(
-        requestId: String,
-        onComplete: (Boolean) -> Unit,
-        onError: (String) -> Unit
-    ) {
-        friendRequestsCollection()
-            .document(requestId)
-            .get()
-            .addOnSuccessListener { document ->
-                onComplete(document.exists())
-            }
-            .addOnFailureListener { exception ->
-                onError(exception.message ?: "Could not verify the existing friend request.")
-            }
-    }
-
-    /**
-     * Saves a new friend request to Firestore.
-     */
-    private fun saveFriendRequest(
+    private fun createFriendRequest(
         request: FriendRequest,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
@@ -121,8 +124,22 @@ object SocialRepository {
                 onSuccess()
             }
             .addOnFailureListener { exception ->
-                onError(exception.message ?: "Could not send the friend request.")
+                onError(friendRequestErrorMessage(exception))
             }
+    }
+
+    /**
+     * Converts Firestore failures into a friendlier message for the UI.
+     */
+    private fun friendRequestErrorMessage(exception: Exception): String {
+        return if (
+            exception is FirebaseFirestoreException &&
+            exception.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
+        ) {
+            "This friend request already exists, or Firestore rules blocked the write."
+        } else {
+            exception.message ?: "Could not send the friend request."
+        }
     }
 
     /**
@@ -140,5 +157,6 @@ object SocialRepository {
     /**
      * Returns the friend-requests collection reference.
      */
-    private fun friendRequestsCollection() = FirebaseFirestore.getInstance().collection("friend_requests")
+    private fun friendRequestsCollection() =
+        FirebaseFirestore.getInstance().collection("friend_requests")
 }
