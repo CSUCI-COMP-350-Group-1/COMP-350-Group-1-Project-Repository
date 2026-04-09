@@ -79,6 +79,8 @@ dependencies {
 
     // Calendar implementation
     implementation("com.google.android.gms:play-services-auth:21.5.1")
+    implementation(libs.androidx.material3)
+    implementation(libs.androidx.compose.foundation)
 
     // Import the Firebase BoM
     implementation(platform("com.google.firebase:firebase-bom:34.11.0"))

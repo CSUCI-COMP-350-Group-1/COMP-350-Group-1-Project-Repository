@@ -37,7 +37,7 @@ class RoomViewModel : ViewModel() {
                 val className = slot.optString("className", "").lowercase()
 
                 val isAvailable = if (className.isEmpty()) true
-                //
+
                 else !className.contains("s-lc-eq-checkout") && !className.contains("unavailable")
 
                 processedData.getOrPut(date) { mutableMapOf() }

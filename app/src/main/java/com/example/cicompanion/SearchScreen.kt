@@ -1,5 +1,6 @@
 package com.example.cicompanion
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
@@ -28,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.CICompanionTheme
 
 data class AppFeature(
@@ -62,15 +65,12 @@ fun SearchScreen(navController: NavHostController) {
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Search", fontSize = 20.sp) }
-            )
-        },
+        containerColor = AppBackground,
         content = { paddingValues ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(AppBackground)
                     .padding(paddingValues)
                     .padding(16.dp)
             ) {
@@ -79,7 +79,8 @@ fun SearchScreen(navController: NavHostController) {
                     onValueChange = { searchQuery = it },
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("Search for a feature...") },
-                    singleLine = true
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp)
                 )
 
                 LazyColumn(

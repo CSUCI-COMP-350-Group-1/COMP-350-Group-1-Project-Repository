@@ -2,10 +2,13 @@ package com.example.cicompanion.studyRoom
 
 //Imports for the VIEW
 
+import android.R.attr.textColor
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -13,6 +16,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import com.example.cicompanion.ui.theme.AppBackground
+import com.example.cicompanion.ui.theme.GrayIcon
+import com.example.cicompanion.ui.theme.GreenAccent
+import com.example.cicompanion.ui.theme.NavBackground
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -23,11 +30,16 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun RoomItem(room: StudyRoom) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        elevation = CardDefaults.cardElevation(2.dp)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = NavBackground,
+        tonalElevation = 2.dp,
+        shadowElevation = 2.dp
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) { //Background here changes center of study room card
 
             // Display room name
             Text(text = room.name, style = MaterialTheme.typography.titleLarge)
@@ -36,7 +48,7 @@ fun RoomItem(room: StudyRoom) {
             // Display row of time slots
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 2.dp)
+                contentPadding = PaddingValues(horizontal = 2.dp), //background for center card
             ) {
                 items(room.slots) { slot ->
                     // Format the time from 24h to 12h time
@@ -51,9 +63,9 @@ fun RoomItem(room: StudyRoom) {
                     val color = if (slot.isAvailable) Color(0xFF2E7D32) else Color(0xFFD32F2F)
 
                     Surface(
-                        shape = MaterialTheme.shapes.small,
-                        color = color.copy(alpha = 0.12f),
-                        border = BorderStroke(1.dp, color.copy(alpha = 0.5f))
+                        shape = RoundedCornerShape(8.dp),
+                        color = AppBackground, //Changes color of time box
+                        border = BorderStroke(1.dp, GrayIcon.copy(alpha = 0.25f))
                     ) {
                         Text(
                             text = displayTime,
