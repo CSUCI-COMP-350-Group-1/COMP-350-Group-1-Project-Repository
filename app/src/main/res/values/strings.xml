@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Sprint 1 Home UI</string>
+    <string name="app_name">CI Companion</string>
     <string name="profile_title">Profile</string>
     <string name="example_user_name">Example User</string>
     <string name="example_user_email">example@myci.csuci.edu</string>
