@@ -160,7 +160,12 @@ private fun ProfileActionArea(
     onSignOut: () -> Unit
 ) {
     if (currentUser == null) {
-        Button(onClick = onSignIn) {
+        Button(onClick = onSignIn,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Red,
+                contentColor = Color.White
+            )
+            ) {
             Text("Sign in with Google")
         }
     } else {
