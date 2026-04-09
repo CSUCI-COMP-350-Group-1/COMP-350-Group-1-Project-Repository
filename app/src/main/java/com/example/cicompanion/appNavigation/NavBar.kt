@@ -27,6 +27,7 @@ import com.example.cicompanion.ui.theme.BrandRedLight
 import com.example.cicompanion.ui.theme.GrayIcon
 import com.example.cicompanion.ui.theme.NavBackground
 import kotlin.math.min
+import androidx.navigation.NavGraph.Companion.findStartDestination
 
 //For easy mapping in other files
 object Routes {

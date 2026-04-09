@@ -1,7 +1,8 @@
-package com.example.cicompanions.appNavigation
+package com.example.cicompanion.appNavigation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
@@ -9,7 +10,9 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -41,7 +44,9 @@ fun TopBar(
     showBackButton: Boolean,
     onHamburgerClick: () -> Unit,
     onBackClick: () -> Unit,
-    onNotificationClick: () -> Unit) {
+    onNotificationClick: () -> Unit,
+    navController: NavController
+) {
     val topBarGradient = Brush.linearGradient(
         colors = listOf(BrandRedLighter, BrandRedDark)
     )
@@ -63,12 +68,35 @@ fun TopBar(
                         )
                     }
                 } else {
+                    // Profile button replacing hamburger menu
+                    IconButton(onClick = {
+                        navController.navigate(Routes.PROFILE) {
+                            launchSingleTop = true
+                        }
+                    }) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(Color.White), // Using white background for contrast against the red top bar
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Profile",
+                                tint = BrandRedDark,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    /* Hamburger menu commented out
                     IconButton(onClick = onHamburgerClick) {
                         Icon(
                             Icons.Default.Menu,
                             contentDescription = "Menu"
                         )
                     }
+                    */
                 }
             },
             actions = {

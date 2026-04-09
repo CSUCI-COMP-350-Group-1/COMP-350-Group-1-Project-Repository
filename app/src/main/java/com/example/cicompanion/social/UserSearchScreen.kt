@@ -1,125 +1,129 @@
 package com.example.cicompanion.social
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImage
 import com.example.cicompanion.ui.theme.AppBackground
-import com.example.cicompanion.ui.theme.CICompanionTheme
+import com.google.firebase.auth.FirebaseAuth
 
-//Dummy data model
-//Can expand with firebase needs
-data class DummyUser(
-    val id: String,
-    val name: String,
-    val email: String,
-    val major: String
-)
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserSearchScreen(navController: NavHostController) {
-    //Dummy user data
-    val dummyUsers = remember {
-        listOf(
-            DummyUser("1","Alice Johnson", "alice@students.ci.edu", "Computer Science"),
-            DummyUser("2","Brandon Lee", "brandon@students.ci.edu", "Information Systems"),
-            DummyUser("3","Cynthia Park", "cynthia@students.ci.edu", "Data Science"),
-            DummyUser("4","Daniel Smith", "daniel@students.ci.edu", "Computer Science"),
-            DummyUser("5","Eva Martinez", "eva@students.ci.edu", "Software Engineering")
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    var searchQuery by remember { mutableStateOf("") }
+    var users by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(currentUser != null) }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val requestStatuses = remember { mutableStateMapOf<String, String>() }
+
+    LaunchedEffect(currentUser?.uid) {
+        if (currentUser == null) {
+            isLoading = false
+            return@LaunchedEffect
+        }
+
+        SocialRepository.fetchSearchableUsers(
+            currentUserId = currentUser.uid,
+            onSuccess = { loadedUsers ->
+                users = loadedUsers
+                isLoading = false
+            },
+            onError = { 
+                errorMessage = it
+                isLoading = false
+            }
+        )
+
+        SocialRepository.fetchOutgoingFriendRequestStatuses(
+            currentUserId = currentUser.uid,
+            onSuccess = { statuses ->
+                requestStatuses.clear()
+                requestStatuses.putAll(statuses)
+            },
+            onError = { errorMessage = it }
         )
     }
 
-    var searchQuery by remember { mutableStateOf("") }
-    //Commented out for sprint 2, uncomment for future
-    //Dummy state for now, add firebase functionality
-    //val addedUsers = remember { mutableStateMapOf<String, Boolean>() }
-
     val filteredUsers = if (searchQuery.isBlank()) {
-        emptyList()
+        users
     } else {
-        //Dummy source
-        dummyUsers.filter { user ->
-            user.name.contains(searchQuery, ignoreCase = true) ||
-                    user.email.contains(searchQuery, ignoreCase = true) ||
-                    user.major.contains(searchQuery, ignoreCase = true)
+        users.filter { user ->
+            user.displayName.contains(searchQuery, ignoreCase = true) ||
+            user.email.contains(searchQuery, ignoreCase = true)
         }
     }
 
     Scaffold(
         containerColor = AppBackground
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(AppBackground)
-                .padding(paddingValues)
-                .padding(16.dp)
-        ) {
-            TextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search for a user...") },
-                singleLine = true,
-                shape = RoundedCornerShape(8.dp)
-            )
-
-            LazyColumn(
+    ) { innerPadding ->
+        if (currentUser == null) {
+            SignedOutSearchMessage(modifier = Modifier.padding(innerPadding))
+        } else {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp)
+                    .padding(innerPadding)
+                    .fillMaxSize()
+                    .padding(16.dp)
             ) {
-                items(filteredUsers) { user ->
-                    //Commented out for sprint 2, uncomment for future
-                    /*UserSearchResultItem(
-                        user = user,
-                        isAdded = addedUsers[user.id] == true, //Dummy feature, local state only
-                        onClick = {
-                            // Placeholder for future Firebase/user profile navigation
-                            // Example later:
-                            // navController.navigate("user_profile/${user.id}")
-                            // Maybe
-                        },
-                        onAddClick = {
-                            // Dummy add button functionality for now
-                            // Replace with Firebase add friend / request logic later
-                            addedUsers[user.id] = true
+                TextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Search by name or email") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp)
+                )
+
+                if (statusMessage != null) {
+                    Text(text = statusMessage!!, color = Color(0xFF2E7D32), modifier = Modifier.padding(top = 8.dp))
+                }
+                if (errorMessage != null) {
+                    Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+                }
+
+                if (isLoading) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize().padding(top = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(filteredUsers, key = { it.uid }) { user ->
+                            UserSearchResultCard(
+                                user = user,
+                                requestStatus = requestStatuses[user.uid],
+                                onSendRequest = {
+                                    SocialRepository.sendFriendRequest(
+                                        currentUser = currentUser,
+                                        targetUser = user,
+                                        onSuccess = {
+                                            requestStatuses[user.uid] = "pending"
+                                            statusMessage = "Friend request sent to ${SocialRepository.displayNameOrEmail(user)}."
+                                        },
+                                        onError = { errorMessage = it }
+                                    )
+                                }
+                            )
                         }
-                    )*/
-                    UserSearchResultItem(
-                        user = user,
-                        onClick = {
-                            // Placeholder for future Firebase/user profile navigation
-                            // Example later:
-                            // navController.navigate("user_profile/${user.id}")
-                            // Maybe
-                        }
-                    )
-                    HorizontalDivider()
+                    }
                 }
             }
         }
@@ -127,47 +131,52 @@ fun UserSearchScreen(navController: NavHostController) {
 }
 
 @Composable
-fun UserSearchResultItem(
-    user: DummyUser,
-    //Commented out for sprint 2, uncomment for future
-    //isAdded: Boolean,
-    onClick: () -> Unit,
-    //Commented out for sprint 2, uncomment for future
-    //onAddClick: () -> Unit
+private fun UserSearchResultCard(
+    user: UserProfile,
+    requestStatus: String?,
+    onSendRequest: () -> Unit
 ) {
-    ListItem(
-        headlineContent = {
-            Text(
-                text = user.name,
-                style = MaterialTheme.typography.bodyLarge
-            )
-        },
-        supportingContent = {
-            Text(
-                text = "${user.email} • ${user.major}",
-                color = Color.Gray,
-                style = MaterialTheme.typography.bodySmall
-            )
-        },
-        //Commented out for sprint 2, uncomment for future
-        /*trailingContent = {
-            Button(
-                onClick = onAddClick,
-                enabled = !isAdded
-            ) {
-                //Dummy UI, only reflects local dummy state, not persistent
-                Text(if (isAdded) "Added" else "Add")
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                UserAvatar(photoUrl = user.photoUrl)
+                Column {
+                    Text(text = SocialRepository.displayNameOrEmail(user), style = MaterialTheme.typography.titleMedium)
+                    Text(text = user.email, color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+                }
             }
-        },*/
-        modifier = Modifier.clickable { onClick() }
-    )
+
+            IconButton(
+                onClick = onSendRequest,
+                enabled = requestStatus == null
+            ) {
+                val icon = if (requestStatus != null) Icons.Default.Check else Icons.Default.Add
+                Icon(imageVector = icon, contentDescription = "Add Friend")
+            }
+        }
+    }
 }
 
-@Preview(showBackground = true)
 @Composable
-fun UserSearchScreenPreview() {
-    CICompanionTheme {
-        val navController = rememberNavController()
-        UserSearchScreen(navController = navController)
+private fun UserAvatar(photoUrl: String) {
+    if (photoUrl.isNotEmpty()) {
+        AsyncImage(
+            model = photoUrl,
+            contentDescription = "User photo",
+            modifier = Modifier.size(48.dp).background(Color.LightGray, CircleShape)
+        )
+    } else {
+        Box(modifier = Modifier.size(48.dp).background(Color.LightGray, CircleShape))
+    }
+}
+
+@Composable
+private fun SignedOutSearchMessage(modifier: Modifier) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("Please sign in to search for friends.")
     }
 }
