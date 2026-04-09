@@ -39,6 +39,7 @@ object Routes {
     const val PROFILE = "profile"
     const val NOTIFICATIONS = "notifications"
     const val USER_SEARCH = "user_search"
+    const val FRIEND_REQUESTS = "friendRequests"
 }
 
 @Composable

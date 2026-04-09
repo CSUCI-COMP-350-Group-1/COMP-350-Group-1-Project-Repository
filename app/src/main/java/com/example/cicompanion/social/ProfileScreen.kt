@@ -80,8 +80,8 @@ fun ProfileScreen(navController: NavHostController) {
             FloatingActionButton(
                 onClick = { navController.navigate(Routes.USER_SEARCH) },
                 shape = CircleShape,
-                containerColor = NavBackground,
-                contentColor = Color.Black
+                containerColor = Color.Red,
+                contentColor = Color.White
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
@@ -128,7 +128,7 @@ fun ProfileScreen(navController: NavHostController) {
                         navController.navigate(Routes.USER_SEARCH)
                     },
                     onViewFriendRequests = {
-                        // navController.navigate("friendRequests")
+                        navController.navigate(Routes.FRIEND_REQUESTS)
                     },
                     onSignOut = {
                         FirebaseAuth.getInstance().signOut()
@@ -160,7 +160,12 @@ private fun ProfileActionArea(
     onSignOut: () -> Unit
 ) {
     if (currentUser == null) {
-        Button(onClick = onSignIn) {
+        Button(onClick = onSignIn,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Red,
+                contentColor = Color.White
+            )
+            ) {
             Text("Sign in with Google")
         }
     } else {
@@ -168,17 +173,29 @@ private fun ProfileActionArea(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            /* Commented out: Plus button replaces this
             Button(onClick = onFindFriends) {
                 Text("Find Friends")
             }
+             */
             Spacer(modifier = Modifier.height(16.dp))
-            /* Commented out Friend Requests button
-            Button(onClick = onViewFriendRequests) {
+            // Commented out Friend Requests button
+            Button(onClick = onViewFriendRequests,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Red,
+                    contentColor = Color.White
+                )
+            ) {
                 Text("Friend Requests")
             }
             Spacer(modifier = Modifier.height(16.dp))
-            */
-            Button(onClick = onSignOut) {
+            Button(
+                onClick = onSignOut,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Red,
+                    contentColor = Color.White
+                )
+            ) {
                 Text("Sign Out")
             }
         }

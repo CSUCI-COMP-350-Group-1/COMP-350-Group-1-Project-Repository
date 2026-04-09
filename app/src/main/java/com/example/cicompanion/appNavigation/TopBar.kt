@@ -9,17 +9,21 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.BrandRedDark
 import com.example.cicompanion.ui.theme.BrandRedLighter
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -33,6 +37,7 @@ fun screenTitleForRoute(route: String?): String {
         Routes.PROFILE -> "Profile"
         Routes.NOTIFICATIONS -> "Notifications"
         Routes.USER_SEARCH -> "User Search"
+        Routes.FRIEND_REQUESTS -> "Friend Requests"
         else -> "CI Companion"
     }
 }
@@ -68,35 +73,12 @@ fun TopBar(
                         )
                     }
                 } else {
-                    // Profile button replacing hamburger menu
-                    IconButton(onClick = {
-                        navController.navigate(Routes.PROFILE) {
-                            launchSingleTop = true
-                        }
-                    }) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(Color.White), // Using white background for contrast against the red top bar
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "Profile",
-                                tint = BrandRedDark,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                    /* Hamburger menu commented out
                     IconButton(onClick = onHamburgerClick) {
                         Icon(
                             Icons.Default.Menu,
                             contentDescription = "Menu"
                         )
                     }
-                    */
                 }
             },
             actions = {
@@ -111,21 +93,94 @@ fun TopBar(
 
 @Composable
 fun DrawerProfileContent(navController: NavController, drawerState: DrawerState, scope: CoroutineScope) {
+    var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
+
+    // Observe auth state changes to update the UI immediately on sign in/out
+    DisposableEffect(Unit) {
+        val listener = FirebaseAuth.AuthStateListener { auth ->
+            currentUser = auth.currentUser
+        }
+        FirebaseAuth.getInstance().addAuthStateListener(listener)
+        onDispose {
+            FirebaseAuth.getInstance().removeAuthStateListener(listener)
+        }
+    }
+
     ModalDrawerSheet {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            // Profile Header Section
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFE6E0F8)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (currentUser?.photoUrl != null) {
+                        AsyncImage(
+                            model = currentUser!!.photoUrl.toString(),
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            tint = Color(0xFF6750A4)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column {
+                    Text(
+                        text = currentUser?.displayName ?: "Signed Out",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = currentUser?.email ?: "Log in to sync data",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                }
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            // Navigation Button
             TextButton(
                 onClick = {
                     navController.navigate(Routes.PROFILE)
                     scope.launch { drawerState.close() }
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(8.dp)
             ) {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = "Profile"
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Text("Profile", style = MaterialTheme.typography.titleMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = "Profile",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        "View Profile",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
     }

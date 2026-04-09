@@ -229,16 +229,18 @@ fun MapScreen(navController: NavHostController) {
         topBar = {
             Surface(shadowElevation = 4.dp) {
                 Column {
+                    /*
                     TopAppBar(
                         title = { Text("CSUCI Campus Map", fontSize = 20.sp) }
                     )
+                     */
                     // Search Bar
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 16.dp, vertical = 24.dp),
                         placeholder = { Text("Search campus...") },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                         trailingIcon = {
