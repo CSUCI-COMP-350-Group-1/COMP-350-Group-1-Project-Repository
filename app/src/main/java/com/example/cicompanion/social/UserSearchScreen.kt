@@ -50,7 +50,8 @@ fun UserSearchScreen(navController: NavHostController) {
             }
         )
 
-        SocialRepository.fetchOutgoingFriendRequestStatuses(
+        // Fetch both incoming and outgoing statuses to correctly identify "accepted" friends
+        SocialRepository.fetchAllFriendRequestStatuses(
             currentUserId = currentUser.uid,
             onSuccess = { statuses ->
                 requestStatuses.clear()
@@ -155,7 +156,13 @@ private fun UserSearchResultCard(
                 enabled = requestStatus == null
             ) {
                 val icon = if (requestStatus != null) Icons.Default.Check else Icons.Default.Add
-                Icon(imageVector = icon, contentDescription = "Add Friend")
+                val tint = if (requestStatus == "accepted") Color(0xFF2E7D32) else LocalContentColor.current
+                
+                Icon(
+                    imageVector = icon,
+                    contentDescription = if (requestStatus == null) "Add Friend" else "Request Status",
+                    tint = tint
+                )
             }
         }
     }
