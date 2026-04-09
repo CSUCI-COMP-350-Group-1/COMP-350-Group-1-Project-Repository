@@ -212,7 +212,7 @@ private fun FriendRequestCard(
                 Button(
                     onClick = onDeclineRequest,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xffc44949),
+                        containerColor = Color(0xFFB0B0B0),
                         contentColor = Color.White
                     )
                 ) {
