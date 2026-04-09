@@ -2,9 +2,9 @@ package com.example.cicompanion.social
 
 import android.app.Activity
 import android.content.Intent
+import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResult
-import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -58,6 +59,7 @@ import com.google.firebase.auth.FirebaseUser
 @Composable
 fun ProfileScreen(navController: NavHostController) {
     var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
+    var friendCount by remember { mutableIntStateOf(0) }
 
     DisposableEffect(Unit) {
         val listener = FirebaseAuth.AuthStateListener { auth ->
@@ -74,6 +76,14 @@ fun ProfileScreen(navController: NavHostController) {
     LaunchedEffect(currentUser?.uid) {
         currentUser?.let { signedInUser ->
             FirestoreManager.saveUserToFirestore(signedInUser)
+
+            SocialRepository.fetchFriendCount(
+                currentUserId = signedInUser.uid,
+                onSuccess = { count -> friendCount = count },
+                onError = { friendCount = 0 }
+            )
+        } ?: run {
+            friendCount = 0
         }
     }
 
@@ -92,6 +102,7 @@ fun ProfileScreen(navController: NavHostController) {
     ) { innerPadding ->
         ProfileScreenContent(
             currentUser = currentUser,
+            friendCount = friendCount,
             navController = navController,
             launcher = launcher,
             modifier = Modifier.padding(innerPadding)
@@ -124,6 +135,7 @@ private fun handleGoogleSignInResult(result: ActivityResult) {
 @Composable
 private fun ProfileScreenContent(
     currentUser: FirebaseUser?,
+    friendCount: Int,
     navController: NavHostController,
     launcher: ManagedActivityResultLauncher<Intent, ActivityResult>,
     modifier: Modifier = Modifier
@@ -139,6 +151,7 @@ private fun ProfileScreenContent(
             userDisplayName = currentUser?.displayName ?: "Signed out",
             userEmail = currentUser?.email ?: "user@example.com",
             photoUrl = currentUser?.photoUrl?.toString(),
+            friendCount = friendCount,
             modifier = Modifier
                 .padding(horizontal = 24.dp, vertical = 32.dp)
                 .fillMaxWidth()
@@ -152,6 +165,9 @@ private fun ProfileScreenContent(
             },
             onFindFriends = {
                 navController.navigate("userSearch")
+            },
+            onViewFriendRequests = {
+                navController.navigate("friendRequests")
             },
             onSignOut = {
                 FirebaseAuth.getInstance().signOut()
@@ -169,6 +185,7 @@ private fun ColumnScope.ProfileActionArea(
     currentUser: FirebaseUser?,
     onSignIn: () -> Unit,
     onFindFriends: () -> Unit,
+    onViewFriendRequests: () -> Unit,
     onSignOut: () -> Unit
 ) {
     Box(
@@ -183,6 +200,7 @@ private fun ColumnScope.ProfileActionArea(
         } else {
             SignedInActionButtons(
                 onFindFriends = onFindFriends,
+                onViewFriendRequests = onViewFriendRequests,
                 onSignOut = onSignOut
             )
         }
@@ -205,6 +223,7 @@ private fun SignInActionButton(onSignIn: () -> Unit) {
 @Composable
 private fun SignedInActionButtons(
     onFindFriends: () -> Unit,
+    onViewFriendRequests: () -> Unit,
     onSignOut: () -> Unit
 ) {
     Column(
@@ -213,6 +232,12 @@ private fun SignedInActionButtons(
     ) {
         Button(onClick = onFindFriends) {
             Text("Find Friends")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(onClick = onViewFriendRequests) {
+            Text("Friend Requests")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -231,6 +256,7 @@ fun ProfileHeader(
     userDisplayName: String,
     userEmail: String,
     photoUrl: String?,
+    friendCount: Int,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -271,7 +297,7 @@ fun ProfileHeader(
             )
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = "0 Friends",
+                text = "$friendCount Friends",
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 color = Color.Black

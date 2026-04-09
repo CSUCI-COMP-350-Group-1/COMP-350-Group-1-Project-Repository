@@ -38,6 +38,9 @@ import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 
+/**
+ * Displays a searchable list of users and lets the current user send friend requests.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserSearchScreen(_navController: NavHostController) {
@@ -112,6 +115,9 @@ fun UserSearchScreen(_navController: NavHostController) {
     }
 }
 
+/**
+ * Loads the list of users that can appear in the search results.
+ */
 private fun loadSearchableUsers(
     currentUserId: String,
     onLoadingChanged: (Boolean) -> Unit,
@@ -133,6 +139,9 @@ private fun loadSearchableUsers(
     )
 }
 
+/**
+ * Loads the current user's outgoing friend-request statuses.
+ */
 private fun loadOutgoingRequestStatuses(
     currentUserId: String,
     onStatusesLoaded: (Map<String, String>) -> Unit,
@@ -145,6 +154,9 @@ private fun loadOutgoingRequestStatuses(
     )
 }
 
+/**
+ * Sends a friend request and updates the local status map.
+ */
 private fun sendFriendRequest(
     targetUser: UserProfile,
     requestStatuses: MutableMap<String, String>,
@@ -169,6 +181,9 @@ private fun sendFriendRequest(
     )
 }
 
+/**
+ * Filters the user list by display name or email.
+ */
 private fun filterUsers(users: List<UserProfile>, searchQuery: String): List<UserProfile> {
     if (searchQuery.isBlank()) {
         return users
@@ -179,12 +194,18 @@ private fun filterUsers(users: List<UserProfile>, searchQuery: String): List<Use
     }
 }
 
+/**
+ * Returns whether the search query matches a user's display name or email.
+ */
 private fun matchesSearchQuery(user: UserProfile, searchQuery: String): Boolean {
     val query = searchQuery.trim()
     return user.displayName.contains(query, ignoreCase = true) ||
             user.email.contains(query, ignoreCase = true)
 }
 
+/**
+ * Displays the signed-out message for the friend-search screen.
+ */
 @Composable
 private fun SignedOutSearchMessage(modifier: Modifier = Modifier) {
     Column(
@@ -201,6 +222,9 @@ private fun SignedOutSearchMessage(modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * Displays the complete friend-search screen content for signed-in users.
+ */
 @Composable
 private fun UserSearchContent(
     searchQuery: String,
@@ -238,6 +262,9 @@ private fun UserSearchContent(
     }
 }
 
+/**
+ * Displays the text field used to search for users.
+ */
 @Composable
 private fun SearchUsersField(
     searchQuery: String,
@@ -252,6 +279,9 @@ private fun SearchUsersField(
     )
 }
 
+/**
+ * Displays a status or error message when one is available.
+ */
 @Composable
 private fun SearchMessageText(message: String?, color: Color) {
     if (message == null) {
@@ -265,6 +295,9 @@ private fun SearchMessageText(message: String?, color: Color) {
     )
 }
 
+/**
+ * Displays the loading state while users are being fetched from Firestore.
+ */
 @Composable
 private fun SearchLoadingState() {
     Column(
@@ -277,6 +310,9 @@ private fun SearchLoadingState() {
     }
 }
 
+/**
+ * Displays the message shown when there are no matching users.
+ */
 @Composable
 private fun EmptyUsersMessage() {
     Text(
@@ -286,6 +322,9 @@ private fun EmptyUsersMessage() {
     )
 }
 
+/**
+ * Displays the list of matching user search results.
+ */
 @Composable
 private fun UserResultsList(
     users: List<UserProfile>,
@@ -308,6 +347,9 @@ private fun UserResultsList(
     }
 }
 
+/**
+ * Displays one user result with a status icon.
+ */
 @Composable
 private fun UserSearchResultCard(
     user: UserProfile,
@@ -332,6 +374,9 @@ private fun UserSearchResultCard(
     }
 }
 
+/**
+ * Displays the correct icon for no request, pending, or accepted status.
+ */
 @Composable
 private fun FriendRequestStatusButton(
     requestStatus: String?,
@@ -354,20 +399,21 @@ private fun FriendRequestStatusButton(
             Icon(
                 imageVector = Icons.Filled.Check,
                 contentDescription = "Friend request status",
-                tint = iconTint,
-                modifier = Modifier.size(28.dp)
+                tint = iconTint
             )
         } else {
             Icon(
                 imageVector = Icons.Filled.Add,
                 contentDescription = "Add friend",
-                tint = iconTint,
-                modifier = Modifier.size(28.dp)
+                tint = iconTint
             )
         }
     }
 }
 
+/**
+ * Displays the basic information for one user in the result list.
+ */
 @Composable
 private fun UserSummary(user: UserProfile) {
     Row(
@@ -390,6 +436,9 @@ private fun UserSummary(user: UserProfile) {
     }
 }
 
+/**
+ * Displays the user photo when available.
+ */
 @Composable
 private fun UserAvatar(photoUrl: String) {
     if (photoUrl.isBlank()) {
@@ -404,6 +453,9 @@ private fun UserAvatar(photoUrl: String) {
     )
 }
 
+/**
+ * Displays a small placeholder avatar for users without a photo.
+ */
 @Composable
 private fun EmptyUserAvatar() {
     Card(modifier = Modifier.size(48.dp)) {}

@@ -39,6 +39,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.cicompanion.calendar.CalendarScreen
 import com.example.cicompanion.home.HomeScreen
 import com.example.cicompanion.maps.MapScreen
+import com.example.cicompanion.social.FriendRequestsScreen
 import com.example.cicompanion.social.ProfileScreen
 import com.example.cicompanion.social.UserSearchScreen
 import com.example.cicompanion.studyRoom.LegendItem
@@ -89,6 +90,9 @@ fun AppNavigation() {
                 }
                 composable("userSearch") {
                     UserSearchScreen(navController)
+                }
+                composable("friendRequests") {
+                    FriendRequestsScreen(navController)
                 }
             }
         }
