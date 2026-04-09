@@ -115,6 +115,9 @@ fun AppNavigation() {
                     composable(Routes.USER_SEARCH) {
                         UserSearchScreen(navController)
                     }
+                    composable(Routes.FRIEND_REQUESTS) {
+                        UserSearchScreen(navController)
+                    }
                 }
             }
         }

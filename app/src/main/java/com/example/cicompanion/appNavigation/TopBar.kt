@@ -37,6 +37,7 @@ fun screenTitleForRoute(route: String?): String {
         Routes.PROFILE -> "Profile"
         Routes.NOTIFICATIONS -> "Notifications"
         Routes.USER_SEARCH -> "User Search"
+        Routes.FRIEND_REQUESTS -> "Friend Requests"
         else -> "CI Companion"
     }
 }

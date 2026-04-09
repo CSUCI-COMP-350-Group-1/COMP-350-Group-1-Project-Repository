@@ -128,7 +128,7 @@ fun ProfileScreen(navController: NavHostController) {
                         navController.navigate(Routes.USER_SEARCH)
                     },
                     onViewFriendRequests = {
-                        // navController.navigate("friendRequests")
+                         navController.navigate("friendRequests")
                     },
                     onSignOut = {
                         FirebaseAuth.getInstance().signOut()
@@ -174,12 +174,16 @@ private fun ProfileActionArea(
             }
              */
             Spacer(modifier = Modifier.height(16.dp))
-            /* Commented out Friend Requests button
-            Button(onClick = onViewFriendRequests) {
+            // Commented out Friend Requests button
+            Button(onClick = onViewFriendRequests,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Red,
+                    contentColor = Color.White
+                )
+            ) {
                 Text("Friend Requests")
             }
             Spacer(modifier = Modifier.height(16.dp))
-            */
             Button(
                 onClick = onSignOut,
                 colors = ButtonDefaults.buttonColors(
