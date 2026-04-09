@@ -313,6 +313,56 @@ object SocialRepository {
     }
 
     /**
+     * Loads all incoming and outgoing friend-request statuses for the current user.
+     */
+    fun fetchAllFriendRequestStatuses(
+        currentUserId: String,
+        onSuccess: (Map<String, String>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val allStatuses = mutableMapOf<String, String>()
+
+        // Fetch outgoing requests
+        friendRequestsCollection()
+            .whereEqualTo("fromUserId", currentUserId)
+            .get()
+            .addOnSuccessListener { outgoingSnapshot ->
+                outgoingSnapshot.documents.forEach { doc ->
+                    val request = doc.toObject(FriendRequest::class.java)
+                    if (request != null && request.toUserId.isNotBlank()) {
+                        allStatuses[request.toUserId] = request.status
+                    }
+                }
+
+                // Fetch incoming requests
+                friendRequestsCollection()
+                    .whereEqualTo("toUserId", currentUserId)
+                    .get()
+                    .addOnSuccessListener { incomingSnapshot ->
+                        incomingSnapshot.documents.forEach { doc ->
+                            val request = doc.toObject(FriendRequest::class.java)
+                            if (request != null && request.fromUserId.isNotBlank()) {
+                                // For incoming, if we're already friends or it's pending, record it
+                                // If both are present (not possible with current logic but good to handle), 
+                                // accepted status takes priority.
+                                val existingStatus = allStatuses[request.fromUserId]
+                                if (existingStatus != "accepted") {
+                                    allStatuses[request.fromUserId] = request.status
+                                }
+                            }
+                        }
+                        onSuccess(allStatuses)
+                    }
+                    .addOnFailureListener { exception ->
+                        onError(exception.message ?: "Could not load incoming friend request statuses.")
+                    }
+            }
+            .addOnFailureListener { exception ->
+                onError(exception.message ?: "Could not load outgoing friend request statuses.")
+            }
+    }
+
+    /**
      * Loads all outgoing friend-request statuses for the current user.
      */
     fun fetchOutgoingFriendRequestStatuses(
