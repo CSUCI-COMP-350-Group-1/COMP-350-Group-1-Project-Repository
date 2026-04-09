@@ -212,7 +212,7 @@ private fun FriendRequestCard(
                 Button(
                     onClick = onDeclineRequest,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFB0B0B0),
+                        containerColor = Color(0xffc44949),
                         contentColor = Color.White
                     )
                 ) {
@@ -221,7 +221,12 @@ private fun FriendRequestCard(
 
                 androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(8.dp))
 
-                Button(onClick = onAcceptRequest) {
+                Button(onClick = onAcceptRequest,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xff49c46a),
+                        contentColor = Color.White
+                    )
+                    ) {
                     Text("Accept")
                 }
             }
