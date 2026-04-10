@@ -6,13 +6,14 @@ import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +38,8 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+
+private val BrandRed = Color(0xFFEF3347)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,48 +78,37 @@ fun ProfileScreen(navController: NavHostController) {
     }
 
     Scaffold(
-        containerColor = AppBackground,
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate(Routes.USER_SEARCH) },
-                shape = CircleShape,
-                containerColor = Color.Red,
-                contentColor = Color.White
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Search Users"
-                )
-            }
-        }
+        containerColor = Color.White // Cleaner white background
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
-                .background(AppBackground)
+                .background(Color.White)
         ) {
             ProfileHeader(
-                userDisplayName = currentUser?.displayName ?: "Signed out",
-                userEmail = currentUser?.email ?: "user@example.com",
+                userDisplayName = currentUser?.displayName ?: "Guest User",
+                userEmail = currentUser?.email ?: "Sign in to sync your data",
                 photoUrl = currentUser?.photoUrl?.toString(),
                 friendCount = friendCount,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp)
-                    .border(
-                        width = 1.dp,
-                        color = GrayIcon.copy(alpha = 0.3f),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                    .background(NavBackground)
+                    .padding(16.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(NavBackground.copy(alpha = 0.5f))
+                    .padding(20.dp)
             )
 
-            Box(
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Scrollable area for actions
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
+                    .weight(1f)
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Top
             ) {
                 ProfileActionArea(
                     currentUser = currentUser,
@@ -152,7 +144,7 @@ private fun handleGoogleSignInResult(result: ActivityResult) {
 }
 
 @Composable
-private fun ProfileActionArea(
+private fun ColumnScope.ProfileActionArea(
     currentUser: FirebaseUser?,
     onSignIn: () -> Unit,
     onFindFriends: () -> Unit,
@@ -160,46 +152,104 @@ private fun ProfileActionArea(
     onSignOut: () -> Unit
 ) {
     if (currentUser == null) {
-        Button(onClick = onSignIn,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Red,
-                contentColor = Color.White
-            )
-            ) {
-            Text("Sign in with Google")
+        Button(
+            onClick = onSignIn,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+        ) {
+            Icon(Icons.Default.Login, contentDescription = null)
+            Spacer(Modifier.width(12.dp))
+            Text("Sign in with Google", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     } else {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        // --- START OF MOCKUP SOCIAL SECTION ---
+        // New "Add Friends" primary button
+        Button(
+            onClick = onFindFriends,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
         ) {
-            /* Commented out: Plus button replaces this
-            Button(onClick = onFindFriends) {
-                Text("Find Friends")
-            }
-             */
-            Spacer(modifier = Modifier.height(16.dp))
-            // Commented out Friend Requests button
-            Button(onClick = onViewFriendRequests,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Red,
-                    contentColor = Color.White
-                )
-            ) {
-                Text("Friend Requests")
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onSignOut,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Red,
-                    contentColor = Color.White
-                )
-            ) {
-                Text("Sign Out")
-            }
+            Icon(Icons.Default.PersonAdd, contentDescription = null)
+            Spacer(Modifier.width(12.dp))
+            Text("Add Friends", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Updated "Friend Requests" button
+        OutlinedButton(
+            onClick = onViewFriendRequests,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.5.dp, BrandRed),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = BrandRed)
+        ) {
+            Icon(Icons.Default.Group, contentDescription = null)
+            Spacer(Modifier.width(12.dp))
+            Text("Friend Requests", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Additional Mockup Buttons
+        SectionLabel("Account Settings")
+        
+        OutlinedButton(
+            onClick = { /* Mockup Edit */ },
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, Color.LightGray),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
+        ) {
+            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(12.dp))
+            Text("Edit Profile", fontSize = 14.sp)
+            Spacer(Modifier.weight(1f))
+            Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = { /* Mockup Settings */ },
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, Color.LightGray),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
+        ) {
+            Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(12.dp))
+            Text("Settings", fontSize = 14.sp)
+            Spacer(Modifier.weight(1f))
+            Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
+        }
+        // --- END OF MOCKUP SOCIAL SECTION ---
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Sign Out at the bottom
+        TextButton(
+            onClick = onSignOut,
+            modifier = Modifier.padding(bottom = 16.dp)
+        ) {
+            Icon(Icons.Default.Logout, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Sign Out", color = Color.Gray, fontWeight = FontWeight.Medium)
         }
     }
+}
+
+@Composable
+fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        style = MaterialTheme.typography.labelLarge,
+        color = Color.Gray,
+        fontWeight = FontWeight.Bold
+    )
 }
 
 @Composable
@@ -211,14 +261,15 @@ fun ProfileHeader(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier.padding(16.dp),
+        modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(100.dp)
+                .size(80.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFE6E0F8)),
+                .background(Color.White)
+                .border(2.dp, Color.White, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             if (photoUrl != null) {
@@ -232,51 +283,46 @@ fun ProfileHeader(
             }
         }
 
-        Spacer(modifier = Modifier.width(24.dp))
+        Spacer(modifier = Modifier.width(20.dp))
 
         Column {
             Text(
                 text = userDisplayName,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 22.sp,
                 color = Color.Black
             )
             Text(
                 text = userEmail,
                 color = Color.DarkGray,
-                fontSize = 14.sp
+                fontSize = 14.sp,
+                maxLines = 1
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "$friendCount Friends",
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = Color.Black
-            )
+            Surface(
+                color = BrandRed.copy(alpha = 0.1f),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = "$friendCount Friends",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = BrandRed
+                )
+            }
         }
     }
 }
 
 @Composable
 fun DefaultAvatar() {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(30.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF6750A4))
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Box(
-            modifier = Modifier
-                .size(60.dp, 30.dp)
-                .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
-                .background(Color(0xFF6750A4))
-        )
-    }
+    Icon(
+        imageVector = Icons.Default.Person,
+        contentDescription = null,
+        modifier = Modifier.size(40.dp),
+        tint = Color.LightGray
+    )
 }
 
 @Preview(showBackground = true)

@@ -22,6 +22,9 @@ import com.example.cicompanion.ui.theme.GrayIcon
 import com.example.cicompanion.ui.theme.NavBackground
 import java.time.format.DateTimeFormatter
 
+private val CustomEventOrange = Color(0xFFFF9800)
+private val BrandRed = Color(0xFFEF3347)
+
 @Composable
 fun CalendarWidget(events: List<CalendarEvent>,
                    modifier: Modifier = Modifier) {
@@ -113,6 +116,8 @@ fun CalendarWidget(events: List<CalendarEvent>,
 
 @Composable
 private fun EventWidgetCard(event: CalendarEvent) {
+    val isCustom = event.calendarId == "custom"
+    val badgeColor = if (isCustom) CustomEventOrange else BrandRed
 
     val eventDateText = event.start.format(
         DateTimeFormatter.ofPattern("EEE, MMM d")
@@ -121,13 +126,36 @@ private fun EventWidgetCard(event: CalendarEvent) {
         .padding(10.dp)
         .fillMaxSize()
     ) {
-        Text(
-            text = event.title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = event.title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            
+            Surface(
+                color = badgeColor.copy(alpha = 0.1f),
+                shape = RoundedCornerShape(4.dp),
+                border = androidx.compose.foundation.BorderStroke(0.5.dp, badgeColor.copy(alpha = 0.5f))
+            ) {
+                Text(
+                    text = if (isCustom) "Custom" else "CSUCI",
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = badgeColor
+                )
+            }
+        }
+        
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = eventDateText,
@@ -153,6 +181,3 @@ private fun EventWidgetCard(event: CalendarEvent) {
         }
     }
 }
-
-
-
