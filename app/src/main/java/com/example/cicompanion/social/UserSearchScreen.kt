@@ -50,7 +50,6 @@ fun UserSearchScreen(navController: NavHostController) {
             }
         )
 
-        // Fetch both incoming and outgoing statuses to correctly identify "accepted" friends
         SocialRepository.fetchAllFriendRequestStatuses(
             currentUserId = currentUser.uid,
             onSuccess = { statuses ->
@@ -153,11 +152,17 @@ private fun UserSearchResultCard(
 
             IconButton(
                 onClick = onSendRequest,
-                enabled = requestStatus == null
+                enabled = requestStatus == null // Only allow clicking if no request/friendship exists
             ) {
                 val icon = if (requestStatus != null) Icons.Default.Check else Icons.Default.Add
-                val tint = if (requestStatus == "accepted") Color(0xFF2E7D32) else LocalContentColor.current
                 
+                // Set color based on status: Green for accepted, Gray for pending
+                val tint = when (requestStatus) {
+                    "accepted" -> Color(0xFF2E7D32) // Green
+                    "pending" -> Color.Gray
+                    else -> LocalContentColor.current
+                }
+
                 Icon(
                     imageVector = icon,
                     contentDescription = if (requestStatus == null) "Add Friend" else "Request Status",
