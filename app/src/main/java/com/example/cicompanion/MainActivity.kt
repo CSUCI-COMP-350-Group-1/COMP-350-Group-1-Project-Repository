@@ -23,7 +23,8 @@ import androidx.navigation.compose.rememberNavController
 import com.example.cicompanion.appNavigation.DrawerProfileContent
 import com.example.cicompanion.appNavigation.TopBar
 import com.example.cicompanion.appNavigation.screenTitleForRoute
-import com.example.cicompanion.calendar.CalendarScreen
+import com.example.cicompanion.calendar.CalendarViewModel
+import com.example.cicompanion.calendar.CalendarApp
 import com.example.cicompanion.home.HomeScreen
 import com.example.cicompanion.maps.MapScreen
 import com.example.cicompanion.social.FriendRequestsScreen
@@ -54,6 +55,9 @@ fun AppNavigation() {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
+    // Create shared CalendarViewModel here to sync across Home and Calendar screens
+    val calendarViewModel: CalendarViewModel = viewModel()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -96,13 +100,13 @@ fun AppNavigation() {
             Box(modifier = Modifier.padding(paddingValues)) {
                 NavHost(navController = navController, startDestination = Routes.HOME) {
                     composable(Routes.HOME) {
-                        HomeScreen(navController)
+                        HomeScreen(navController, calendarViewModel)
                     }
                     composable(Routes.MAP) {
                         MapScreen(navController)
                     }
                     composable(Routes.CALENDAR) {
-                        CalendarScreen(navController = navController)
+                        CalendarApp(viewModel = calendarViewModel)
                     }
                     composable(Routes.STUDY_ROOM) {
                         RoomListScreen(viewModel = viewModel(), navController = navController)

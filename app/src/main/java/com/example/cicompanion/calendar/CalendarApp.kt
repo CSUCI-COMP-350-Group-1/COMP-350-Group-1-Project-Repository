@@ -4,13 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cicompanion.calendar.model.CalendarEvent
@@ -47,14 +48,20 @@ private val CardOffWhite = Color(0xFFF6E6D8)
 private val DateCellWhite = Color(0xFFF7F4F8)
 private val DateCellBorder = Color(0xFFE2BFB7)
 private val CustomEventOrange = Color(0xFFFF9800)
+private val PinnedEventPurple = Color(0xFF9C27B0)
 
-data class DayEventInfo(val hasCsuci: Boolean = false, val hasCustom: Boolean = false)
+data class DayEventInfo(
+    val hasCsuci: Boolean = false, 
+    val hasCustom: Boolean = false,
+    val hasPinned: Boolean = false
+)
 
 /** Shows the full calendar screen and routes state into smaller UI pieces. */
 @Composable
 fun CalendarApp(viewModel: CalendarViewModel) {
     var showAddEventDialog by remember { mutableStateOf(false) }
     var eventToDelete by remember { mutableStateOf<CalendarEvent?>(null) }
+    val scrollState = rememberScrollState()
 
     val selectedDateEvents = remember(viewModel.events, viewModel.selectedDate) {
         buildSelectedDateEvents(viewModel.events, viewModel.selectedDate)
@@ -108,6 +115,7 @@ fun CalendarApp(viewModel: CalendarViewModel) {
         ) {
             CalendarScreenBody(
                 viewModel = viewModel,
+                scrollState = scrollState,
                 mode = viewModel.mode,
                 filter = viewModel.filter,
                 visibleMonth = viewModel.visibleMonth,
@@ -118,14 +126,18 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                 onDismissError = viewModel::clearError,
                 onModeSelected = viewModel::updateMode,
                 onFilterSelected = viewModel::updateFilter,
-                onDateSelected = viewModel::onDateSelected,
+                onDateSelected = { 
+                    viewModel.onDateSelected(it)
+                    viewModel.setHighlightedEvent(null) 
+                },
                 onPreviousDay = viewModel::previousDay,
                 onNextDay = viewModel::nextDay,
                 onPreviousWeek = viewModel::previousWeek,
                 onNextWeek = viewModel::nextWeek,
                 onPreviousMonth = viewModel::previousMonth,
                 onNextMonth = viewModel::nextMonth,
-                onRequestDelete = { eventToDelete = it }
+                onRequestDelete = { eventToDelete = it },
+                onTogglePin = viewModel::togglePinEvent
             )
         }
     }
@@ -304,6 +316,7 @@ fun AmPmToggle(isAm: Boolean, onToggle: (Boolean) -> Unit) {
 @Composable
 private fun CalendarScreenBody(
     viewModel: CalendarViewModel,
+    scrollState: androidx.compose.foundation.ScrollState,
     mode: CalendarMode,
     filter: EventFilter,
     visibleMonth: YearMonth,
@@ -321,9 +334,14 @@ private fun CalendarScreenBody(
     onNextWeek: () -> Unit,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
-    onRequestDelete: (CalendarEvent) -> Unit
+    onRequestDelete: (CalendarEvent) -> Unit,
+    onTogglePin: (CalendarEvent) -> Unit,
+    highlightedEventId: String? = null
 ) {
-    ScrollablePage(contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+    ScrollablePage(
+        scrollState = scrollState,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+    ) {
         CalendarHeroHeader(
             selectedDate = selectedDate,
             modifier = Modifier
@@ -375,7 +393,9 @@ private fun CalendarScreenBody(
                 onNextWeek = onNextWeek,
                 onPreviousMonth = onPreviousMonth,
                 onNextMonth = onNextMonth,
-                onDeleteEvent = onRequestDelete
+                onDeleteEvent = onRequestDelete,
+                onTogglePin = onTogglePin,
+                highlightedEventId = highlightedEventId
             )
         }
     }
@@ -388,7 +408,7 @@ private fun CalendarFilterTabs(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         EventFilter.entries.forEach { filter ->
             FilterCard(
@@ -419,13 +439,13 @@ private fun FilterCard(
             .background(containerColor)
             .border(1.dp, borderColor, RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 12.dp),
+            .padding(horizontal = 4.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = filter.name,
             color = textColor,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
@@ -577,27 +597,11 @@ private fun CalendarContent(
     onNextWeek: () -> Unit,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
-    onDeleteEvent: (CalendarEvent) -> Unit
+    onDeleteEvent: (CalendarEvent) -> Unit,
+    onTogglePin: (CalendarEvent) -> Unit,
+    highlightedEventId: String? = null
 ) {
     when (mode) {
-        CalendarMode.DAY -> DayView(
-            selectedDate = selectedDate,
-            events = selectedDateEvents,
-            onPreviousDay = onPreviousDay,
-            onNextDay = onNextDay,
-            onDeleteEvent = onDeleteEvent
-        )
-
-        CalendarMode.WEEK -> WeekView(
-            selectedDate = selectedDate,
-            dayEventInfoMap = dayEventInfoMap,
-            eventsForSelectedDate = selectedDateEvents,
-            onDateSelected = onDateSelected,
-            onPreviousWeek = onPreviousWeek,
-            onNextWeek = onNextWeek,
-            onDeleteEvent = onDeleteEvent
-        )
-
         CalendarMode.MONTH -> MonthView(
             visibleMonth = visibleMonth,
             selectedDate = selectedDate,
@@ -606,7 +610,29 @@ private fun CalendarContent(
             onDateSelected = onDateSelected,
             onPreviousMonth = onPreviousMonth,
             onNextMonth = onNextMonth,
-            onDeleteEvent = onDeleteEvent
+            onDeleteEvent = onDeleteEvent,
+            onTogglePin = onTogglePin,
+            highlightedEventId = highlightedEventId
+        )
+        CalendarMode.DAY -> DayView(
+            selectedDate = selectedDate,
+            events = selectedDateEvents,
+            onPreviousDay = onPreviousDay,
+            onNextDay = onNextDay,
+            onDeleteEvent = onDeleteEvent,
+            onTogglePin = onTogglePin,
+            highlightedEventId = highlightedEventId
+        )
+        CalendarMode.WEEK -> WeekView(
+            selectedDate = selectedDate,
+            dayEventInfoMap = dayEventInfoMap,
+            eventsForSelectedDate = selectedDateEvents,
+            onDateSelected = onDateSelected,
+            onPreviousWeek = onPreviousWeek,
+            onNextWeek = onNextWeek,
+            onDeleteEvent = onDeleteEvent,
+            onTogglePin = onTogglePin,
+            highlightedEventId = highlightedEventId
         )
     }
 }
@@ -618,7 +644,9 @@ private fun DayView(
     events: List<CalendarEvent>,
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
-    onDeleteEvent: (CalendarEvent) -> Unit
+    onDeleteEvent: (CalendarEvent) -> Unit,
+    onTogglePin: (CalendarEvent) -> Unit,
+    highlightedEventId: String? = null
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy") }
 
@@ -634,7 +662,9 @@ private fun DayView(
         EventsSection(
             title = "Events",
             events = events,
-            onDeleteEvent = onDeleteEvent
+            onDeleteEvent = onDeleteEvent,
+            onTogglePin = onTogglePin,
+            highlightedEventId = highlightedEventId
         )
     }
 }
@@ -648,7 +678,9 @@ private fun WeekView(
     onDateSelected: (LocalDate) -> Unit,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
-    onDeleteEvent: (CalendarEvent) -> Unit
+    onDeleteEvent: (CalendarEvent) -> Unit,
+    onTogglePin: (CalendarEvent) -> Unit,
+    highlightedEventId: String? = null
 ) {
     val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
     val weekDates = remember(selectedDate, firstDayOfWeek) {
@@ -677,7 +709,9 @@ private fun WeekView(
         EventsSection(
             title = "Selected day",
             events = eventsForSelectedDate,
-            onDeleteEvent = onDeleteEvent
+            onDeleteEvent = onDeleteEvent,
+            onTogglePin = onTogglePin,
+            highlightedEventId = highlightedEventId
         )
     }
 }
@@ -692,7 +726,9 @@ private fun MonthView(
     onDateSelected: (LocalDate) -> Unit,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
-    onDeleteEvent: (CalendarEvent) -> Unit
+    onDeleteEvent: (CalendarEvent) -> Unit,
+    onTogglePin: (CalendarEvent) -> Unit,
+    highlightedEventId: String? = null
 ) {
     val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
     val monthCells = remember(visibleMonth, firstDayOfWeek) {
@@ -721,7 +757,9 @@ private fun MonthView(
         EventsSection(
             title = "Selected day",
             events = selectedDateEvents,
-            onDeleteEvent = onDeleteEvent
+            onDeleteEvent = onDeleteEvent,
+            onTogglePin = onTogglePin,
+            highlightedEventId = highlightedEventId
         )
     }
 }
@@ -985,7 +1023,14 @@ private fun EventDots(
                     .background(CoralRed, CircleShape)
             )
         }
-        if (info.hasCustom) {
+        if (info.hasPinned) {
+            Box(
+                modifier = Modifier
+                    .padding(end = 4.dp)
+                    .size(8.dp)
+                    .background(PinnedEventPurple, CircleShape)
+            )
+        } else if (info.hasCustom) {
             Box(
                 modifier = Modifier
                     .size(8.dp)
@@ -1000,25 +1045,44 @@ private fun EventDots(
 private fun EventsSection(
     title: String,
     events: List<CalendarEvent>,
-    onDeleteEvent: (CalendarEvent) -> Unit
+    onDeleteEvent: (CalendarEvent) -> Unit,
+    onTogglePin: (CalendarEvent) -> Unit,
+    highlightedEventId: String? = null
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionHeading(text = title)
-        EventsList(events = events, onDeleteEvent = onDeleteEvent)
+        EventsList(
+            events = events, 
+            onDeleteEvent = onDeleteEvent, 
+            onTogglePin = onTogglePin,
+            highlightedEventId = highlightedEventId
+        )
     }
 }
 
 /** Shows either an empty state or the full list of event cards. */
 @Composable
-private fun EventsList(events: List<CalendarEvent>, onDeleteEvent: (CalendarEvent) -> Unit) {
+private fun EventsList(
+    events: List<CalendarEvent>,
+    onDeleteEvent: (CalendarEvent) -> Unit,
+    onTogglePin: (CalendarEvent) -> Unit,
+    highlightedEventId: String? = null
+) {
     if (events.isEmpty()) {
         EmptyEventsMessage()
         return
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         events.forEach { event ->
-            EventCard(event = event, onDelete = { onDeleteEvent(event) })
+            EventCard(
+                event = event,
+                onDelete = { onDeleteEvent(event) },
+                onTogglePin = { onTogglePin(event) },
+                isHighlighted = event.id == highlightedEventId
+            )
         }
     }
 }
@@ -1037,16 +1101,22 @@ private fun EmptyEventsMessage() {
 
 /** Shows one event card. */
 @Composable
-private fun EventCard(event: CalendarEvent, onDelete: () -> Unit) {
+private fun EventCard(event: CalendarEvent, onDelete: () -> Unit, onTogglePin: () -> Unit, isHighlighted: Boolean = false) {
     val displayTitle = formatEventTextForDisplay(event.title)
     val displayLocation = event.location?.let(::formatEventTextForDisplay)
     val displayDescription = event.description?.let(::formatEventTextForDisplay)
+    val isCustom = event.calendarId == "custom"
+
+    val containerColor = if (isHighlighted) PinnedEventPurple.copy(alpha = 0.1f) else CardOffWhite
+    val borderColor = if (isHighlighted) PinnedEventPurple else Color.Transparent
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(if (isHighlighted) 2.dp else 0.dp, borderColor, RoundedCornerShape(22.dp)),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = CardOffWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 8.dp else if (isCustom) 5.dp else 3.dp)
     ) {
         Column(
             modifier = Modifier
@@ -1054,63 +1124,64 @@ private fun EventCard(event: CalendarEvent, onDelete: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            EventCardHeader(title = displayTitle, isCustom = event.calendarId == "custom", onDelete = onDelete)
-            EventMetaLine(text = event.timeLabel())
-            displayLocation?.let { EventMetaLine(text = "Location: $it") }
-            displayDescription?.let { EventDescription(text = it) }
-        }
-    }
-}
-
-/** Shows the top row of an event card. */
-@Composable
-private fun EventCardHeader(title: String, isCustom: Boolean, onDelete: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
-    ) {
-        Text(
-            text = title,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (isCustom) {
-                Surface(
-                    onClick = onDelete,
-                    color = Color.White,
-                    shape = CircleShape,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, CoralRed),
-                    modifier = Modifier.padding(end = 8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (isCustom) {
+                    IconButton(
+                        onClick = onTogglePin,
+                        modifier = Modifier.size(24.dp).offset(y = 2.dp)
                     ) {
                         Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            tint = CoralRed,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Delete Event",
-                            color = CoralRed,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold
+                            imageVector = if (event.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                            contentDescription = "Pin",
+                            tint = if (event.isPinned) PinnedEventPurple else Color.Gray,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
+                
+                Text(
+                    text = displayTitle,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (isCustom) {
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(CoralRed.copy(alpha = 0.1f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Delete",
+                                    tint = CoralRed,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
+                    EventBadge(
+                        text = if (event.isPinned) "Pinned" else if (isCustom) "Custom" else "CSUCI",
+                        color = if (event.isPinned) PinnedEventPurple else if (isCustom) CustomEventOrange else CoralRed
+                    )
+                }
             }
-            EventBadge(
-                text = if (isCustom) "Custom" else "CSUCI",
-                color = if (isCustom) CustomEventOrange else CoralRed
-            )
+
+            EventMetaLine(text = event.timeLabel())
+            displayLocation?.let { EventMetaLine(text = "Location: $it") }
+            displayDescription?.let { EventDescription(text = it) }
         }
     }
 }
@@ -1130,7 +1201,7 @@ private fun EventBadge(text: String, color: Color) {
         Text(
             text = text,
             color = color,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold
         )
     }
@@ -1162,7 +1233,8 @@ private fun buildSelectedDateEvents(
     selectedDate: LocalDate
 ): List<CalendarEvent> {
     return events.filter { it.occursOn(selectedDate) }.sortedWith(
-        compareByDescending<CalendarEvent> { it.calendarId == "custom" }
+        compareByDescending<CalendarEvent> { it.isPinned }
+            .thenByDescending { it.calendarId == "custom" }
             .thenBy { it.start }
     )
 }
@@ -1205,7 +1277,7 @@ private fun resolveDateCellBackgroundColor(isSelected: Boolean): Color {
 /** Chooses the border color for a date cell. */
 @Composable
 private fun resolveDateCellBorderColor(isSelected: Boolean): Color {
-    return if (isSelected) CoralRed else SoftBorder
+    return if (isSelected) CoralRed else Color.Transparent
 }
 
 /** Chooses the main text color for a date cell. */
@@ -1234,14 +1306,15 @@ private fun buildDayEventInfoMap(events: List<CalendarEvent>): Map<LocalDate, Da
         var day = event.start.toLocalDate()
         val lastDay = event.lastDateInclusive()
         val isCustom = event.calendarId == "custom"
+        val isPinned = event.isPinned
 
         while (!day.isAfter(lastDay)) {
             val current = infoMap[day] ?: DayEventInfo()
-            infoMap[day] = if (isCustom) {
-                current.copy(hasCustom = true)
-            } else {
-                current.copy(hasCsuci = true)
-            }
+            infoMap[day] = current.copy(
+                hasCsuci = current.hasCsuci || (event.calendarId != "custom"),
+                hasCustom = current.hasCustom || isCustom,
+                hasPinned = current.hasPinned || isPinned
+            )
             day = day.plusDays(1)
         }
     }

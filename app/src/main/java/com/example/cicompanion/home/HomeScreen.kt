@@ -1,78 +1,165 @@
 package com.example.cicompanion.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.cicompanion.appNavigation.FeatureCard
 import com.example.cicompanion.appNavigation.featureItems
 import com.example.cicompanion.calendar.CalendarViewModel
+import com.example.cicompanion.calendar.EventFilter
 import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(navController: NavHostController) {
-
-    val calendarViewModel: CalendarViewModel = viewModel()
-
+fun HomeScreen(
+    navController: NavHostController,
+    calendarViewModel: CalendarViewModel = viewModel()
+) {
     val widgetEvents = remember(calendarViewModel.events) {
         upcomingHomeWidgetEvents(calendarViewModel.events)
     }
+    
+    val pinnedEvents = remember(calendarViewModel.events) {
+        calendarViewModel.events.filter { it.isPinned }
+    }
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .background(AppBackground)
             .padding(top = 16.dp)
     ) {
-        // Upcoming events widget at the top
-        CalendarWidget(
-            events = widgetEvents,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
+        item {
+            // Upcoming events widget at the top
+            CalendarWidget(
+                events = widgetEvents,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
 
-        Text(
-            text = "Quick Access",
+        if (pinnedEvents.isNotEmpty()) {
+            item {
+                Text(
+                    text = "Pinned Reminders",
+                    modifier = Modifier.padding(start = 16.dp, top = 24.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+            }
+            items(pinnedEvents) { event ->
+                PinnedEventItem(
+                    event = event,
+                    onNavigateToEvent = {
+                        calendarViewModel.updateFilter(EventFilter.ALL)
+                        calendarViewModel.onDateSelected(event.start.toLocalDate())
+                        calendarViewModel.setHighlightedEvent(event.id)
+                        navController.navigate(Routes.CALENDAR)
+                    }
+                )
+            }
+        }
+
+        item {
+            Text(
+                text = "Quick Access",
+                modifier = Modifier.padding(start = 16.dp, top = 24.dp),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        item {
+            // Feature grid items
+            featureItems.chunked(2).forEach { rowItems ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    rowItems.forEach { feature ->
+                        Box(modifier = Modifier.weight(1f)) {
+                            FeatureCard(
+                                feature = feature,
+                                onClick = { navController.navigate(feature.route) }
+                            )
+                        }
+                    }
+                    if (rowItems.size == 1) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+fun PinnedEventItem(event: CalendarEvent, onNavigateToEvent: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
             modifier = Modifier
-                .padding(start = 16.dp, top = 24.dp),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.Black
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(12.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            items(featureItems) { feature ->
-                FeatureCard(
-                    feature = feature,
-                    onClick = { navController.navigate(feature.route) }
+            Icon(
+                Icons.Default.PushPin,
+                contentDescription = null,
+                tint = Color(0xFF9C27B0), // Pinned purple
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = event.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${event.start.format(DateTimeFormatter.ofPattern("MMM d"))} • ${event.timeLabel()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
+            }
+            IconButton(onClick = onNavigateToEvent) {
+                Icon(
+                    Icons.Default.MoreHoriz,
+                    contentDescription = "View Details",
+                    tint = Color.Gray
                 )
             }
         }

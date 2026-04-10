@@ -13,7 +13,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.util.UUID
 
-enum class EventFilter { ALL, CSUCI, CUSTOM }
+enum class EventFilter { ALL, CSUCI, CUSTOM, PINNED }
 
 class CalendarViewModel(
     private val repository: CalendarRepository = CalendarRepository()
@@ -37,12 +37,8 @@ class CalendarViewModel(
     var filter: EventFilter by mutableStateOf(EventFilter.ALL)
         private set
 
-    val events: List<CalendarEvent>
-        get() = when (filter) {
-            EventFilter.ALL -> customEvents + csuciEvents // Custom events on top
-            EventFilter.CSUCI -> csuciEvents
-            EventFilter.CUSTOM -> customEvents
-        }
+    var highlightedEventId: String? by mutableStateOf(null)
+        private set
 
     var isLoading: Boolean by mutableStateOf(false)
         private set
@@ -55,7 +51,14 @@ class CalendarViewModel(
         loadCustomEvents()
     }
 
-    /** Updates the active calendar view mode. */
+    val events: List<CalendarEvent>
+        get() = when (filter) {
+            EventFilter.ALL -> customEvents + csuciEvents
+            EventFilter.CSUCI -> csuciEvents
+            EventFilter.CUSTOM -> customEvents
+            EventFilter.PINNED -> (customEvents + csuciEvents).filter { it.isPinned }
+        }
+
     fun updateMode(newMode: CalendarMode) {
         mode = newMode
     }
@@ -64,7 +67,10 @@ class CalendarViewModel(
         filter = newFilter
     }
 
-    /** Loads all events from the CSUCI calendar subscribe link. */
+    fun setHighlightedEvent(eventId: String?) {
+        highlightedEventId = eventId
+    }
+
     fun loadOnlineCalendar() {
         val trimmedUrl = sourceUrl.trim()
         if (trimmedUrl.isBlank()) {
@@ -108,57 +114,55 @@ class CalendarViewModel(
         }
     }
 
-    /** Selects a new date and updates the visible month when needed. */
+    fun togglePinEvent(event: CalendarEvent) {
+        viewModelScope.launch {
+            val targetStatus = !event.isPinned
+            FirestoreManager.updateEventPinStatus(event.id, targetStatus)
+            loadCustomEvents()
+        }
+    }
+
     fun onDateSelected(date: LocalDate) {
         selectedDate = date
         visibleMonth = YearMonth.from(date)
     }
 
-    /** Moves the selected date back by one day. */
     fun previousDay() {
         onDateSelected(selectedDate.minusDays(1))
     }
 
-    /** Moves the selected date forward by one day. */
     fun nextDay() {
         onDateSelected(selectedDate.plusDays(1))
     }
 
-    /** Moves the selected date back by one week. */
     fun previousWeek() {
         onDateSelected(selectedDate.minusWeeks(1))
     }
 
-    /** Moves the selected date forward by one week. */
     fun nextWeek() {
         onDateSelected(selectedDate.plusWeeks(1))
     }
 
-    /** Shows the previous month and keeps the selected day inside it. */
     fun previousMonth() {
         visibleMonth = visibleMonth.minusMonths(1)
         selectedDate = clampSelectedDateToVisibleMonth(selectedDate, visibleMonth)
     }
 
-    /** Shows the next month and keeps the selected day inside it. */
     fun nextMonth() {
         visibleMonth = visibleMonth.plusMonths(1)
         selectedDate = clampSelectedDateToVisibleMonth(selectedDate, visibleMonth)
     }
 
-    /** Clears the current error message. */
     fun clearError() {
         errorMessage = null
     }
 
-    /** Keeps the selected day inside the month being shown. */
     private fun clampSelectedDateToVisibleMonth(date: LocalDate, month: YearMonth): LocalDate {
         val safeDay = date.dayOfMonth.coerceAtMost(month.lengthOfMonth())
         return month.atDay(safeDay)
     }
 
     private companion object {
-        /** Holds the CSUCI events feed used by the app. */
         const val CSUCI_CALENDAR_SUBSCRIBE_URL: String =
             "webcal://25livepub.collegenet.com/calendars/csuci-calendar-of-events.ics"
     }

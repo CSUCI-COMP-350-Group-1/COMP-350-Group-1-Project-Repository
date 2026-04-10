@@ -51,7 +51,8 @@ object FirestoreManager {
             "start" to event.start.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
             "end" to event.endExclusive.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
             "isAllDay" to event.isAllDay,
-            "calendarId" to "custom"
+            "calendarId" to "custom",
+            "isPinned" to event.isPinned
         )
 
         return try {
@@ -62,6 +63,21 @@ object FirestoreManager {
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error saving custom event", e)
+            false
+        }
+    }
+
+    suspend fun updateEventPinStatus(eventId: String, isPinned: Boolean): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        val db = FirebaseFirestore.getInstance()
+        return try {
+            db.collection("users").document(user.uid)
+                .collection("customEvents").document(eventId)
+                .update("isPinned", isPinned)
+                .await()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating pin status", e)
             false
         }
     }
@@ -99,6 +115,7 @@ object FirestoreManager {
                 val startStr = doc.getString("start") ?: return@mapNotNull null
                 val endStr = doc.getString("end") ?: return@mapNotNull null
                 val isAllDay = doc.getBoolean("isAllDay") ?: false
+                val isPinned = doc.getBoolean("isPinned") ?: false
                 
                 CalendarEvent(
                     id = id,
@@ -109,7 +126,8 @@ object FirestoreManager {
                     htmlLink = null,
                     start = ZonedDateTime.parse(startStr),
                     endExclusive = ZonedDateTime.parse(endStr),
-                    isAllDay = isAllDay
+                    isAllDay = isAllDay,
+                    isPinned = isPinned
                 )
             }
         } catch (e: Exception) {
