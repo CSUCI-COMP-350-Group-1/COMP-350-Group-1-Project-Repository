@@ -6,6 +6,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,18 +20,23 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cicompanion.calendar.model.CalendarEvent
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.YearMonth
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.time.temporal.WeekFields
 import java.util.Locale
+import java.util.UUID
 
 private val CoralRed = Color(0xFFEF3347)
 private val HotPink = Color(0xFFF21F63)
@@ -36,21 +46,59 @@ private val SelectedDateFill = Color(0xFFFFE2E7)
 private val CardOffWhite = Color(0xFFF6E6D8)
 private val DateCellWhite = Color(0xFFF7F4F8)
 private val DateCellBorder = Color(0xFFE2BFB7)
+private val CustomEventOrange = Color(0xFFFF9800)
 
-
+data class DayEventInfo(val hasCsuci: Boolean = false, val hasCustom: Boolean = false)
 
 /** Shows the full calendar screen and routes state into smaller UI pieces. */
 @Composable
 fun CalendarApp(viewModel: CalendarViewModel) {
+    var showAddEventDialog by remember { mutableStateOf(false) }
+    var eventToDelete by remember { mutableStateOf<CalendarEvent?>(null) }
+
     val selectedDateEvents = remember(viewModel.events, viewModel.selectedDate) {
         buildSelectedDateEvents(viewModel.events, viewModel.selectedDate)
     }
 
-    val eventCountByDate = remember(viewModel.events) {
-        buildEventCountMap(viewModel.events)
+    val dayEventInfoMap = remember(viewModel.events) {
+        buildDayEventInfoMap(viewModel.events)
     }
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
+    Scaffold(
+        containerColor = Color.White,
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = { showAddEventDialog = true },
+                containerColor = CoralRed,
+                contentColor = Color.White,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(bottom = 8.dp),
+                icon = {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.CalendarMonth, contentDescription = null)
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .offset(x = 4.dp, y = 4.dp)
+                                .size(14.dp)
+                                .background(Color.White, CircleShape)
+                                .padding(1.dp)
+                                .background(CoralRed, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(10.dp)
+                            )
+                        }
+                    }
+                },
+                text = { Text("Add Event", fontWeight = FontWeight.Bold) }
+            )
+        }
+    ) { padding ->
         PullToRefreshContainer(
             isRefreshing = viewModel.isLoading,
             onRefresh = viewModel::loadOnlineCalendar,
@@ -59,22 +107,194 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                 .fillMaxSize()
         ) {
             CalendarScreenBody(
+                viewModel = viewModel,
                 mode = viewModel.mode,
+                filter = viewModel.filter,
                 visibleMonth = viewModel.visibleMonth,
                 selectedDate = viewModel.selectedDate,
                 selectedDateEvents = selectedDateEvents,
-                eventCountByDate = eventCountByDate,
-                totalEventCount = viewModel.events.size,
+                dayEventInfoMap = dayEventInfoMap,
                 errorMessage = viewModel.errorMessage,
                 onDismissError = viewModel::clearError,
                 onModeSelected = viewModel::updateMode,
+                onFilterSelected = viewModel::updateFilter,
                 onDateSelected = viewModel::onDateSelected,
                 onPreviousDay = viewModel::previousDay,
                 onNextDay = viewModel::nextDay,
                 onPreviousWeek = viewModel::previousWeek,
                 onNextWeek = viewModel::nextWeek,
                 onPreviousMonth = viewModel::previousMonth,
-                onNextMonth = viewModel::nextMonth
+                onNextMonth = viewModel::nextMonth,
+                onRequestDelete = { eventToDelete = it }
+            )
+        }
+    }
+
+    if (showAddEventDialog) {
+        AddEventDialog(
+            selectedDate = viewModel.selectedDate,
+            onDismiss = { showAddEventDialog = false },
+            onConfirm = { title, description, location, startTime, endTime ->
+                val startZdt = ZonedDateTime.of(viewModel.selectedDate, startTime, ZonedDateTime.now().zone)
+                val endZdt = ZonedDateTime.of(viewModel.selectedDate, endTime, ZonedDateTime.now().zone)
+                val newEvent = CalendarEvent(
+                    id = UUID.randomUUID().toString(),
+                    calendarId = "custom",
+                    title = title,
+                    description = description,
+                    location = location,
+                    htmlLink = null,
+                    start = startZdt,
+                    endExclusive = endZdt,
+                    isAllDay = false
+                )
+                viewModel.addCustomEvent(newEvent)
+                showAddEventDialog = false
+            }
+        )
+    }
+
+    // Deletion Confirmation Dialog
+    eventToDelete?.let { event ->
+        AlertDialog(
+            onDismissRequest = { eventToDelete = null },
+            title = { Text("Delete Event") },
+            text = { Text("Do you really want to delete this event?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteCustomEvent(event.id)
+                        eventToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CoralRed)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { eventToDelete = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun AddEventDialog(
+    selectedDate: LocalDate,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, String, LocalTime, LocalTime) -> Unit
+) {
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var location by remember { mutableStateOf("") }
+    
+    var startHour by remember { mutableStateOf("9") }
+    var startMin by remember { mutableStateOf("00") }
+    var startIsAm by remember { mutableStateOf(true) }
+    
+    var endHour by remember { mutableStateOf("10") }
+    var endMin by remember { mutableStateOf("00") }
+    var endIsAm by remember { mutableStateOf(true) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Custom Event for ${selectedDate.format(DateTimeFormatter.ISO_LOCAL_DATE)}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title") },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                )
+                OutlinedTextField(
+                    value = location,
+                    onValueChange = { location = it },
+                    label = { Text("Location") },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    singleLine = true
+                )
+                
+                Text("Start Time", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = startHour, onValueChange = { startHour = it }, label = { Text("HH") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    OutlinedTextField(value = startMin, onValueChange = { startMin = it }, label = { Text("MM") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    AmPmToggle(isAm = startIsAm, onToggle = { startIsAm = it })
+                }
+                
+                Text("End Time", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = endHour, onValueChange = { endHour = it }, label = { Text("HH") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    OutlinedTextField(value = endMin, onValueChange = { endMin = it }, label = { Text("MM") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    AmPmToggle(isAm = endIsAm, onToggle = { endIsAm = it })
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val sHour = (startHour.toIntOrNull() ?: 9).let { 
+                    if (!startIsAm && it < 12) it + 12 else if (startIsAm && it == 12) 0 else it 
+                }
+                val eHour = (endHour.toIntOrNull() ?: 10).let { 
+                    if (!endIsAm && it < 12) it + 12 else if (endIsAm && it == 12) 0 else it 
+                }
+                
+                val startTime = LocalTime.of(sHour % 24, startMin.toIntOrNull() ?: 0)
+                val endTime = LocalTime.of(eHour % 24, endMin.toIntOrNull() ?: 0)
+                onConfirm(title, description, location, startTime, endTime)
+            }) {
+                Text("Add")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+fun AmPmToggle(isAm: Boolean, onToggle: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(DateCellWhite)
+            .border(1.dp, DateCellBorder, RoundedCornerShape(8.dp))
+    ) {
+        Box(
+            modifier = Modifier
+                .clickable { onToggle(true) }
+                .background(if (isAm) CoralRed else Color.Transparent)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "AM",
+                color = if (isAm) Color.White else SoftText,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Box(
+            modifier = Modifier
+                .clickable { onToggle(false) }
+                .background(if (!isAm) CoralRed else Color.Transparent)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "PM",
+                color = if (!isAm) Color.White else SoftText,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold
             )
         }
     }
@@ -83,22 +303,25 @@ fun CalendarApp(viewModel: CalendarViewModel) {
 /** Shows the scrollable page content that sits inside pull-to-refresh. */
 @Composable
 private fun CalendarScreenBody(
+    viewModel: CalendarViewModel,
     mode: CalendarMode,
+    filter: EventFilter,
     visibleMonth: YearMonth,
     selectedDate: LocalDate,
     selectedDateEvents: List<CalendarEvent>,
-    eventCountByDate: Map<LocalDate, Int>,
-    totalEventCount: Int,
+    dayEventInfoMap: Map<LocalDate, DayEventInfo>,
     errorMessage: String?,
     onDismissError: () -> Unit,
     onModeSelected: (CalendarMode) -> Unit,
+    onFilterSelected: (EventFilter) -> Unit,
     onDateSelected: (LocalDate) -> Unit,
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
     onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit
+    onNextMonth: () -> Unit,
+    onRequestDelete: (CalendarEvent) -> Unit
 ) {
     ScrollablePage(contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
         CalendarHeroHeader(
@@ -122,29 +345,90 @@ private fun CalendarScreenBody(
             }
 
             SectionCard {
-                SectionHeading(text = "Choose a view")
+                SectionHeading(text = "View")
                 Spacer(modifier = Modifier.height(12.dp))
                 CalendarModeTabs(
                     selectedMode = mode,
                     onModeSelected = onModeSelected
                 )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                SectionHeading(text = "Filter")
+                Spacer(modifier = Modifier.height(12.dp))
+                CalendarFilterTabs(
+                    selectedFilter = filter,
+                    onFilterSelected = onFilterSelected
+                )
             }
 
             CalendarContent(
+                viewModel = viewModel,
                 mode = mode,
                 visibleMonth = visibleMonth,
                 selectedDate = selectedDate,
                 selectedDateEvents = selectedDateEvents,
-                eventCountByDate = eventCountByDate,
+                dayEventInfoMap = dayEventInfoMap,
                 onDateSelected = onDateSelected,
                 onPreviousDay = onPreviousDay,
                 onNextDay = onNextDay,
                 onPreviousWeek = onPreviousWeek,
                 onNextWeek = onNextWeek,
                 onPreviousMonth = onPreviousMonth,
-                onNextMonth = onNextMonth
+                onNextMonth = onNextMonth,
+                onDeleteEvent = onRequestDelete
             )
         }
+    }
+}
+
+@Composable
+private fun CalendarFilterTabs(
+    selectedFilter: EventFilter,
+    onFilterSelected: (EventFilter) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        EventFilter.entries.forEach { filter ->
+            FilterCard(
+                filter = filter,
+                isSelected = selectedFilter == filter,
+                modifier = Modifier.weight(1f),
+                onClick = { onFilterSelected(filter) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun FilterCard(
+    filter: EventFilter,
+    isSelected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val containerColor = if (isSelected) CoralRed else DateCellWhite
+    val textColor = if (isSelected) Color.White else CoralRed
+    val borderColor = if (isSelected) Color.Transparent else DateCellBorder
+
+    Box(
+        modifier = modifier
+            .shadow(elevation = if (isSelected) 6.dp else 0.dp, shape = RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(containerColor)
+            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = filter.name,
+            color = textColor,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -167,7 +451,7 @@ private fun CalendarHeroHeader(
     ) {
         Column {
             Text(
-                text = "Spring 2026 Semester",
+                text = "CI Companion Calendar",
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onPrimary
             )
@@ -280,44 +564,49 @@ private fun ModeCard(
 /** Chooses which calendar layout to show for the current mode. */
 @Composable
 private fun CalendarContent(
+    viewModel: CalendarViewModel,
     mode: CalendarMode,
     visibleMonth: YearMonth,
     selectedDate: LocalDate,
     selectedDateEvents: List<CalendarEvent>,
-    eventCountByDate: Map<LocalDate, Int>,
+    dayEventInfoMap: Map<LocalDate, DayEventInfo>,
     onDateSelected: (LocalDate) -> Unit,
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
     onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit
+    onNextMonth: () -> Unit,
+    onDeleteEvent: (CalendarEvent) -> Unit
 ) {
     when (mode) {
         CalendarMode.DAY -> DayView(
             selectedDate = selectedDate,
             events = selectedDateEvents,
             onPreviousDay = onPreviousDay,
-            onNextDay = onNextDay
+            onNextDay = onNextDay,
+            onDeleteEvent = onDeleteEvent
         )
 
         CalendarMode.WEEK -> WeekView(
             selectedDate = selectedDate,
-            eventCountByDate = eventCountByDate,
+            dayEventInfoMap = dayEventInfoMap,
             eventsForSelectedDate = selectedDateEvents,
             onDateSelected = onDateSelected,
             onPreviousWeek = onPreviousWeek,
-            onNextWeek = onNextWeek
+            onNextWeek = onNextWeek,
+            onDeleteEvent = onDeleteEvent
         )
 
         CalendarMode.MONTH -> MonthView(
             visibleMonth = visibleMonth,
             selectedDate = selectedDate,
-            eventCountByDate = eventCountByDate,
+            dayEventInfoMap = dayEventInfoMap,
             selectedDateEvents = selectedDateEvents,
             onDateSelected = onDateSelected,
             onPreviousMonth = onPreviousMonth,
-            onNextMonth = onNextMonth
+            onNextMonth = onNextMonth,
+            onDeleteEvent = onDeleteEvent
         )
     }
 }
@@ -328,7 +617,8 @@ private fun DayView(
     selectedDate: LocalDate,
     events: List<CalendarEvent>,
     onPreviousDay: () -> Unit,
-    onNextDay: () -> Unit
+    onNextDay: () -> Unit,
+    onDeleteEvent: (CalendarEvent) -> Unit
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy") }
 
@@ -343,7 +633,8 @@ private fun DayView(
 
         EventsSection(
             title = "Events",
-            events = events
+            events = events,
+            onDeleteEvent = onDeleteEvent
         )
     }
 }
@@ -352,11 +643,12 @@ private fun DayView(
 @Composable
 private fun WeekView(
     selectedDate: LocalDate,
-    eventCountByDate: Map<LocalDate, Int>,
+    dayEventInfoMap: Map<LocalDate, DayEventInfo>,
     eventsForSelectedDate: List<CalendarEvent>,
     onDateSelected: (LocalDate) -> Unit,
     onPreviousWeek: () -> Unit,
-    onNextWeek: () -> Unit
+    onNextWeek: () -> Unit,
+    onDeleteEvent: (CalendarEvent) -> Unit
 ) {
     val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
     val weekDates = remember(selectedDate, firstDayOfWeek) {
@@ -377,14 +669,15 @@ private fun WeekView(
             WeekRow(
                 dates = weekDates,
                 selectedDate = selectedDate,
-                eventCountByDate = eventCountByDate,
+                dayEventInfoMap = dayEventInfoMap,
                 onDateSelected = onDateSelected
             )
         }
 
         EventsSection(
             title = "Selected day",
-            events = eventsForSelectedDate
+            events = eventsForSelectedDate,
+            onDeleteEvent = onDeleteEvent
         )
     }
 }
@@ -394,11 +687,12 @@ private fun WeekView(
 private fun MonthView(
     visibleMonth: YearMonth,
     selectedDate: LocalDate,
-    eventCountByDate: Map<LocalDate, Int>,
+    dayEventInfoMap: Map<LocalDate, DayEventInfo>,
     selectedDateEvents: List<CalendarEvent>,
     onDateSelected: (LocalDate) -> Unit,
     onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit
+    onNextMonth: () -> Unit,
+    onDeleteEvent: (CalendarEvent) -> Unit
 ) {
     val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
     val monthCells = remember(visibleMonth, firstDayOfWeek) {
@@ -419,14 +713,15 @@ private fun MonthView(
             MonthGrid(
                 monthCells = monthCells,
                 selectedDate = selectedDate,
-                eventCountByDate = eventCountByDate,
+                dayEventInfoMap = dayEventInfoMap,
                 onDateSelected = onDateSelected
             )
         }
 
         EventsSection(
             title = "Selected day",
-            events = selectedDateEvents
+            events = selectedDateEvents,
+            onDeleteEvent = onDeleteEvent
         )
     }
 }
@@ -567,7 +862,7 @@ private fun WeekdayChip(
 private fun WeekRow(
     dates: List<LocalDate>,
     selectedDate: LocalDate,
-    eventCountByDate: Map<LocalDate, Int>,
+    dayEventInfoMap: Map<LocalDate, DayEventInfo>,
     onDateSelected: (LocalDate) -> Unit
 ) {
     Row(
@@ -579,7 +874,7 @@ private fun WeekRow(
                 modifier = Modifier.weight(1f),
                 date = date,
                 isSelected = date == selectedDate,
-                eventCount = eventCountByDate[date] ?: 0,
+                eventInfo = dayEventInfoMap[date] ?: DayEventInfo(),
                 onClick = { onDateSelected(date) }
             )
         }
@@ -591,7 +886,7 @@ private fun WeekRow(
 private fun MonthGrid(
     monthCells: List<LocalDate?>,
     selectedDate: LocalDate,
-    eventCountByDate: Map<LocalDate, Int>,
+    dayEventInfoMap: Map<LocalDate, DayEventInfo>,
     onDateSelected: (LocalDate) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -608,7 +903,7 @@ private fun MonthGrid(
                             modifier = Modifier.weight(1f),
                             date = date,
                             isSelected = date == selectedDate,
-                            eventCount = eventCountByDate[date] ?: 0,
+                            eventInfo = dayEventInfoMap[date] ?: DayEventInfo(),
                             onClick = { onDateSelected(date) }
                         )
                     }
@@ -634,7 +929,7 @@ private fun DateCell(
     modifier: Modifier = Modifier,
     date: LocalDate,
     isSelected: Boolean,
-    eventCount: Int,
+    eventInfo: DayEventInfo,
     onClick: () -> Unit
 ) {
     Box(
@@ -661,29 +956,42 @@ private fun DateCell(
                 fontWeight = FontWeight.Bold
             )
 
-            EventCountLabel(
-                eventCount = eventCount,
+            EventDots(
+                info = eventInfo,
                 isSelected = isSelected
             )
         }
     }
 }
 
-/** Shows the event count text only when a date has at least one event. */
+/** Shows colorful dots for events instead of text. */
 @Composable
-private fun EventCountLabel(
-    eventCount: Int,
+private fun EventDots(
+    info: DayEventInfo,
     isSelected: Boolean
 ) {
-    if (eventCount > 0) {
-        Text(
-            text = if (eventCount == 1) "1\nevent" else "$eventCount\nevents",
-            style = MaterialTheme.typography.labelSmall,
-            color = resolveEventCountTextColor(isSelected),
-            fontWeight = FontWeight.SemiBold,
-            lineHeight = 12.sp,
-            textAlign = TextAlign.Start
-        )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (info.hasCsuci) {
+            Box(
+                modifier = Modifier
+                    .padding(end = 4.dp)
+                    .size(8.dp)
+                    .background(CoralRed, CircleShape)
+            )
+        }
+        if (info.hasCustom) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(CustomEventOrange, CircleShape)
+            )
+        }
     }
 }
 
@@ -691,17 +999,18 @@ private fun EventCountLabel(
 @Composable
 private fun EventsSection(
     title: String,
-    events: List<CalendarEvent>
+    events: List<CalendarEvent>,
+    onDeleteEvent: (CalendarEvent) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionHeading(text = title)
-        EventsList(events = events)
+        EventsList(events = events, onDeleteEvent = onDeleteEvent)
     }
 }
 
 /** Shows either an empty state or the full list of event cards. */
 @Composable
-private fun EventsList(events: List<CalendarEvent>) {
+private fun EventsList(events: List<CalendarEvent>, onDeleteEvent: (CalendarEvent) -> Unit) {
     if (events.isEmpty()) {
         EmptyEventsMessage()
         return
@@ -709,7 +1018,7 @@ private fun EventsList(events: List<CalendarEvent>) {
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         events.forEach { event ->
-            EventCard(event = event)
+            EventCard(event = event, onDelete = { onDeleteEvent(event) })
         }
     }
 }
@@ -728,7 +1037,7 @@ private fun EmptyEventsMessage() {
 
 /** Shows one event card. */
 @Composable
-private fun EventCard(event: CalendarEvent) {
+private fun EventCard(event: CalendarEvent, onDelete: () -> Unit) {
     val displayTitle = formatEventTextForDisplay(event.title)
     val displayLocation = event.location?.let(::formatEventTextForDisplay)
     val displayDescription = event.description?.let(::formatEventTextForDisplay)
@@ -745,7 +1054,7 @@ private fun EventCard(event: CalendarEvent) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            EventCardHeader(title = displayTitle)
+            EventCardHeader(title = displayTitle, isCustom = event.calendarId == "custom", onDelete = onDelete)
             EventMetaLine(text = event.timeLabel())
             displayLocation?.let { EventMetaLine(text = "Location: $it") }
             displayDescription?.let { EventDescription(text = it) }
@@ -755,7 +1064,7 @@ private fun EventCard(event: CalendarEvent) {
 
 /** Shows the top row of an event card. */
 @Composable
-private fun EventCardHeader(title: String) {
+private fun EventCardHeader(title: String, isCustom: Boolean, onDelete: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -769,24 +1078,58 @@ private fun EventCardHeader(title: String) {
             color = MaterialTheme.colorScheme.onSurface
         )
 
-        EventBadge()
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (isCustom) {
+                Surface(
+                    onClick = onDelete,
+                    color = Color.White,
+                    shape = CircleShape,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CoralRed),
+                    modifier = Modifier.padding(end = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = CoralRed,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Delete Event",
+                            color = CoralRed,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+            EventBadge(
+                text = if (isCustom) "Custom" else "CSUCI",
+                color = if (isCustom) CustomEventOrange else CoralRed
+            )
+        }
     }
 }
 
 /** Shows the small badge on the right side of an event card. */
 @Composable
-private fun EventBadge() {
+private fun EventBadge(text: String, color: Color) {
     Box(
         modifier = Modifier
-            .padding(start = 12.dp)
+            .padding(start = 4.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(DateCellWhite)
+            .background(color.copy(alpha = 0.1f))
+            .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
             .padding(horizontal = 10.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "Event",
-            color = MaterialTheme.colorScheme.primary,
+            text = text,
+            color = color,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold
         )
@@ -818,7 +1161,10 @@ private fun buildSelectedDateEvents(
     events: List<CalendarEvent>,
     selectedDate: LocalDate
 ): List<CalendarEvent> {
-    return events.filter { it.occursOn(selectedDate) }.sortedBy { it.start }
+    return events.filter { it.occursOn(selectedDate) }.sortedWith(
+        compareByDescending<CalendarEvent> { it.calendarId == "custom" }
+            .thenBy { it.start }
+    )
 }
 
 /** Builds the title used in week view. */
@@ -853,7 +1199,7 @@ private fun modeAccentColor(mode: CalendarMode): Color {
 /** Chooses the background color for a date cell. */
 @Composable
 private fun resolveDateCellBackgroundColor(isSelected: Boolean): Color {
-    return if (isSelected) CoralRed else MaterialTheme.colorScheme.surface
+    return if (isSelected) CardOffWhite else Color.White
 }
 
 /** Chooses the border color for a date cell. */
@@ -865,7 +1211,7 @@ private fun resolveDateCellBorderColor(isSelected: Boolean): Color {
 /** Chooses the main text color for a date cell. */
 @Composable
 private fun resolveDateCellTextColor(isSelected: Boolean): Color {
-    return if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    return if (isSelected) CoralRed else MaterialTheme.colorScheme.onSurface
 }
 
 /** Chooses the badge fill color used by the event count label. */
@@ -880,21 +1226,27 @@ private fun resolveEventCountTextColor(isSelected: Boolean): Color {
     return if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
 }
 
-/** Counts how many events fall on each date in the loaded month. */
-private fun buildEventCountMap(events: List<CalendarEvent>): Map<LocalDate, Int> {
-    val counts = mutableMapOf<LocalDate, Int>()
+/** Builds the day event info map. */
+private fun buildDayEventInfoMap(events: List<CalendarEvent>): Map<LocalDate, DayEventInfo> {
+    val infoMap = mutableMapOf<LocalDate, DayEventInfo>()
 
     for (event in events) {
         var day = event.start.toLocalDate()
         val lastDay = event.lastDateInclusive()
+        val isCustom = event.calendarId == "custom"
 
         while (!day.isAfter(lastDay)) {
-            counts[day] = (counts[day] ?: 0) + 1
+            val current = infoMap[day] ?: DayEventInfo()
+            infoMap[day] = if (isCustom) {
+                current.copy(hasCustom = true)
+            } else {
+                current.copy(hasCsuci = true)
+            }
             day = day.plusDays(1)
         }
     }
 
-    return counts
+    return infoMap
 }
 
 /** Builds the month grid with leading and trailing empty cells. */

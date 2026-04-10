@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,7 +27,6 @@ import com.example.cicompanion.appNavigation.featureItems
 import com.example.cicompanion.calendar.CalendarViewModel
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.ui.theme.AppBackground
-import com.example.cicompanion.home.CalendarWidget
 import java.time.ZonedDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,15 +39,13 @@ fun HomeScreen(navController: NavHostController) {
         upcomingHomeWidgetEvents(calendarViewModel.events)
     }
 
-
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(AppBackground)
             .padding(top = 16.dp)
     ) {
-        //dummy events for widget
+        // Upcoming events widget at the top
         CalendarWidget(
             events = widgetEvents,
             modifier = Modifier.padding(horizontal = 16.dp)

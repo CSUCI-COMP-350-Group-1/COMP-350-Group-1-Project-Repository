@@ -5,8 +5,11 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -183,6 +186,7 @@ fun MapScreen(navController: NavHostController) {
     // Search and Filtering State
     var searchQuery by remember { mutableStateOf("") }
     var filterType by remember { mutableStateOf<LocationType?>(null) }
+    var showSearchResults by remember { mutableStateOf(false) }
 
     val cameraPositionState = rememberCameraPositionState {
         // Default camera position set to CSUCI center (default location)
@@ -229,15 +233,13 @@ fun MapScreen(navController: NavHostController) {
         topBar = {
             Surface(shadowElevation = 4.dp) {
                 Column {
-                    /*
-                    TopAppBar(
-                        title = { Text("CSUCI Campus Map", fontSize = 20.sp) }
-                    )
-                     */
                     // Search Bar
                     OutlinedTextField(
                         value = searchQuery,
-                        onValueChange = { searchQuery = it },
+                        onValueChange = {
+                            searchQuery = it
+                            showSearchResults = it.isNotEmpty()
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 24.dp),
@@ -245,7 +247,10 @@ fun MapScreen(navController: NavHostController) {
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { searchQuery = "" }) {
+                                IconButton(onClick = {
+                                    searchQuery = ""
+                                    showSearchResults = false
+                                }) {
                                     Icon(Icons.Default.Close, contentDescription = null)
                                 }
                             }
@@ -253,6 +258,40 @@ fun MapScreen(navController: NavHostController) {
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp)
                     )
+
+                    if (showSearchResults && filteredLocations.isNotEmpty()) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .heightIn(max = 200.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                        ) {
+                            LazyColumn {
+                                items(filteredLocations) { location ->
+                                    ListItem(
+                                        headlineContent = { Text(location.name) },
+                                        supportingContent = { Text(location.type.name, fontSize = 12.sp) },
+                                        leadingContent = {
+                                            Icon(location.icon, contentDescription = null, tint = location.color)
+                                        },
+                                        modifier = Modifier.clickable {
+                                            searchQuery = location.name
+                                            showSearchResults = false
+                                            selectedDestination = location.position
+                                            scope.launch {
+                                                cameraPositionState.animate(
+                                                    CameraUpdateFactory.newLatLngZoom(location.position, 18f)
+                                                )
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // Chips on the filter
                     LazyRow(
                         modifier = Modifier
@@ -325,7 +364,10 @@ fun MapScreen(navController: NavHostController) {
                 userLocation = userLocation,
                 selectedDestination = selectedDestination,
                 onLocationClick = { selectedDestination = it },
-                onMapClick = { selectedDestination = null },
+                onMapClick = {
+                    selectedDestination = null
+                    showSearchResults = false
+                },
                 displayLocations = filteredLocations
             )
 
@@ -405,16 +447,6 @@ fun MapContent(
                     LandmarkIcon(icon = location.icon, contentDescription = location.name, color = location.color)
                 }
             }
-        }
-
-        // Draw walking path
-        if (userLocation != null && selectedDestination != null) {
-            Polyline(
-                points = listOf(userLocation, selectedDestination),
-                color = Color(0xFF1A73E8),
-                width = 8f,
-                geodesic = true
-            )
         }
     }
 }

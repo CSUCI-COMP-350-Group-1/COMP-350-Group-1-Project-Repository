@@ -7,9 +7,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.cicompanion.calendar.data.repository.CalendarRepository
 import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.social.FirestoreManager
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
+import java.util.UUID
+
+enum class EventFilter { ALL, CSUCI, CUSTOM }
 
 class CalendarViewModel(
     private val repository: CalendarRepository = CalendarRepository()
@@ -27,8 +31,18 @@ class CalendarViewModel(
     var sourceUrl: String by mutableStateOf(CSUCI_CALENDAR_SUBSCRIBE_URL)
         private set
 
-    var events: List<CalendarEvent> by mutableStateOf(emptyList())
+    private var csuciEvents: List<CalendarEvent> by mutableStateOf(emptyList())
+    private var customEvents: List<CalendarEvent> by mutableStateOf(emptyList())
+    
+    var filter: EventFilter by mutableStateOf(EventFilter.ALL)
         private set
+
+    val events: List<CalendarEvent>
+        get() = when (filter) {
+            EventFilter.ALL -> customEvents + csuciEvents // Custom events on top
+            EventFilter.CSUCI -> csuciEvents
+            EventFilter.CUSTOM -> customEvents
+        }
 
     var isLoading: Boolean by mutableStateOf(false)
         private set
@@ -38,11 +52,16 @@ class CalendarViewModel(
 
     init {
         loadOnlineCalendar()
+        loadCustomEvents()
     }
 
     /** Updates the active calendar view mode. */
     fun updateMode(newMode: CalendarMode) {
         mode = newMode
+    }
+    
+    fun updateFilter(newFilter: EventFilter) {
+        filter = newFilter
     }
 
     /** Loads all events from the CSUCI calendar subscribe link. */
@@ -60,12 +79,32 @@ class CalendarViewModel(
             runCatching {
                 repository.loadEvents(sourceUrl = trimmedUrl)
             }.onSuccess { loadedEvents ->
-                events = loadedEvents
+                csuciEvents = loadedEvents
             }.onFailure { error ->
                 errorMessage = error.message ?: "Failed to load online calendar."
             }
 
             isLoading = false
+        }
+    }
+
+    fun loadCustomEvents() {
+        viewModelScope.launch {
+            customEvents = FirestoreManager.fetchCustomEvents()
+        }
+    }
+
+    fun addCustomEvent(event: CalendarEvent) {
+        viewModelScope.launch {
+            FirestoreManager.saveCustomEvent(event)
+            loadCustomEvents()
+        }
+    }
+
+    fun deleteCustomEvent(eventId: String) {
+        viewModelScope.launch {
+            FirestoreManager.deleteCustomEvent(eventId)
+            loadCustomEvents()
         }
     }
 
