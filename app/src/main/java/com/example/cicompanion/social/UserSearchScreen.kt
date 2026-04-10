@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -120,6 +121,17 @@ fun UserSearchScreen(navController: NavHostController) {
                                         },
                                         onError = { errorMessage = it }
                                     )
+                                },
+                                onRemoveFriend = {
+                                    SocialRepository.removeFriend(
+                                        currentUserId = currentUser.uid,
+                                        targetUserId = user.uid,
+                                        onSuccess = {
+                                            requestStatuses.remove(user.uid)
+                                            statusMessage = "Friendship removed for ${SocialRepository.displayNameOrEmail(user)}."
+                                        },
+                                        onError = { errorMessage = it }
+                                    )
                                 }
                             )
                         }
@@ -134,7 +146,8 @@ fun UserSearchScreen(navController: NavHostController) {
 private fun UserSearchResultCard(
     user: UserProfile,
     requestStatus: String?,
-    onSendRequest: () -> Unit
+    onSendRequest: () -> Unit,
+    onRemoveFriend: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -150,24 +163,37 @@ private fun UserSearchResultCard(
                 }
             }
 
-            IconButton(
-                onClick = onSendRequest,
-                enabled = requestStatus == null // Only allow clicking if no request/friendship exists
-            ) {
-                val icon = if (requestStatus != null) Icons.Default.Check else Icons.Default.Add
-                
-                // Set color based on status: Green for accepted, Gray for pending
-                val tint = when (requestStatus) {
-                    "accepted" -> Color(0xFF2E7D32) // Green
-                    "pending" -> Color.Gray
-                    else -> LocalContentColor.current
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Remove Friend button (red X)
+                // Visible ONLY when they are already friends (accepted)
+                if (requestStatus == "accepted") {
+                    IconButton(onClick = onRemoveFriend) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Remove Friend",
+                            tint = Color.Red
+                        )
+                    }
                 }
 
-                Icon(
-                    imageVector = icon,
-                    contentDescription = if (requestStatus == null) "Add Friend" else "Request Status",
-                    tint = tint
-                )
+                // Add/Status button
+                IconButton(
+                    onClick = onSendRequest,
+                    enabled = requestStatus == null
+                ) {
+                    val icon = if (requestStatus != null) Icons.Default.Check else Icons.Default.Add
+                    val tint = when (requestStatus) {
+                        "accepted" -> Color(0xFF2E7D32)
+                        "pending" -> Color.Gray
+                        else -> LocalContentColor.current
+                    }
+
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = if (requestStatus == null) "Add Friend" else "Status",
+                        tint = tint
+                    )
+                }
             }
         }
     }

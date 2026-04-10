@@ -234,6 +234,47 @@ object SocialRepository {
             }
     }
 
+    /**
+     * Removes a friendship or pending request.
+     * Uses single-field queries (which are safe/indexed) and filters in memory to avoid PERMISSION_DENIED.
+     */
+    fun removeFriend(
+        currentUserId: String,
+        targetUserId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val collection = friendRequestsCollection()
+
+        // 1. Check requests sent BY me
+        collection.whereEqualTo("fromUserId", currentUserId).get()
+            .addOnSuccessListener { outgoingSnapshot ->
+                val outgoingDoc = outgoingSnapshot.documents.find { it.getString("toUserId") == targetUserId }
+                
+                if (outgoingDoc != null) {
+                    outgoingDoc.reference.delete()
+                        .addOnSuccessListener { onSuccess() }
+                        .addOnFailureListener { onError("Permission Denied: Only the receiver can remove this friend. Please check your Firestore Security Rules.") }
+                } else {
+                    // 2. Check requests sent TO me
+                    collection.whereEqualTo("toUserId", currentUserId).get()
+                        .addOnSuccessListener { incomingSnapshot ->
+                            val incomingDoc = incomingSnapshot.documents.find { it.getString("fromUserId") == targetUserId }
+                            
+                            if (incomingDoc != null) {
+                                incomingDoc.reference.delete()
+                                    .addOnSuccessListener { onSuccess() }
+                                    .addOnFailureListener { onError("Permission Denied: Could not delete incoming friendship. Check Firestore Rules.") }
+                            } else {
+                                onError("No friendship found to remove.")
+                            }
+                        }
+                        .addOnFailureListener { onError("Error searching incoming requests: ${it.message}") }
+                }
+            }
+            .addOnFailureListener { onError("Error searching outgoing requests: ${it.message}") }
+    }
+
     private fun updateFriendRequestStatus(
         requestId: String,
         newStatus: String,
