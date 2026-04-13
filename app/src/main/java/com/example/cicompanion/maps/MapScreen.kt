@@ -234,6 +234,11 @@ fun MapScreen(navController: NavHostController) {
             Surface(shadowElevation = 4.dp) {
                 Column {
                     // Search Bar
+                    /*
+                    TopAppBar(
+                        title = { Text("CSUCI Campus Map", fontSize = 20.sp) }
+                    )
+                     */
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = {
