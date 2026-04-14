@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
@@ -151,15 +152,32 @@ private fun UserSearchResultCard(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 UserAvatar(photoUrl = user.photoUrl)
                 Column {
-                    Text(text = SocialRepository.displayNameOrEmail(user), style = MaterialTheme.typography.titleMedium)
-                    Text(text = user.email, color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = SocialRepository.displayNameOrEmail(user),
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = user.email,
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
 
@@ -174,25 +192,21 @@ private fun UserSearchResultCard(
                             tint = Color.Red
                         )
                     }
-                }
+                } else {
+                    // Add/Status button
+                    IconButton(
+                        onClick = onSendRequest,
+                        enabled = requestStatus == null
+                    ) {
+                        val icon = if (requestStatus == "pending") Icons.Default.Check else Icons.Default.Add
+                        val tint = if (requestStatus == "pending") Color.Gray else LocalContentColor.current
 
-                // Add/Status button
-                IconButton(
-                    onClick = onSendRequest,
-                    enabled = requestStatus == null
-                ) {
-                    val icon = if (requestStatus != null) Icons.Default.Check else Icons.Default.Add
-                    val tint = when (requestStatus) {
-                        "accepted" -> Color(0xFF2E7D32)
-                        "pending" -> Color.Gray
-                        else -> LocalContentColor.current
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = if (requestStatus == null) "Add Friend" else "Status",
+                            tint = tint
+                        )
                     }
-
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = if (requestStatus == null) "Add Friend" else "Status",
-                        tint = tint
-                    )
                 }
             }
         }

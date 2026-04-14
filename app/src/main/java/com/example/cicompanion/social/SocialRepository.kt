@@ -6,9 +6,6 @@ import com.google.firebase.firestore.QuerySnapshot
 
 object SocialRepository {
 
-    /**
-     * Loads all searchable users except the currently signed-in user.
-     */
     fun fetchSearchableUsers(
         currentUserId: String,
         onSuccess: (List<UserProfile>) -> Unit,
@@ -215,9 +212,6 @@ object SocialRepository {
         )
     }
 
-    /**
-     * Resets the friend request by deleting it, allowing a fresh start (Plus icon).
-     */
     fun declineFriendRequest(
         request: FriendRequest,
         onSuccess: () -> Unit,
@@ -234,10 +228,6 @@ object SocialRepository {
             }
     }
 
-    /**
-     * Removes a friendship or pending request.
-     * Uses single-field queries (which are safe/indexed) and filters in memory to avoid PERMISSION_DENIED.
-     */
     fun removeFriend(
         currentUserId: String,
         targetUserId: String,
