@@ -2,6 +2,13 @@ package com.example.cicompanion.social
 
 import android.util.Log
 import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.maps.CampusLocation
+import com.example.cicompanion.maps.LocationType
+import com.google.android.gms.maps.model.LatLng
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
@@ -132,6 +139,38 @@ object FirestoreManager {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching custom events", e)
+            emptyList()
+        }
+    }
+
+    suspend fun fetchCampusLocations(): List<CampusLocation> {
+        val db = FirebaseFirestore.getInstance()
+        return try {
+            val snapshot = db.collection("campusLocations").get().await()
+            if (snapshot.isEmpty) return emptyList()
+            
+            snapshot.documents.mapNotNull { doc ->
+                val name = doc.getString("name") ?: ""
+                val lat = doc.getDouble("latitude") ?: 0.0
+                val lng = doc.getDouble("longitude") ?: 0.0
+                val description = doc.getString("description") ?: ""
+                val typeStr = doc.getString("type") ?: "BUILDING"
+                val colorHex = doc.getString("color") ?: "#D32F2F"
+                
+                val type = try { LocationType.valueOf(typeStr) } catch(e: Exception) { LocationType.BUILDING }
+                val color = Color(android.graphics.Color.parseColor(colorHex))
+                val icon = when (type) {
+                    LocationType.BUILDING -> Icons.Default.Business
+                    LocationType.FOOD -> Icons.Default.Restaurant
+                    LocationType.AREA -> Icons.Default.People
+                    LocationType.HOUSING -> Icons.Default.Home
+                    LocationType.PARKING -> Icons.Default.LocalParking
+                }
+
+                CampusLocation(name, LatLng(lat, lng), description, type, icon, color)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching campus locations", e)
             emptyList()
         }
     }

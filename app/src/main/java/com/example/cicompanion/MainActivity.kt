@@ -103,7 +103,7 @@ fun AppNavigation() {
                         HomeScreen(navController, calendarViewModel)
                     }
                     composable(Routes.MAP) {
-                        MapScreen(navController)
+                        MapScreen(navController, calendarViewModel)
                     }
                     composable(Routes.CALENDAR) {
                         CalendarApp(viewModel = calendarViewModel)

@@ -1,17 +1,21 @@
 package com.example.cicompanion.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -26,6 +30,7 @@ import com.example.cicompanion.calendar.EventFilter
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
+import com.example.cicompanion.ui.theme.BrandRedDark
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
@@ -155,11 +160,21 @@ fun PinnedEventItem(event: CalendarEvent, onNavigateToEvent: () -> Unit) {
                     color = Color.Gray
                 )
             }
-            IconButton(onClick = onNavigateToEvent) {
+            
+            // Replaced '...' button with circular calendar button to match MapScreen
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(BrandRedDark.copy(alpha = 0.1f))
+                    .clickable(onClick = onNavigateToEvent),
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(
-                    Icons.Default.MoreHoriz,
-                    contentDescription = "View Details",
-                    tint = Color.Gray
+                    imageVector = Icons.Default.CalendarMonth,
+                    contentDescription = "View in Calendar",
+                    tint = BrandRedDark,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }

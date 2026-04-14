@@ -11,8 +11,8 @@ import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -56,7 +56,7 @@ fun NavBar(navController: NavHostController) {
         containerColor = navBarBackground,
         windowInsets = NavigationBarDefaults.windowInsets,
         modifier = Modifier
-            .heightIn(min = 72.dp)
+            .heightIn(min = 80.dp)
             .drawWithContent {
                 drawContent()
                 drawLine(color =
@@ -80,7 +80,12 @@ fun NavBar(navController: NavHostController) {
                     contentDescription = item.title,
                     tint = if(isSelected) BrandRedLight else GrayIcon
                 ) },
-                label = null,
+                label = { 
+                    Text(
+                        text = item.title,
+                        color = if(isSelected) BrandRedLight else GrayIcon
+                    )
+                },
                 selected = isSelected,
                 colors = NavigationBarItemDefaults.colors(
                     indicatorColor = Color.Transparent
