@@ -35,16 +35,43 @@ import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.CICompanionTheme
 import kotlinx.coroutines.launch
+//New for push notifications
+import com.example.cicompanion.notifications.NotificationPermissionRequester
+import com.example.cicompanion.startup.AppStartupCoordinator
 
 class MainActivity : ComponentActivity() {
+    // Handles Android 13+ notification permission.
+    private lateinit var notificationPermissionRequester: NotificationPermissionRequester
+    // Handles auth listener, token sync, channel setup, and request observer.
+    private lateinit var appStartupCoordinator: AppStartupCoordinator
+
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        initializeStartupHelpers()
+        startAppServices()
         enableEdgeToEdge()
         setContent {
             CICompanionTheme {
                 AppNavigation()
             }
         }
+    }
+
+    override fun onDestroy() {
+        appStartupCoordinator.stop()
+        super.onDestroy()
+    }
+    // Keeps object creation separate from startup actions
+    private fun initializeStartupHelpers() {
+        notificationPermissionRequester = NotificationPermissionRequester(this)
+        appStartupCoordinator = AppStartupCoordinator(applicationContext)
+    }
+    //Keeps startup flow readable and compact
+    private fun startAppServices() {
+        notificationPermissionRequester.requestIfNeeded()
+        appStartupCoordinator.start()
     }
 }
 

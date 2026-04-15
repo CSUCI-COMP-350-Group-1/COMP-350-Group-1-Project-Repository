@@ -3,8 +3,26 @@ package com.example.cicompanion.social
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.QuerySnapshot
+import com.google.firebase.firestore.ListenerRegistration
 
 object SocialRepository {
+
+    // Real-time listener used by the notification observer.
+    fun observePendingIncomingFriendRequests(
+        currentUserId: String,
+        onSnapshot: (QuerySnapshot) -> Unit,
+        onError: (String) -> Unit
+    ): ListenerRegistration {
+        return buildIncomingFriendRequestsQuery(currentUserId)
+            .addSnapshotListener { snapshot, exception ->
+                if (exception != null) {
+                    onError(exception.message ?: "Could not observe incoming friend requests.")
+                    return@addSnapshotListener
+                }
+
+                snapshot?.let(onSnapshot)
+            }
+    }
 
     fun fetchSearchableUsers(
         currentUserId: String,

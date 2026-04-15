@@ -95,6 +95,9 @@ dependencies {
     // core library needed
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 
+    // Firebase Cloud Messaging/"push notifications"
+    implementation("com.google.firebase:firebase-messaging")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
