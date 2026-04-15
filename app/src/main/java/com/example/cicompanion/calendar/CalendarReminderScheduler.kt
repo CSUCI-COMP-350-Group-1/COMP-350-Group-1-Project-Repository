@@ -149,6 +149,7 @@ object CalendarReminderScheduler {
     //Comment out above for test
     /*private fun buildReminderTriggerTime(event: CalendarEvent): ZonedDateTime {
         // TEST ONLY: fire reminder 1 minute from now
+        // Will push all event notifications, AND I MEAN ALL!!!!
         return ZonedDateTime.now(event.start.zone).plusMinutes(1)
     }*/
 

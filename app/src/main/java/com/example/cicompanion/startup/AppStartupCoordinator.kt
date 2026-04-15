@@ -6,6 +6,7 @@ import com.example.cicompanion.firebase.FcmTokenManager
 import com.example.cicompanion.notifications.AppNotificationManager
 import com.example.cicompanion.social.FriendRequestNotificationObserver
 import com.google.firebase.auth.FirebaseAuth
+import com.example.cicompanion.notifications.NotificationRepository
 
 class AppStartupCoordinator(
     context: Context
@@ -27,6 +28,7 @@ class AppStartupCoordinator(
 
     //Called once by MainActivity during startup
     fun start() {
+        NotificationRepository.initialize(appContext)
         //Create all app notification channels.
         AppNotificationManager.createNotificationChannels(appContext)
 

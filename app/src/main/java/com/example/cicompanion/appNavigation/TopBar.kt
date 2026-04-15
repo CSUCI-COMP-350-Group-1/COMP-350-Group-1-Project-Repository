@@ -50,6 +50,7 @@ fun TopBar(
     onHamburgerClick: () -> Unit,
     onBackClick: () -> Unit,
     onNotificationClick: () -> Unit,
+    notificationCount: Int,
     navController: NavController
 ) {
     val topBarGradient = Brush.linearGradient(
@@ -82,9 +83,20 @@ fun TopBar(
                 }
             },
             actions = {
-                //Commented out for the sprint 2, uncomment for notification page in future
                 IconButton(onClick = onNotificationClick) {
-                    Icon(Icons.Default.Notifications, contentDescription = null)
+                    BadgedBox(
+                        badge = {
+                            if (notificationCount > 0) {
+                                Badge {
+                                    Text(
+                                        text = if (notificationCount > 99) "99+" else notificationCount.toString()
+                                    )
+                                }
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Default.Notifications, contentDescription = "Notifications")
+                    }
                 }
             }
         )

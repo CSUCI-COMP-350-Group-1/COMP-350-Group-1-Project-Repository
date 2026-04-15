@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.cicompanion.MainActivity
 import com.example.cicompanion.social.FriendRequest
+import com.example.cicompanion.notifications.NotificationRepository
 
 object AppNotificationManager {
 
@@ -60,7 +61,7 @@ object AppNotificationManager {
     }
 
     //Friend request specific wrapper
-    fun showFriendRequestNotification(context: Context, request: FriendRequest) {
+    /*fun showFriendRequestNotification(context: Context, request: FriendRequest) {
         val senderName = request.fromDisplayName.ifBlank { request.fromEmail }
 
         showSimpleNotification(
@@ -69,10 +70,22 @@ object AppNotificationManager {
             title = "New friend request",
             body = "$senderName sent you a friend request."
         )
+    }*/
+    fun showFriendRequestNotification(context: Context, request: FriendRequest) {
+        val senderName = request.fromDisplayName.ifBlank { request.fromEmail }
+
+        showNotification(
+            context = context,
+            channelId = FRIEND_REQUEST_CHANNEL_ID,
+            notificationId = request.id.hashCode(),
+            title = "New friend request",
+            body = "$senderName sent you a friend request.",
+            type = "Friend Request"
+        )
     }
 
     // NEW: Wrapper used by CalendarReminderWorker.
-    fun showCalendarReminderNotification(
+    /*fun showCalendarReminderNotification(
         context: Context,
         title: String,
         location: String,
@@ -91,10 +104,31 @@ object AppNotificationManager {
             title = "Event tomorrow",
             body = "$title\n$body"
         )
+    }*/
+    fun showCalendarReminderNotification(
+        context: Context,
+        title: String,
+        location: String,
+        timeLabel: String
+    ) {
+        val body = if (location.isBlank()) {
+            timeLabel
+        } else {
+            "$timeLabel\n$location"
+        }
+
+        showNotification(
+            context = context,
+            channelId = CALENDAR_REMINDER_CHANNEL_ID,
+            notificationId = ("calendar_" + title + timeLabel).hashCode(),
+            title = "Event tomorrow",
+            body = "$title\n$body",
+            type = "Calendar Reminder"
+        )
     }
 
     //Reusable notification function for local notifications and future FCM handling.
-    fun showSimpleNotification(
+    /*fun showSimpleNotification(
         context: Context,
         notificationId: Int,
         title: String,
@@ -107,14 +141,38 @@ object AppNotificationManager {
             title = title,
             body = body
         )
+    }*/
+    fun showSimpleNotification(
+        context: Context,
+        notificationId: Int,
+        title: String,
+        body: String
+    ) {
+        showNotification(
+            context = context,
+            channelId = FRIEND_REQUEST_CHANNEL_ID,
+            notificationId = notificationId,
+            title = title,
+            body = body,
+            type = "General"
+        )
     }
     private fun showNotification(
         context: Context,
         channelId: String,
         notificationId: Int,
         title: String,
-        body: String
+        body: String,
+        type: String
     ) {
+        //Save every posted notification so it also appears in NotificationScreen
+        NotificationRepository.addNotification(
+            context = context,
+            title = title,
+            body = body,
+            type = type
+        )
+
         if (!canPostNotifications(context)) return
 
         val contentIntent = buildMainActivityPendingIntent(

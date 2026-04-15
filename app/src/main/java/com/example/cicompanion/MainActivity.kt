@@ -38,6 +38,8 @@ import kotlinx.coroutines.launch
 import com.example.cicompanion.notifications.NotificationPermissionRequester
 import com.example.cicompanion.social.NotificationScreen
 import com.example.cicompanion.startup.AppStartupCoordinator
+import androidx.compose.runtime.collectAsState
+import com.example.cicompanion.notifications.NotificationRepository
 
 class MainActivity : ComponentActivity() {
     // Handles Android 13+ notification permission.
@@ -86,6 +88,9 @@ fun AppNavigation() {
     val currentRoute = navBackStackEntry?.destination?.route
     val currentScreenTitle = screenTitleForRoute(currentRoute)
 
+    val notifications by NotificationRepository.notifications.collectAsState()
+    val unreadNotificationCount = notifications.count { !it.isRead }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = drawerState.isOpen,
@@ -115,7 +120,8 @@ fun AppNavigation() {
                     onNotificationClick = {
                          navController.navigate(Routes.NOTIFICATIONS)
                     },
-                    navController = navController
+                    navController = navController,
+                    notificationCount = unreadNotificationCount,
                 )
             },
             bottomBar = { NavBar(navController) }
