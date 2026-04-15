@@ -24,8 +24,8 @@ class CalendarViewModel(
     var visibleMonth: YearMonth by mutableStateOf(YearMonth.now())
         private set
 
-    var sourceUrl: String by mutableStateOf(CSUCI_CALENDAR_SUBSCRIBE_URL)
-        private set
+    //Uses shared config so the background worker and UI stay in sync
+    var sourceUrl: String by mutableStateOf(CalendarFeedConfig.CSUCI_CALENDAR_SUBSCRIBE_URL)
 
     var events: List<CalendarEvent> by mutableStateOf(emptyList())
         private set
@@ -116,11 +116,5 @@ class CalendarViewModel(
     private fun clampSelectedDateToVisibleMonth(date: LocalDate, month: YearMonth): LocalDate {
         val safeDay = date.dayOfMonth.coerceAtMost(month.lengthOfMonth())
         return month.atDay(safeDay)
-    }
-
-    private companion object {
-        /** Holds the CSUCI events feed used by the app. */
-        const val CSUCI_CALENDAR_SUBSCRIBE_URL: String =
-            "webcal://25livepub.collegenet.com/calendars/csuci-calendar-of-events.ics"
     }
 }

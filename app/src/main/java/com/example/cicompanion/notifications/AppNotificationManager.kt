@@ -23,11 +23,19 @@ object AppNotificationManager {
     private const val FRIEND_REQUEST_CHANNEL_DESCRIPTION =
         "Notifications for incoming friend requests"
 
+    //Calendar reminder notification channel
+    const val CALENDAR_REMINDER_CHANNEL_ID = "calendar_reminder_channel"
+
+    private const val CALENDAR_REMINDER_CHANNEL_NAME = "Calendar Reminders"
+    private const val CALENDAR_REMINDER_CHANNEL_DESCRIPTION =
+        "Notifications for upcoming calendar events"
+
     //Create Android notification channel once at app startup
-    fun createNotificationChannel(context: Context) {
+    fun createNotificationChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
-        val channel = NotificationChannel(
+        //Friend request channel
+        val friendRequestChannel = NotificationChannel(
             FRIEND_REQUEST_CHANNEL_ID,
             FRIEND_REQUEST_CHANNEL_NAME,
             NotificationManager.IMPORTANCE_HIGH
@@ -35,8 +43,20 @@ object AppNotificationManager {
             description = FRIEND_REQUEST_CHANNEL_DESCRIPTION
         }
 
+        //Calendar reminder channel
+        val calendarReminderChannel = NotificationChannel(
+            CALENDAR_REMINDER_CHANNEL_ID,
+            CALENDAR_REMINDER_CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = CALENDAR_REMINDER_CHANNEL_DESCRIPTION
+        }
+
         val notificationManager = context.getSystemService(NotificationManager::class.java)
-        notificationManager.createNotificationChannel(channel)
+
+        //Register both channels
+        notificationManager.createNotificationChannel(friendRequestChannel)
+        notificationManager.createNotificationChannel(calendarReminderChannel)
     }
 
     //Friend request specific wrapper
@@ -51,9 +71,46 @@ object AppNotificationManager {
         )
     }
 
+    // NEW: Wrapper used by CalendarReminderWorker.
+    fun showCalendarReminderNotification(
+        context: Context,
+        title: String,
+        location: String,
+        timeLabel: String
+    ) {
+        val body = if (location.isBlank()) {
+            timeLabel
+        } else {
+            "$timeLabel\n$location"
+        }
+
+        showNotification(
+            context = context,
+            channelId = CALENDAR_REMINDER_CHANNEL_ID,
+            notificationId = ("calendar_" + title + timeLabel).hashCode(),
+            title = "Event tomorrow",
+            body = "$title\n$body"
+        )
+    }
+
     //Reusable notification function for local notifications and future FCM handling.
     fun showSimpleNotification(
         context: Context,
+        notificationId: Int,
+        title: String,
+        body: String
+    ) {
+        showNotification(
+            context = context,
+            channelId = FRIEND_REQUEST_CHANNEL_ID,
+            notificationId = notificationId,
+            title = title,
+            body = body
+        )
+    }
+    private fun showNotification(
+        context: Context,
+        channelId: String,
         notificationId: Int,
         title: String,
         body: String
@@ -65,7 +122,7 @@ object AppNotificationManager {
             requestCode = notificationId
         )
 
-        val notification = NotificationCompat.Builder(context, FRIEND_REQUEST_CHANNEL_ID)
+        val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.stat_notify_more)
             .setContentTitle(title)
             .setContentText(body)
@@ -103,5 +160,21 @@ object AppNotificationManager {
         } else {
             true
         }
+    }
+
+    //Create the calendar reminder channel.
+    private fun createCalendarReminderChannel(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+
+        val channel = NotificationChannel(
+            CALENDAR_REMINDER_CHANNEL_ID,
+            CALENDAR_REMINDER_CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = CALENDAR_REMINDER_CHANNEL_DESCRIPTION
+        }
+
+        val notificationManager = context.getSystemService(NotificationManager::class.java)
+        notificationManager.createNotificationChannel(channel)
     }
 }

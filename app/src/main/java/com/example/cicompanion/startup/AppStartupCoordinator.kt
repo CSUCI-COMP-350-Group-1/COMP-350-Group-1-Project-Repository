@@ -1,6 +1,7 @@
 package com.example.cicompanion.startup
 
 import android.content.Context
+import com.example.cicompanion.calendar.CalendarReminderScheduler
 import com.example.cicompanion.firebase.FcmTokenManager
 import com.example.cicompanion.notifications.AppNotificationManager
 import com.example.cicompanion.social.FriendRequestNotificationObserver
@@ -26,8 +27,11 @@ class AppStartupCoordinator(
 
     //Called once by MainActivity during startup
     fun start() {
-        AppNotificationManager.createNotificationChannel(appContext)
+        //Create all app notification channels.
+        AppNotificationManager.createNotificationChannels(appContext)
 
+        //Start calendar sync + reminder scheduling.
+        CalendarReminderScheduler.start(appContext)
         FirebaseAuth.getInstance().addAuthStateListener(authStateListener)
         handleAuthenticatedUser(FirebaseAuth.getInstance().currentUser?.uid)
     }

@@ -35,8 +35,8 @@ import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.CICompanionTheme
 import kotlinx.coroutines.launch
-//New for push notifications
 import com.example.cicompanion.notifications.NotificationPermissionRequester
+import com.example.cicompanion.social.NotificationScreen
 import com.example.cicompanion.startup.AppStartupCoordinator
 
 class MainActivity : ComponentActivity() {
@@ -113,7 +113,7 @@ fun AppNavigation() {
                         }
                     },
                     onNotificationClick = {
-                        // navController.navigate(Routes.NOTIFICATIONS)
+                         navController.navigate(Routes.NOTIFICATIONS)
                     },
                     navController = navController
                 )
@@ -145,6 +145,9 @@ fun AppNavigation() {
                     }
                     composable(Routes.FRIEND_REQUESTS) {
                         FriendRequestsScreen(navController)
+                    }
+                    composable(Routes.NOTIFICATIONS) {
+                        NotificationScreen(navController)
                     }
                 }
             }

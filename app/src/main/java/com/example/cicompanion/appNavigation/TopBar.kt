@@ -83,9 +83,9 @@ fun TopBar(
             },
             actions = {
                 //Commented out for the sprint 2, uncomment for notification page in future
-                /*IconButton(onClick = onNotificationClick) {
+                IconButton(onClick = onNotificationClick) {
                     Icon(Icons.Default.Notifications, contentDescription = null)
-                }*/
+                }
             }
         )
     }
