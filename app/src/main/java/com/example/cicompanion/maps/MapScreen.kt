@@ -669,7 +669,7 @@ fun MapContent(
 
         displayLocations.forEach { location ->
             val isSelected = selectedLocation?.name == location.name
-            // Only include custom and pinned events on the map to reduce clutter
+            // Only includes custom and pinned events on the map to reduce clutter
             val locationEvents = events.filter { 
                 (it.calendarId == "custom" || it.isPinned) &&
                 it.location?.contains(location.name, ignoreCase = true) == true 
@@ -717,14 +717,14 @@ fun SelectedPointerIcon(location: CampusLocation, eventCount: Int = 0, hasPinned
             .size(75.dp) 
             .graphicsLayer(translationY = bounce)
     ) {
-        // Pointer Pin color based on location color
+        // Pointer Pin, with color based on the original icon
         Icon(
             imageVector = Icons.Default.LocationOn,
             contentDescription = null,
             tint = location.color,
             modifier = Modifier.fillMaxSize()
         )
-        // Icon on top in white circle with dynamic border if events exist
+        // Icon on top in white, with border if events exist
         Surface(
             shape = CircleShape,
             color = Color.White,
@@ -747,7 +747,7 @@ fun SelectedPointerIcon(location: CampusLocation, eventCount: Int = 0, hasPinned
             }
         }
 
-        // Simple notification dot for events (removed random numbers)
+        // Little 'notification' dot to indicate an event in that location
         if (eventCount > 0) {
             Box(
                 modifier = Modifier
@@ -780,7 +780,7 @@ fun LandmarkIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, color: C
             Icon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
         }
 
-        // Simple notification dot for events (removed random numbers)
+        // Little 'notification' dot to indicate an event in that location
         if (eventCount > 0) {
             Box(
                 modifier = Modifier

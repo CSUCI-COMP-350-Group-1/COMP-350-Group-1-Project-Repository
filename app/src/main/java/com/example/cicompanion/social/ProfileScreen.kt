@@ -44,7 +44,7 @@ private val BrandRed = Color(0xFFEF3347)
 @Composable
 fun ProfileScreen(navController: NavHostController) {
     // SWITCH TO TRUE IF YOU WANT TO SEE THE MOCKUP
-    val useNewDesign = false
+    val useNewDesign = true
 
     if (useNewDesign) {
         NewProfileScreen(navController)

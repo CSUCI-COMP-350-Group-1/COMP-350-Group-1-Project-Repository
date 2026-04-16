@@ -166,7 +166,7 @@ fun CalendarApp(viewModel: CalendarViewModel) {
         )
     }
 
-    // Deletion Confirmation Dialog
+    // Deletion Confirmation (for custom events)
     eventToDelete?.let { event ->
         AlertDialog(
             onDismissRequest = { eventToDelete = null },
@@ -210,6 +210,8 @@ fun AddEventDialog(
     var endMin by remember { mutableStateOf("00") }
     var endIsAm by remember { mutableStateOf(true) }
 
+
+// Create the custom event
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add Custom Event for ${selectedDate.format(DateTimeFormatter.ISO_LOCAL_DATE)}") },
@@ -253,13 +255,13 @@ fun AddEventDialog(
         },
         confirmButton = {
             Button(onClick = {
-                val sHour = (startHour.toIntOrNull() ?: 9).let { 
-                    if (!startIsAm && it < 12) it + 12 else if (startIsAm && it == 12) 0 else it 
+                val sHour = (startHour.toIntOrNull() ?: 9).let {
+                    if (!startIsAm && it < 12) it + 12 else if (startIsAm && it == 12) 0 else it
                 }
-                val eHour = (endHour.toIntOrNull() ?: 10).let { 
-                    if (!endIsAm && it < 12) it + 12 else if (endIsAm && it == 12) 0 else it 
+                val eHour = (endHour.toIntOrNull() ?: 10).let {
+                    if (!endIsAm && it < 12) it + 12 else if (endIsAm && it == 12) 0 else it
                 }
-                
+
                 val startTime = LocalTime.of(sHour % 24, startMin.toIntOrNull() ?: 0)
                 val endTime = LocalTime.of(eHour % 24, endMin.toIntOrNull() ?: 0)
                 onConfirm(title, description, location, startTime, endTime)
