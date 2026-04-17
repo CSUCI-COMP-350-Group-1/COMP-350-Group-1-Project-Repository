@@ -174,7 +174,7 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
 
             // Search Button (which was moved from the bottom to here)
             NavigationDrawerItem(
-                label = { Text("Search") },
+                label = { Text("Search for Feature") },
                 selected = false,
                 icon = { Icon(Icons.Default.Search, contentDescription = null) },
                 onClick = {
