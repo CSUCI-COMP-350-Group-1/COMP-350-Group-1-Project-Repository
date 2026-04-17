@@ -95,7 +95,7 @@ val campusLocations = listOf(
     CampusLocation("Bell Tower West", LatLng(34.16070116130278, -119.04439859472768), "", LocationType.BUILDING, Icons.Default.Business, Color(0xFFD32F2F)),
     CampusLocation("John Spoor Broome Library", LatLng(34.16269668565898, -119.04094849136715), "Main Library", LocationType.BUILDING, Icons.AutoMirrored.Filled.MenuBook, Color(0xFF388E3C)),
     CampusLocation("Student Union", LatLng(34.1610, -119.0436), "Dining and Lounge", LocationType.BUILDING, Icons.Default.Groups, Color(0xFF388E3C)),
-    CampusLocation("Marin Hall", LatLng(34.164528096869034, -119.04507117740494), "Faculty Offices for Mathematics and Data Science", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation("Marin Hall", LatLng(34.164528096869034, -119.04507117740494), "Faculty Offices for Mathematics and Data Science", LocationType.BUILDING, Icons.Default.Business, Color(0xFFD32F2F)),
     CampusLocation("Shasta Hall", LatLng(34.164576865185516, -119.04472618829523), "Faculty Offices for Computer Science and Engineering", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Gateway Hall", LatLng(34.16483652693463, -119.04547452459948), "Large building with classrooms and study rooms", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
     CampusLocation("Napa Hall", LatLng(34.16377605025435, -119.04540741204008), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
@@ -190,7 +190,7 @@ fun MapScreen(navController: NavHostController, calendarViewModel: CalendarViewM
         }
     }
 
-    // Centering camera without zoom change on selection
+    // Centering camera on the location (when selected)
     LaunchedEffect(selectedLocation) {
         selectedLocation?.let { location ->
             cameraPositionState.animate(
@@ -467,7 +467,7 @@ fun MapEventItem(event: CalendarEvent, onMoreClick: () -> Unit) {
                 )
             }
             
-            // Replaced '...' button with circular calendar button
+            // Replaced '...' button with circular calendar button to match MapScreen
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -669,7 +669,7 @@ fun MapContent(
 
         displayLocations.forEach { location ->
             val isSelected = selectedLocation?.name == location.name
-            // Only includes custom and pinned events on the map to reduce clutter
+            // Only include custom and pinned events on the map to reduce clutter
             val locationEvents = events.filter { 
                 (it.calendarId == "custom" || it.isPinned) &&
                 it.location?.contains(location.name, ignoreCase = true) == true 
@@ -717,14 +717,14 @@ fun SelectedPointerIcon(location: CampusLocation, eventCount: Int = 0, hasPinned
             .size(75.dp) 
             .graphicsLayer(translationY = bounce)
     ) {
-        // Pointer Pin, with color based on the original icon
+        // Pointer Pin color based on location color
         Icon(
             imageVector = Icons.Default.LocationOn,
             contentDescription = null,
             tint = location.color,
             modifier = Modifier.fillMaxSize()
         )
-        // Icon on top in white, with border if events exist
+        // Icon on top in white circle with dynamic border if events exist
         Surface(
             shape = CircleShape,
             color = Color.White,
@@ -747,7 +747,7 @@ fun SelectedPointerIcon(location: CampusLocation, eventCount: Int = 0, hasPinned
             }
         }
 
-        // Little 'notification' dot to indicate an event in that location
+        // Simple notification dot for events (removed random numbers)
         if (eventCount > 0) {
             Box(
                 modifier = Modifier
@@ -780,7 +780,7 @@ fun LandmarkIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, color: C
             Icon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
         }
 
-        // Little 'notification' dot to indicate an event in that location
+        // Simple notification dot for events (removed random numbers)
         if (eventCount > 0) {
             Box(
                 modifier = Modifier
@@ -822,19 +822,12 @@ fun LocationInfoCard(location: CampusLocation, onClose: () -> Unit, onDetailsCli
                 IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.LightGray) }
             }
             Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { /* Mock Directions */ },
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandRedDark),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.height(36.dp).weight(1f),
-                    contentPadding = PaddingValues(0.dp)
-                ) { Text("Directions", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+            Row(horizontalArrangement = Arrangement.Center) {
                 Surface(
                     onClick = onDetailsClick,
                     color = AppBackground,
                     shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.height(36.dp).weight(1f),
+                    modifier = Modifier.height(36.dp).fillMaxWidth(),
                     border = BorderStroke(1.dp, BrandRedDark.copy(alpha = 0.2f))
                 ) {
                     Box(contentAlignment = Alignment.Center) {

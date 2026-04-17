@@ -9,11 +9,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
@@ -44,13 +46,12 @@ fun UserSearchScreen(navController: NavHostController) {
                 users = loadedUsers
                 isLoading = false
             },
-            onError = { 
+            onError = {
                 errorMessage = it
                 isLoading = false
             }
         )
 
-        // Fetch both incoming and outgoing statuses to correctly identify "accepted" friends
         SocialRepository.fetchAllFriendRequestStatuses(
             currentUserId = currentUser.uid,
             onSuccess = { statuses ->
@@ -66,7 +67,7 @@ fun UserSearchScreen(navController: NavHostController) {
     } else {
         users.filter { user ->
             user.displayName.contains(searchQuery, ignoreCase = true) ||
-            user.email.contains(searchQuery, ignoreCase = true)
+                    user.email.contains(searchQuery, ignoreCase = true)
         }
     }
 
@@ -121,6 +122,17 @@ fun UserSearchScreen(navController: NavHostController) {
                                         },
                                         onError = { errorMessage = it }
                                     )
+                                },
+                                onRemoveFriend = {
+                                    SocialRepository.removeFriend(
+                                        currentUserId = currentUser.uid,
+                                        targetUserId = user.uid,
+                                        onSuccess = {
+                                            requestStatuses.remove(user.uid)
+                                            statusMessage = "Friendship removed for ${SocialRepository.displayNameOrEmail(user)}."
+                                        },
+                                        onError = { errorMessage = it }
+                                    )
                                 }
                             )
                         }
@@ -135,34 +147,67 @@ fun UserSearchScreen(navController: NavHostController) {
 private fun UserSearchResultCard(
     user: UserProfile,
     requestStatus: String?,
-    onSendRequest: () -> Unit
+    onSendRequest: () -> Unit,
+    onRemoveFriend: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 UserAvatar(photoUrl = user.photoUrl)
                 Column {
-                    Text(text = SocialRepository.displayNameOrEmail(user), style = MaterialTheme.typography.titleMedium)
-                    Text(text = user.email, color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = SocialRepository.displayNameOrEmail(user),
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = user.email,
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
 
-            IconButton(
-                onClick = onSendRequest,
-                enabled = requestStatus == null
-            ) {
-                val icon = if (requestStatus != null) Icons.Default.Check else Icons.Default.Add
-                val tint = if (requestStatus == "accepted") Color(0xFF2E7D32) else LocalContentColor.current
-                
-                Icon(
-                    imageVector = icon,
-                    contentDescription = if (requestStatus == null) "Add Friend" else "Request Status",
-                    tint = tint
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Remove Friend button (red X)
+                // Visible ONLY when they are already friends (accepted)
+                if (requestStatus == "accepted") {
+                    IconButton(onClick = onRemoveFriend) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Remove Friend",
+                            tint = Color.Red
+                        )
+                    }
+                } else {
+                    // Add/Status button
+                    IconButton(
+                        onClick = onSendRequest,
+                        enabled = requestStatus == null
+                    ) {
+                        val icon = if (requestStatus == "pending") Icons.Default.Check else Icons.Default.Add
+                        val tint = if (requestStatus == "pending") Color.Gray else LocalContentColor.current
+
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = if (requestStatus == null) "Add Friend" else "Status",
+                            tint = tint
+                        )
+                    }
+                }
             }
         }
     }

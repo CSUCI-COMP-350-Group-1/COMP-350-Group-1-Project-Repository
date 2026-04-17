@@ -32,7 +32,8 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 //For easy mapping in other files
 object Routes {
     const val HOME = "home"
-    const val SEARCH = "search"
+    const val SOCIAL = "profile" // go to profile page ATM for social
+    // def change that to another new page when you make it
     const val MAP = "map"
     const val CALENDAR = "calendar"
     const val STUDY_ROOM = "studyRoom"
@@ -40,13 +41,15 @@ object Routes {
     const val NOTIFICATIONS = "notifications"
     const val USER_SEARCH = "user_search"
     const val FRIEND_REQUESTS = "friendRequests"
+    const val SEARCH = "search" // Keeping just in case it breaks anything
 }
 
 @Composable
 fun NavBar(navController: NavHostController) {
     val items = listOf(
         NavBarItem("Home", "home", Icons.Filled.Home),
-        NavBarItem("Search", "search", Icons.Filled.Search),
+        NavBarItem("Social", "profile", Icons.Filled.People),
+        NavBarItem("Calendar", "calendar", Icons.Filled.CalendarMonth),
         NavBarItem("Map", "map", Icons.Filled.LocationOn)
     )
     val navBarBackground = NavBackground

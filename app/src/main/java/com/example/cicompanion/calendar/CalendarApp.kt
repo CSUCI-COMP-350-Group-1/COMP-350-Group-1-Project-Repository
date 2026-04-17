@@ -7,10 +7,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,13 +20,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.ui.theme.BrandRedDark
+import com.example.cicompanion.ui.theme.BrandRedLighter
+import com.google.firebase.auth.FirebaseAuth
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
@@ -42,8 +41,6 @@ import java.util.UUID
 private val CoralRed = Color(0xFFEF3347)
 private val HotPink = Color(0xFFF21F63)
 private val SoftText = Color(0xFF6E5555)
-private val SoftBorder = Color(0xFFE7C2B8)
-private val SelectedDateFill = Color(0xFFFFE2E7)
 private val CardOffWhite = Color(0xFFF6E6D8)
 private val DateCellWhite = Color(0xFFF7F4F8)
 private val DateCellBorder = Color(0xFFE2BFB7)
@@ -63,6 +60,18 @@ fun CalendarApp(viewModel: CalendarViewModel) {
     var eventToDelete by remember { mutableStateOf<CalendarEvent?>(null) }
     val scrollState = rememberScrollState()
 
+    var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
+
+    DisposableEffect(Unit) {
+        val listener = FirebaseAuth.AuthStateListener { auth ->
+            currentUser = auth.currentUser
+        }
+        FirebaseAuth.getInstance().addAuthStateListener(listener)
+        onDispose {
+            FirebaseAuth.getInstance().removeAuthStateListener(listener)
+        }
+    }
+
     val selectedDateEvents = remember(viewModel.events, viewModel.selectedDate) {
         buildSelectedDateEvents(viewModel.events, viewModel.selectedDate)
     }
@@ -74,36 +83,38 @@ fun CalendarApp(viewModel: CalendarViewModel) {
     Scaffold(
         containerColor = Color.White,
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { showAddEventDialog = true },
-                containerColor = CoralRed,
-                contentColor = Color.White,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.padding(bottom = 8.dp),
-                icon = {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.CalendarMonth, contentDescription = null)
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .offset(x = 4.dp, y = 4.dp)
-                                .size(14.dp)
-                                .background(Color.White, CircleShape)
-                                .padding(1.dp)
-                                .background(CoralRed, CircleShape),
+            if (currentUser != null) {
+                ExtendedFloatingActionButton(
+                    onClick = { showAddEventDialog = true },
+                    containerColor = CoralRed,
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    icon = {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.CalendarMonth, contentDescription = null)
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .offset(x = 4.dp, y = 4.dp)
+                                    .size(14.dp)
+                                    .background(Color.White, CircleShape)
+                                    .padding(1.dp)
+                                    .background(CoralRed, CircleShape),
                             contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(10.dp)
-                            )
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(10.dp)
+                                )
+                            }
                         }
-                    }
-                },
-                text = { Text("Add Event", fontWeight = FontWeight.Bold) }
-            )
+                    },
+                    text = { Text("Add Event", fontWeight = FontWeight.Bold) }
+                )
+            }
         }
     ) { padding ->
         PullToRefreshContainer(
@@ -114,28 +125,15 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                 .fillMaxSize()
         ) {
             CalendarScreenBody(
-                viewModel = viewModel,
                 scrollState = scrollState,
-                mode = viewModel.mode,
-                filter = viewModel.filter,
-                visibleMonth = viewModel.visibleMonth,
-                selectedDate = viewModel.selectedDate,
+                viewModel = viewModel,
                 selectedDateEvents = selectedDateEvents,
                 dayEventInfoMap = dayEventInfoMap,
-                errorMessage = viewModel.errorMessage,
                 onDismissError = viewModel::clearError,
-                onModeSelected = viewModel::updateMode,
-                onFilterSelected = viewModel::updateFilter,
                 onDateSelected = { 
                     viewModel.onDateSelected(it)
                     viewModel.setHighlightedEvent(null) 
                 },
-                onPreviousDay = viewModel::previousDay,
-                onNextDay = viewModel::nextDay,
-                onPreviousWeek = viewModel::previousWeek,
-                onNextWeek = viewModel::nextWeek,
-                onPreviousMonth = viewModel::previousMonth,
-                onNextMonth = viewModel::nextMonth,
                 onRequestDelete = { eventToDelete = it },
                 onTogglePin = viewModel::togglePinEvent
             )
@@ -146,7 +144,7 @@ fun CalendarApp(viewModel: CalendarViewModel) {
         AddEventDialog(
             selectedDate = viewModel.selectedDate,
             onDismiss = { showAddEventDialog = false },
-            onConfirm = { title, description, location, startTime, endTime ->
+            onConfirm = { title: String, description: String, location: String, startTime: LocalTime, endTime: LocalTime ->
                 val startZdt = ZonedDateTime.of(viewModel.selectedDate, startTime, ZonedDateTime.now().zone)
                 val endZdt = ZonedDateTime.of(viewModel.selectedDate, endTime, ZonedDateTime.now().zone)
                 val newEvent = CalendarEvent(
@@ -166,7 +164,7 @@ fun CalendarApp(viewModel: CalendarViewModel) {
         )
     }
 
-    // Deletion Confirmation (for custom events)
+    // Deletion Confirmation Dialog
     eventToDelete?.let { event ->
         AlertDialog(
             onDismissRequest = { eventToDelete = null },
@@ -192,160 +190,25 @@ fun CalendarApp(viewModel: CalendarViewModel) {
     }
 }
 
-@Composable
-fun AddEventDialog(
-    selectedDate: LocalDate,
-    onDismiss: () -> Unit,
-    onConfirm: (String, String, String, LocalTime, LocalTime) -> Unit
-) {
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("") }
-    
-    var startHour by remember { mutableStateOf("9") }
-    var startMin by remember { mutableStateOf("00") }
-    var startIsAm by remember { mutableStateOf(true) }
-    
-    var endHour by remember { mutableStateOf("10") }
-    var endMin by remember { mutableStateOf("00") }
-    var endIsAm by remember { mutableStateOf(true) }
-
-
-// Create the custom event
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Add Custom Event for ${selectedDate.format(DateTimeFormatter.ISO_LOCAL_DATE)}") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Title") },
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Description") },
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-                )
-                OutlinedTextField(
-                    value = location,
-                    onValueChange = { location = it },
-                    label = { Text("Location") },
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    singleLine = true
-                )
-                
-                Text("Start Time", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = startHour, onValueChange = { startHour = it }, label = { Text("HH") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                    OutlinedTextField(value = startMin, onValueChange = { startMin = it }, label = { Text("MM") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                    AmPmToggle(isAm = startIsAm, onToggle = { startIsAm = it })
-                }
-                
-                Text("End Time", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = endHour, onValueChange = { endHour = it }, label = { Text("HH") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                    OutlinedTextField(value = endMin, onValueChange = { endMin = it }, label = { Text("MM") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                    AmPmToggle(isAm = endIsAm, onToggle = { endIsAm = it })
-                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                val sHour = (startHour.toIntOrNull() ?: 9).let {
-                    if (!startIsAm && it < 12) it + 12 else if (startIsAm && it == 12) 0 else it
-                }
-                val eHour = (endHour.toIntOrNull() ?: 10).let {
-                    if (!endIsAm && it < 12) it + 12 else if (endIsAm && it == 12) 0 else it
-                }
-
-                val startTime = LocalTime.of(sHour % 24, startMin.toIntOrNull() ?: 0)
-                val endTime = LocalTime.of(eHour % 24, endMin.toIntOrNull() ?: 0)
-                onConfirm(title, description, location, startTime, endTime)
-            }) {
-                Text("Add")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
-}
-
-@Composable
-fun AmPmToggle(isAm: Boolean, onToggle: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(DateCellWhite)
-            .border(1.dp, DateCellBorder, RoundedCornerShape(8.dp))
-    ) {
-        Box(
-            modifier = Modifier
-                .clickable { onToggle(true) }
-                .background(if (isAm) CoralRed else Color.Transparent)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "AM",
-                color = if (isAm) Color.White else SoftText,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        Box(
-            modifier = Modifier
-                .clickable { onToggle(false) }
-                .background(if (!isAm) CoralRed else Color.Transparent)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "PM",
-                color = if (!isAm) Color.White else SoftText,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
 /** Shows the scrollable page content that sits inside pull-to-refresh. */
 @Composable
 private fun CalendarScreenBody(
-    viewModel: CalendarViewModel,
     scrollState: androidx.compose.foundation.ScrollState,
-    mode: CalendarMode,
-    filter: EventFilter,
-    visibleMonth: YearMonth,
-    selectedDate: LocalDate,
+    viewModel: CalendarViewModel,
     selectedDateEvents: List<CalendarEvent>,
     dayEventInfoMap: Map<LocalDate, DayEventInfo>,
-    errorMessage: String?,
     onDismissError: () -> Unit,
-    onModeSelected: (CalendarMode) -> Unit,
-    onFilterSelected: (EventFilter) -> Unit,
     onDateSelected: (LocalDate) -> Unit,
-    onPreviousDay: () -> Unit,
-    onNextDay: () -> Unit,
-    onPreviousWeek: () -> Unit,
-    onNextWeek: () -> Unit,
-    onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit,
     onRequestDelete: (CalendarEvent) -> Unit,
-    onTogglePin: (CalendarEvent) -> Unit,
-    highlightedEventId: String? = null
+    onTogglePin: (CalendarEvent) -> Unit
 ) {
     ScrollablePage(
         scrollState = scrollState,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
     ) {
         CalendarHeroHeader(
-            selectedDate = selectedDate,
+            selectedDate = viewModel.selectedDate,
+            viewModel = viewModel,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
@@ -357,7 +220,7 @@ private fun CalendarScreenBody(
                 .padding(horizontal = 16.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            errorMessage?.let { message ->
+            viewModel.errorMessage?.let { message ->
                 ErrorMessage(
                     message = message,
                     onDismiss = onDismissError
@@ -368,89 +231,29 @@ private fun CalendarScreenBody(
                 SectionHeading(text = "View")
                 Spacer(modifier = Modifier.height(12.dp))
                 CalendarModeTabs(
-                    selectedMode = mode,
-                    onModeSelected = onModeSelected
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                SectionHeading(text = "Filter")
-                Spacer(modifier = Modifier.height(12.dp))
-                CalendarFilterTabs(
-                    selectedFilter = filter,
-                    onFilterSelected = onFilterSelected
+                    selectedMode = viewModel.mode,
+                    onModeSelected = viewModel::updateMode
                 )
             }
 
             CalendarContent(
-                viewModel = viewModel,
-                mode = mode,
-                visibleMonth = visibleMonth,
-                selectedDate = selectedDate,
+                mode = viewModel.mode,
+                visibleMonth = viewModel.visibleMonth,
+                selectedDate = viewModel.selectedDate,
                 selectedDateEvents = selectedDateEvents,
                 dayEventInfoMap = dayEventInfoMap,
                 onDateSelected = onDateSelected,
-                onPreviousDay = onPreviousDay,
-                onNextDay = onNextDay,
-                onPreviousWeek = onPreviousWeek,
-                onNextWeek = onNextWeek,
-                onPreviousMonth = onPreviousMonth,
-                onNextMonth = onNextMonth,
+                onPreviousDay = viewModel::previousDay,
+                onNextDay = viewModel::nextDay,
+                onPreviousWeek = viewModel::previousWeek,
+                onNextWeek = viewModel::nextWeek,
+                onPreviousMonth = viewModel::previousMonth,
+                onNextMonth = viewModel::nextMonth,
                 onDeleteEvent = onRequestDelete,
                 onTogglePin = onTogglePin,
-                highlightedEventId = highlightedEventId
+                highlightedEventId = viewModel.highlightedEventId
             )
         }
-    }
-}
-
-@Composable
-private fun CalendarFilterTabs(
-    selectedFilter: EventFilter,
-    onFilterSelected: (EventFilter) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        EventFilter.entries.forEach { filter ->
-            FilterCard(
-                filter = filter,
-                isSelected = selectedFilter == filter,
-                modifier = Modifier.weight(1f),
-                onClick = { onFilterSelected(filter) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun FilterCard(
-    filter: EventFilter,
-    isSelected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    val containerColor = if (isSelected) CoralRed else DateCellWhite
-    val textColor = if (isSelected) Color.White else CoralRed
-    val borderColor = if (isSelected) Color.Transparent else DateCellBorder
-
-    Box(
-        modifier = modifier
-            .shadow(elevation = if (isSelected) 6.dp else 0.dp, shape = RoundedCornerShape(16.dp))
-            .clip(RoundedCornerShape(16.dp))
-            .background(containerColor)
-            .border(1.dp, borderColor, RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 12.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = filter.name,
-            color = textColor,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
     }
 }
 
@@ -458,6 +261,7 @@ private fun FilterCard(
 @Composable
 private fun CalendarHeroHeader(
     selectedDate: LocalDate,
+    viewModel: CalendarViewModel,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -465,28 +269,127 @@ private fun CalendarHeroHeader(
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(
-                Brush.horizontalGradient(
-                    colors = listOf(CoralRed, HotPink)
+                Brush.linearGradient(
+                    colors = listOf(BrandRedLighter, BrandRedDark)
                 )
             )
             .padding(20.dp)
     ) {
-        Column {
-            Text(
-                text = "CI Companion Calendar",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onPrimary
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "CI Companion Calendar",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+
+            FilterDropdown(viewModel = viewModel)
+        }
+    }
+}
+
+@Composable
+private fun FilterDropdown(viewModel: CalendarViewModel) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier
+                .background(Color.White.copy(alpha = 0.2f), CircleShape)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.FilterList,
+                contentDescription = "Filter",
+                tint = Color.White
             )
+        }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .background(Color.White)
+                .width(200.dp)
+        ) {
             Text(
-                text = selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onPrimary
+                text = "Filter Events",
+                modifier = Modifier.padding(16.dp),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            
+            FilterMenuItem(
+                label = "CSUCI Events",
+                isSelected = viewModel.filterCsuci,
+                color = CoralRed,
+                onClick = { viewModel.toggleFilterCsuci() }
+            )
+            FilterMenuItem(
+                label = "Custom Events",
+                isSelected = viewModel.filterCustom,
+                color = CustomEventOrange,
+                onClick = { viewModel.toggleFilterCustom() }
+            )
+            FilterMenuItem(
+                label = "Pinned Events",
+                isSelected = viewModel.filterPinned,
+                color = PinnedEventPurple,
+                onClick = { viewModel.toggleFilterPinned() }
             )
         }
     }
+}
+
+@Composable
+private fun FilterMenuItem(
+    label: String,
+    isSelected: Boolean,
+    color: Color,
+    onClick: () -> Unit
+) {
+    DropdownMenuItem(
+        text = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (isSelected) color else Color.Transparent)
+                        .border(1.dp, color, RoundedCornerShape(4.dp))
+                        .clickable(onClick = onClick),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                Text(text = label, style = MaterialTheme.typography.bodyMedium)
+            }
+        },
+        onClick = onClick
+    )
 }
 
 /** Shows the current error and a button that clears it. */
@@ -558,7 +461,7 @@ private fun ModeCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val accentColor = modeAccentColor(mode)
+    val accentColor = modeAccentColor()
     val containerColor = if (isSelected) accentColor else DateCellWhite
     val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else accentColor
     val borderColor = if (isSelected) Color.Transparent else DateCellBorder
@@ -586,7 +489,6 @@ private fun ModeCard(
 /** Chooses which calendar layout to show for the current mode. */
 @Composable
 private fun CalendarContent(
-    viewModel: CalendarViewModel,
     mode: CalendarMode,
     visibleMonth: YearMonth,
     selectedDate: LocalDate,
@@ -997,8 +899,7 @@ private fun DateCell(
             )
 
             EventDots(
-                info = eventInfo,
-                isSelected = isSelected
+                info = eventInfo
             )
         }
     }
@@ -1007,8 +908,7 @@ private fun DateCell(
 /** Shows colorful dots for events instead of text. */
 @Composable
 private fun EventDots(
-    info: DayEventInfo,
-    isSelected: Boolean
+    info: DayEventInfo
 ) {
     Row(
         modifier = Modifier
@@ -1104,9 +1004,6 @@ private fun EmptyEventsMessage() {
 /** Shows one event card. */
 @Composable
 private fun EventCard(event: CalendarEvent, onDelete: () -> Unit, onTogglePin: () -> Unit, isHighlighted: Boolean = false) {
-    val displayTitle = formatEventTextForDisplay(event.title)
-    val displayLocation = event.location?.let(::formatEventTextForDisplay)
-    val displayDescription = event.description?.let(::formatEventTextForDisplay)
     val isCustom = event.calendarId == "custom"
 
     val containerColor = if (isHighlighted) PinnedEventPurple.copy(alpha = 0.1f) else CardOffWhite
@@ -1146,7 +1043,7 @@ private fun EventCard(event: CalendarEvent, onDelete: () -> Unit, onTogglePin: (
                 }
                 
                 Text(
-                    text = displayTitle,
+                    text = event.title,
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
@@ -1182,8 +1079,8 @@ private fun EventCard(event: CalendarEvent, onDelete: () -> Unit, onTogglePin: (
             }
 
             EventMetaLine(text = event.timeLabel())
-            displayLocation?.let { EventMetaLine(text = "Location: $it") }
-            displayDescription?.let { EventDescription(text = it) }
+            event.location?.let { EventMetaLine(text = "Location: $it") }
+            event.description?.let { EventDescription(text = it) }
         }
     }
 }
@@ -1261,14 +1158,8 @@ private fun buildOrderedDays(firstDayOfWeek: DayOfWeek): List<DayOfWeek> {
     return (0..6).map { firstDayOfWeek.plus(it.toLong()) }
 }
 
-/** Chooses the accent color for each calendar mode card. */
-private fun modeAccentColor(mode: CalendarMode): Color {
-    return when (mode) {
-        CalendarMode.DAY -> CoralRed
-        CalendarMode.WEEK -> CoralRed
-        CalendarMode.MONTH -> CoralRed
-    }
-}
+/** Chooses the accent color for calendar mode cards. */
+private fun modeAccentColor(): Color = CoralRed
 
 /** Chooses the background color for a date cell. */
 @Composable
@@ -1286,18 +1177,6 @@ private fun resolveDateCellBorderColor(isSelected: Boolean): Color {
 @Composable
 private fun resolveDateCellTextColor(isSelected: Boolean): Color {
     return if (isSelected) CoralRed else MaterialTheme.colorScheme.onSurface
-}
-
-/** Chooses the badge fill color used by the event count label. */
-@Composable
-private fun resolveEventCountBadgeColor(isSelected: Boolean): Color {
-    return if (isSelected) Color.White.copy(alpha = 0.22f) else SelectedDateFill
-}
-
-/** Chooses the badge text color used by the event count label. */
-@Composable
-private fun resolveEventCountTextColor(isSelected: Boolean): Color {
-    return if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
 }
 
 /** Builds the day event info map. */
@@ -1346,4 +1225,49 @@ private fun buildMonthCells(
     }
 
     return result
+}
+
+/** Simple dialog for adding a new event. */
+@Composable
+private fun AddEventDialog(
+    selectedDate: LocalDate,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, String, LocalTime, LocalTime) -> Unit
+) {
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var location by remember { mutableStateOf("") }
+    var startTimeStr by remember { mutableStateOf("09:00") }
+    var endTimeStr by remember { mutableStateOf("10:00") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Event for ${selectedDate.format(DateTimeFormatter.ofPattern("MMM d"))}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") })
+                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description") })
+                OutlinedTextField(value = location, onValueChange = { location = it }, label = { Text("Location") })
+                OutlinedTextField(value = startTimeStr, onValueChange = { startTimeStr = it }, label = { Text("Start Time (HH:mm)") })
+                OutlinedTextField(value = endTimeStr, onValueChange = { endTimeStr = it }, label = { Text("End Time (HH:mm)") })
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val start = runCatching { LocalTime.parse(startTimeStr) }.getOrDefault(LocalTime.of(9, 0))
+                    val end = runCatching { LocalTime.parse(endTimeStr) }.getOrDefault(LocalTime.of(10, 0))
+                    onConfirm(title, description, location, start, end)
+                },
+                enabled = title.isNotBlank()
+            ) {
+                Text("Add")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

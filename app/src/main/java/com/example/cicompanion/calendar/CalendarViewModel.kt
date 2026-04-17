@@ -13,8 +13,6 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.util.UUID
 
-enum class EventFilter { ALL, CSUCI, CUSTOM, PINNED }
-
 class CalendarViewModel(
     private val repository: CalendarRepository = CalendarRepository()
 ) : ViewModel() {
@@ -34,7 +32,11 @@ class CalendarViewModel(
     private var csuciEvents: List<CalendarEvent> by mutableStateOf(emptyList())
     private var customEvents: List<CalendarEvent> by mutableStateOf(emptyList())
     
-    var filter: EventFilter by mutableStateOf(EventFilter.ALL)
+    var filterCsuci by mutableStateOf(true)
+        private set
+    var filterCustom by mutableStateOf(true)
+        private set
+    var filterPinned by mutableStateOf(true)
         private set
 
     var highlightedEventId: String? by mutableStateOf(null)
@@ -52,19 +54,36 @@ class CalendarViewModel(
     }
 
     val events: List<CalendarEvent>
-        get() = when (filter) {
-            EventFilter.ALL -> customEvents + csuciEvents
-            EventFilter.CSUCI -> csuciEvents
-            EventFilter.CUSTOM -> customEvents
-            EventFilter.PINNED -> (customEvents + csuciEvents).filter { it.isPinned }
+        get() = (customEvents + csuciEvents).filter { event ->
+            if (event.isPinned) {
+                filterPinned
+            } else if (event.calendarId == "custom") {
+                filterCustom
+            } else {
+                filterCsuci
+            }
         }
 
     fun updateMode(newMode: CalendarMode) {
         mode = newMode
     }
     
-    fun updateFilter(newFilter: EventFilter) {
-        filter = newFilter
+    fun toggleFilterCsuci() {
+        filterCsuci = !filterCsuci
+    }
+
+    fun toggleFilterCustom() {
+        filterCustom = !filterCustom
+    }
+
+    fun toggleFilterPinned() {
+        filterPinned = !filterPinned
+    }
+
+    fun resetFilters() {
+        filterCsuci = true
+        filterCustom = true
+        filterPinned = true
     }
 
     fun setHighlightedEvent(eventId: String?) {

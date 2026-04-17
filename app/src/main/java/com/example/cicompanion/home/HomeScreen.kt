@@ -26,7 +26,6 @@ import androidx.navigation.NavHostController
 import com.example.cicompanion.appNavigation.FeatureCard
 import com.example.cicompanion.appNavigation.featureItems
 import com.example.cicompanion.calendar.CalendarViewModel
-import com.example.cicompanion.calendar.EventFilter
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
@@ -76,7 +75,7 @@ fun HomeScreen(
                 PinnedEventItem(
                     event = event,
                     onNavigateToEvent = {
-                        calendarViewModel.updateFilter(EventFilter.ALL)
+                        calendarViewModel.resetFilters()
                         calendarViewModel.onDateSelected(event.start.toLocalDate())
                         calendarViewModel.setHighlightedEvent(event.id)
                         navController.navigate(Routes.CALENDAR)
