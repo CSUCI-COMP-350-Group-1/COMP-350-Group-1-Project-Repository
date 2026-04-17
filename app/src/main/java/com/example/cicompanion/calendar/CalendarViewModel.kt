@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.cicompanion.calendar.data.repository.CalendarRepository
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.social.FirestoreManager
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
@@ -48,9 +50,20 @@ class CalendarViewModel(
     var errorMessage: String? by mutableStateOf(null)
         private set
 
+    private var authListenerJob: Job? = null
+
     init {
         loadOnlineCalendar()
-        loadCustomEvents()
+        
+        // Setup listener for auth changes to clear/reload data
+        val auth = FirebaseAuth.getInstance()
+        auth.addAuthStateListener { firebaseAuth ->
+            if (firebaseAuth.currentUser != null) {
+                loadCustomEvents()
+            } else {
+                customEvents = emptyList()
+            }
+        }
     }
 
     val events: List<CalendarEvent>
