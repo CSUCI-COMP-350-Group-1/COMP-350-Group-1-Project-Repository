@@ -467,7 +467,7 @@ fun MapEventItem(event: CalendarEvent, onMoreClick: () -> Unit) {
                 )
             }
             
-            // Replaced '...' button with circular calendar button to match MapScreen
+            // calendar button
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -747,7 +747,7 @@ fun SelectedPointerIcon(location: CampusLocation, eventCount: Int = 0, hasPinned
             }
         }
 
-        // Simple notification dot for events (removed random numbers)
+        //  dot for events
         if (eventCount > 0) {
             Box(
                 modifier = Modifier
@@ -780,7 +780,7 @@ fun LandmarkIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, color: C
             Icon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
         }
 
-        // Simple notification dot for events (removed random numbers)
+        //  dot for events
         if (eventCount > 0) {
             Box(
                 modifier = Modifier
