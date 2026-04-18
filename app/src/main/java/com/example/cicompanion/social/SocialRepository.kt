@@ -1,5 +1,6 @@
 package com.example.cicompanion.social
 
+import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.QuerySnapshot
@@ -91,8 +92,15 @@ object SocialRepository {
         }
 
         val request = buildFriendRequest(currentUser, targetUser, requestId)
-        saveFriendRequest(request, onSuccess, onError)
+        saveFriendRequest(
+            request = request,
+            currentUser = currentUser,
+            targetUser = targetUser,
+            onSuccess = onSuccess,
+            onError = onError
+        )
     }
+
 
     private fun createFriendRequestId(fromUserId: String, toUserId: String): String {
         return "${fromUserId}_$toUserId"
@@ -139,6 +147,8 @@ object SocialRepository {
 
     private fun saveFriendRequest(
         request: FriendRequest,
+        currentUser: FirebaseUser,
+        targetUser: UserProfile,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
@@ -146,6 +156,10 @@ object SocialRepository {
             .document(request.id)
             .set(request)
             .addOnSuccessListener {
+                FriendRequestNotificationSender.sendFriendRequestNotification(
+                    targetUserId = targetUser.uid,
+                    senderDisplayName = currentUser.displayName ?: currentUser.email ?: "Someone"
+                )
                 onSuccess()
             }
             .addOnFailureListener { exception ->
