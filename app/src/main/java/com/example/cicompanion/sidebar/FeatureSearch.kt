@@ -41,12 +41,10 @@ sealed class FeatureAction {
 @Composable
 fun SearchScreen(navController: NavHostController) {
     val context = LocalContext.current
-    
-    // Dynamically build the list of features
+
     val appFeaturesList = remember {
         val features = mutableListOf<AppFeature>()
-        
-        // 1. Add top-level routes from our main navigation
+
         val navRoutes = listOf(
             Routes.HOME,
             Routes.MAP,
@@ -67,19 +65,6 @@ fun SearchScreen(navController: NavHostController) {
                 )
             )
         }
-        
-        // 2. Add specific sub-features or deep links
-        // this one in particular links out of the app.
-        // since we want to keep users in-app, this is likely to be removed in the future.
-        /*
-        features.add(
-            AppFeature(
-                name = "Reserve a Study Room",
-                path = "Home > Study Room > Reserve",
-                action = FeatureAction.OpenUrl("https://csuci.libcal.com/reserve/spaces/first-floor")
-            )
-        )
-        */
 
         features.sortBy { it.name }
         features
