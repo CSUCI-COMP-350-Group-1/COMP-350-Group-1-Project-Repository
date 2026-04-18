@@ -26,6 +26,7 @@ import com.example.cicompanion.appNavigation.screenTitleForRoute
 import com.example.cicompanion.calendar.CalendarScreen
 import com.example.cicompanion.home.HomeScreen
 import com.example.cicompanion.maps.MapScreen
+import com.example.cicompanion.sidebar.SearchScreen
 import com.example.cicompanion.social.FriendRequestsScreen
 import com.example.cicompanion.social.ProfileScreen
 import com.example.cicompanion.social.UserSearchScreen
