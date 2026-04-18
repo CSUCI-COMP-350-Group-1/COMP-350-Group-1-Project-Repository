@@ -3,7 +3,10 @@ package com.example.cicompanion.calendar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -21,9 +24,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cicompanion.calendar.model.CalendarEvent
@@ -60,6 +66,7 @@ data class DayEventInfo(
 @Composable
 fun CalendarApp(viewModel: CalendarViewModel) {
     var showAddEventDialog by remember { mutableStateOf(false) }
+    var eventToEdit by remember { mutableStateOf<CalendarEvent?>(null) }
     var eventToDelete by remember { mutableStateOf<CalendarEvent?>(null) }
     val scrollState = rememberScrollState()
 
@@ -136,6 +143,7 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                     viewModel.setHighlightedEvent(null) 
                 },
                 onRequestDelete = { eventToDelete = it },
+                onRequestEdit = { eventToEdit = it },
                 onTogglePin = viewModel::togglePinEvent
             )
         }
@@ -161,6 +169,26 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                 )
                 viewModel.addCustomEvent(newEvent)
                 showAddEventDialog = false
+            }
+        )
+    }
+
+    eventToEdit?.let { event ->
+        EditEventDialog(
+            event = event,
+            onDismiss = { eventToEdit = null },
+            onConfirm = { title, description, location, startTime, endTime ->
+                val startZdt = ZonedDateTime.of(event.start.toLocalDate(), startTime, event.start.zone)
+                val endZdt = ZonedDateTime.of(event.start.toLocalDate(), endTime, event.endExclusive?.zone ?: event.start.zone)
+                val updatedEvent = event.copy(
+                    title = title,
+                    description = description,
+                    location = location,
+                    start = startZdt,
+                    endExclusive = endZdt
+                )
+                viewModel.addCustomEvent(updatedEvent) // saveCustomEvent works for updates too
+                eventToEdit = null
             }
         )
     }
@@ -199,6 +227,7 @@ private fun CalendarScreenBody(
     onDismissError: () -> Unit,
     onDateSelected: (LocalDate) -> Unit,
     onRequestDelete: (CalendarEvent) -> Unit,
+    onRequestEdit: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit
 ) {
     Column(
@@ -251,6 +280,7 @@ private fun CalendarScreenBody(
                 onPreviousMonth = viewModel::previousMonth,
                 onNextMonth = viewModel::nextMonth,
                 onDeleteEvent = onRequestDelete,
+                onEditEvent = onRequestEdit,
                 onTogglePin = onTogglePin,
                 highlightedEventId = viewModel.highlightedEventId
             )
@@ -498,6 +528,7 @@ private fun CalendarContent(
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onDeleteEvent: (CalendarEvent) -> Unit,
+    onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
     highlightedEventId: String? = null
 ) {
@@ -511,6 +542,7 @@ private fun CalendarContent(
             onPreviousMonth = onPreviousMonth,
             onNextMonth = onNextMonth,
             onDeleteEvent = onDeleteEvent,
+            onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
             highlightedEventId = highlightedEventId
         )
@@ -520,6 +552,7 @@ private fun CalendarContent(
             onPreviousDay = onPreviousDay,
             onNextDay = onNextDay,
             onDeleteEvent = onDeleteEvent,
+            onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
             highlightedEventId = highlightedEventId
         )
@@ -531,6 +564,7 @@ private fun CalendarContent(
             onPreviousWeek = onPreviousWeek,
             onNextWeek = onNextWeek,
             onDeleteEvent = onDeleteEvent,
+            onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
             highlightedEventId = highlightedEventId
         )
@@ -544,6 +578,7 @@ private fun DayView(
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
     onDeleteEvent: (CalendarEvent) -> Unit,
+    onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
     highlightedEventId: String? = null
 ) {
@@ -562,6 +597,7 @@ private fun DayView(
             title = "Events",
             events = events,
             onDeleteEvent = onDeleteEvent,
+            onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
             highlightedEventId = highlightedEventId
         )
@@ -577,6 +613,7 @@ private fun WeekView(
     onPreviousWeek: () -> Unit,
     onNextWeek: () -> Unit,
     onDeleteEvent: (CalendarEvent) -> Unit,
+    onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
     highlightedEventId: String? = null
 ) {
@@ -608,6 +645,7 @@ private fun WeekView(
             title = "Selected day",
             events = eventsForSelectedDate,
             onDeleteEvent = onDeleteEvent,
+            onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
             highlightedEventId = highlightedEventId
         )
@@ -624,6 +662,7 @@ private fun MonthView(
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onDeleteEvent: (CalendarEvent) -> Unit,
+    onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
     highlightedEventId: String? = null
 ) {
@@ -655,6 +694,7 @@ private fun MonthView(
             title = "Selected day",
             events = selectedDateEvents,
             onDeleteEvent = onDeleteEvent,
+            onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
             highlightedEventId = highlightedEventId
         )
@@ -929,6 +969,7 @@ private fun EventsSection(
     title: String,
     events: List<CalendarEvent>,
     onDeleteEvent: (CalendarEvent) -> Unit,
+    onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
     highlightedEventId: String? = null
 ) {
@@ -937,6 +978,7 @@ private fun EventsSection(
         EventsList(
             events = events, 
             onDeleteEvent = onDeleteEvent, 
+            onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
             highlightedEventId = highlightedEventId
         )
@@ -947,6 +989,7 @@ private fun EventsSection(
 private fun EventsList(
     events: List<CalendarEvent>,
     onDeleteEvent: (CalendarEvent) -> Unit,
+    onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
     highlightedEventId: String? = null
 ) {
@@ -962,6 +1005,7 @@ private fun EventsList(
             EventCard(
                 event = event,
                 onDelete = { onDeleteEvent(event) },
+                onEdit = { onEditEvent(event) },
                 onTogglePin = { onTogglePin(event) },
                 isHighlighted = event.id == highlightedEventId
             )
@@ -981,7 +1025,13 @@ private fun EmptyEventsMessage() {
 }
 
 @Composable
-private fun EventCard(event: CalendarEvent, onDelete: () -> Unit, onTogglePin: () -> Unit, isHighlighted: Boolean = false) {
+private fun EventCard(
+    event: CalendarEvent, 
+    onDelete: () -> Unit, 
+    onEdit: () -> Unit,
+    onTogglePin: () -> Unit, 
+    isHighlighted: Boolean = false
+) {
     val isCustom = event.calendarId == "custom"
 
     val containerColor = if (isHighlighted) PinnedEventPurple.copy(alpha = 0.1f) else CardOffWhite
@@ -1030,6 +1080,25 @@ private fun EventCard(event: CalendarEvent, onDelete: () -> Unit, onTogglePin: (
 
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (isCustom) {
+                        IconButton(
+                            onClick = onEdit,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Gray.copy(alpha = 0.1f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Edit",
+                                    tint = Color.Gray,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+
                         IconButton(
                             onClick = onDelete,
                             modifier = Modifier.size(24.dp)
@@ -1256,8 +1325,13 @@ private fun AddEventDialog(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                TimeInputRow(label = "Start", time = startTime, onTimeChange = { startTime = it })
-                TimeInputRow(label = "End", time = endTime, onTimeChange = { endTime = it })
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Start Time", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    WheelTimePicker(initialTime = startTime, onTimeChange = { startTime = it })
+                    
+                    Text("End Time", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    WheelTimePicker(initialTime = endTime, onTimeChange = { endTime = it })
+                }
             }
         },
         confirmButton = {
@@ -1279,89 +1353,195 @@ private fun AddEventDialog(
 }
 
 @Composable
-private fun TimeInputRow(
-    label: String,
-    time: LocalTime,
+private fun EditEventDialog(
+    event: CalendarEvent,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, String, LocalTime, LocalTime) -> Unit
+) {
+    var title by remember { mutableStateOf(event.title) }
+    var description by remember { mutableStateOf(event.description ?: "") }
+    var location by remember { mutableStateOf(event.location ?: "") }
+    var startTime by remember { mutableStateOf(event.start.toLocalTime()) }
+    var endTime by remember { mutableStateOf(event.endExclusive?.toLocalTime() ?: event.start.toLocalTime().plusHours(1)) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.padding(16.dp),
+        shape = RoundedCornerShape(24.dp),
+        containerColor = Color.White,
+        title = { 
+            Text(
+                text = "Edit Event",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = CoralRed
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Date: ${event.start.toLocalDate().format(DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy"))}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = SoftText
+                )
+                
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                OutlinedTextField(
+                    value = location,
+                    onValueChange = { location = it },
+                    label = { Text("Location") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Start Time", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    WheelTimePicker(initialTime = startTime, onTimeChange = { startTime = it })
+                    
+                    Text("End Time", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    WheelTimePicker(initialTime = endTime, onTimeChange = { endTime = it })
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(title, description, location, startTime, endTime) },
+                colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
+                enabled = title.isNotBlank(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Back", color = CoralRed, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
+}
+
+@Composable
+fun WheelTimePicker(
+    initialTime: LocalTime,
     onTimeChange: (LocalTime) -> Unit
 ) {
-    val isAm = time.hour < 12
-    val hour12 = if (time.hour == 0) 12 else if (time.hour > 12) time.hour - 12 else time.hour
-    
-    var hourText by remember(hour12) { mutableStateOf(hour12.toString()) }
-    var minuteText by remember(time.minute) { mutableStateOf(String.format(Locale.US, "%02d", time.minute)) }
+    var hour by remember { mutableStateOf(if (initialTime.hour == 0) 12 else if (initialTime.hour > 12) initialTime.hour - 12 else initialTime.hour) }
+    var minute by remember { mutableStateOf(initialTime.minute) }
+    var amPm by remember { mutableStateOf(if (initialTime.hour < 12) "AM" else "PM") }
+
+    LaunchedEffect(hour, minute, amPm) {
+        val h = when {
+            amPm == "AM" && hour == 12 -> 0
+            amPm == "AM" -> hour
+            amPm == "PM" && hour == 12 -> 12
+            else -> hour + 12
+        }
+        onTimeChange(LocalTime.of(h, minute))
+    }
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().height(120.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = "$label:",
-            modifier = Modifier.width(55.dp),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Bold
+        WheelPicker(
+            items = (1..12).toList(),
+            initialIndex = hour - 1,
+            onItemSelected = { hour = it },
+            modifier = Modifier.weight(1f)
+        )
+        Text(":", style = MaterialTheme.typography.headlineMedium)
+        WheelPicker(
+            items = (0..59).toList(),
+            initialIndex = minute,
+            onItemSelected = { minute = it },
+            format = { String.format(Locale.US, "%02d", it) },
+            modifier = Modifier.weight(1f)
+        )
+        WheelPicker(
+            items = listOf("AM", "PM"),
+            initialIndex = if (amPm == "AM") 0 else 1,
+            onItemSelected = { amPm = it },
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+fun <T> WheelPicker(
+    items: List<T>,
+    initialIndex: Int,
+    onItemSelected: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    format: (T) -> String = { it.toString() }
+) {
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
+    val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
+    val itemHeight = 40.dp
+    val itemHeightPx = with(LocalDensity.current) { itemHeight.toPx() }
+
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress) {
+            val centerIndex = listState.firstVisibleItemIndex
+            if (centerIndex in items.indices) {
+                onItemSelected(items[centerIndex])
+            }
+        }
+    }
+
+    Box(modifier = modifier.height(itemHeight * 3), contentAlignment = Alignment.Center) {
+        // Overlay for selection
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(itemHeight)
+                .background(CoralRed.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                .border(1.dp, CoralRed.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
         )
 
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        LazyColumn(
+            state = listState,
+            flingBehavior = flingBehavior,
+            contentPadding = PaddingValues(vertical = itemHeight),
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            OutlinedTextField(
-                value = hourText,
-                onValueChange = { input ->
-                    val filtered = input.filter { it.isDigit() }.take(2)
-                    hourText = filtered
-                    if (filtered.isNotEmpty()) {
-                        val h = filtered.toInt()
-                        if (h in 1..12) {
-                            val newHour = if (isAm) (if (h == 12) 0 else h) else (if (h == 12) 12 else h + 12)
-                            onTimeChange(time.withHour(newHour))
-                        }
-                    }
-                },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(8.dp),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center)
-            )
-
-            Text(":", fontWeight = FontWeight.Bold)
-
-            OutlinedTextField(
-                value = minuteText,
-                onValueChange = { input ->
-                    val filtered = input.filter { it.isDigit() }.take(2)
-                    minuteText = filtered
-                    if (filtered.isNotEmpty()) {
-                        val m = filtered.toInt()
-                        if (m in 0..59) {
-                            onTimeChange(time.withMinute(m))
-                        }
-                    }
-                },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(8.dp),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center)
-            )
-        }
-
-        Button(
-            onClick = {
-                val newHour = if (isAm) time.hour + 12 else time.hour - 12
-                onTimeChange(time.withHour(newHour))
-            },
-            modifier = Modifier
-                .width(60.dp)
-                .height(48.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
-            shape = RoundedCornerShape(8.dp),
-            contentPadding = PaddingValues(0.dp)
-        ) {
-            Text(if (isAm) "AM" else "PM", style = MaterialTheme.typography.labelMedium)
+            items(items.size) { index ->
+                Box(
+                    modifier = Modifier.height(itemHeight).fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = format(items[index]),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = if (listState.firstVisibleItemIndex == index) CoralRed else Color.Gray
+                    )
+                }
+            }
         }
     }
 }
