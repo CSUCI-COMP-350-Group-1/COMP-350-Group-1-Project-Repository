@@ -118,6 +118,9 @@ fun AppNavigation() {
                     composable(Routes.PROFILE) {
                         ProfileScreen(navController)
                     }
+                    composable(Routes.SOCIAL) {
+                        ProfileScreen(navController)
+                    }
                     composable(Routes.USER_SEARCH) {
                         UserSearchScreen(navController)
                     }

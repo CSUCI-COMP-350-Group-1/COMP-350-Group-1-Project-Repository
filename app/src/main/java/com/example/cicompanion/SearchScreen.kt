@@ -47,7 +47,8 @@ fun SearchScreen(navController: NavHostController) {
             AppFeature("Map", Routes.MAP, "Home > Map"),
             AppFeature("Calendar", Routes.CALENDAR, "Home > Calendar"),
             AppFeature("Study Room Weekly Availability", Routes.STUDY_ROOM, "Home > Study Room"),
-            AppFeature("Profile", Routes.PROFILE, "Home > Profile")
+            AppFeature("Profile", Routes.PROFILE, "Home > Profile"),
+            AppFeature("Social", Routes.SOCIAL, "Home > Social")
         )
     }
 
@@ -78,7 +79,7 @@ fun SearchScreen(navController: NavHostController) {
                         shape = RoundedCornerShape(8.dp)
                     )
 
-                    DropdownMenu( // changed search to be a dropdown menu for a smoother experience somewhat
+                    DropdownMenu(
                         expanded = filteredResults.isNotEmpty(),
                         onDismissRequest = { searchQuery = "" },
                         modifier = Modifier
