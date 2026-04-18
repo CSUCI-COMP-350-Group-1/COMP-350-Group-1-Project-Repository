@@ -1286,6 +1286,9 @@ private fun TimeInputRow(
 ) {
     val isAm = time.hour < 12
     val hour12 = if (time.hour == 0) 12 else if (time.hour > 12) time.hour - 12 else time.hour
+    
+    var hourText by remember(hour12) { mutableStateOf(hour12.toString()) }
+    var minuteText by remember(time.minute) { mutableStateOf(String.format(Locale.US, "%02d", time.minute)) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1300,19 +1303,49 @@ private fun TimeInputRow(
         )
 
         Row(
-            modifier = Modifier
-                .weight(1f)
-                .height(48.dp)
-                .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp))
-                .padding(horizontal = 8.dp),
+            modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // Simple display of time, can be made more interactive if needed
-            Text(
-                text = String.format(Locale.US, "%02d:%02d", hour12, time.minute),
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold
+            OutlinedTextField(
+                value = hourText,
+                onValueChange = { input ->
+                    val filtered = input.filter { it.isDigit() }.take(2)
+                    hourText = filtered
+                    if (filtered.isNotEmpty()) {
+                        val h = filtered.toInt()
+                        if (h in 1..12) {
+                            val newHour = if (isAm) (if (h == 12) 0 else h) else (if (h == 12) 12 else h + 12)
+                            onTimeChange(time.withHour(newHour))
+                        }
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(8.dp),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center)
+            )
+
+            Text(":", fontWeight = FontWeight.Bold)
+
+            OutlinedTextField(
+                value = minuteText,
+                onValueChange = { input ->
+                    val filtered = input.filter { it.isDigit() }.take(2)
+                    minuteText = filtered
+                    if (filtered.isNotEmpty()) {
+                        val m = filtered.toInt()
+                        if (m in 0..59) {
+                            onTimeChange(time.withMinute(m))
+                        }
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(8.dp),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center)
             )
         }
 
