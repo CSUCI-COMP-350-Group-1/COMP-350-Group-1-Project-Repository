@@ -7,9 +7,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.cicompanion.calendar.data.repository.CalendarRepository
 import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.social.FirestoreManager
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
+import java.util.UUID
 
 class CalendarViewModel(
     private val repository: CalendarRepository = CalendarRepository()
@@ -27,7 +31,17 @@ class CalendarViewModel(
     var sourceUrl: String by mutableStateOf(CSUCI_CALENDAR_SUBSCRIBE_URL)
         private set
 
-    var events: List<CalendarEvent> by mutableStateOf(emptyList())
+    private var csuciEvents: List<CalendarEvent> by mutableStateOf(emptyList())
+    private var customEvents: List<CalendarEvent> by mutableStateOf(emptyList())
+    
+    var filterCsuci by mutableStateOf(true)
+        private set
+    var filterCustom by mutableStateOf(true)
+        private set
+    var filterPinned by mutableStateOf(true)
+        private set
+
+    var highlightedEventId: String? by mutableStateOf(null)
         private set
 
     var isLoading: Boolean by mutableStateOf(false)
@@ -36,16 +50,59 @@ class CalendarViewModel(
     var errorMessage: String? by mutableStateOf(null)
         private set
 
+    private var authListenerJob: Job? = null
+
     init {
         loadOnlineCalendar()
+        
+        // Setup listener for auth changes to clear/reload data
+        val auth = FirebaseAuth.getInstance()
+        auth.addAuthStateListener { firebaseAuth ->
+            if (firebaseAuth.currentUser != null) {
+                loadCustomEvents()
+            } else {
+                customEvents = emptyList()
+            }
+        }
     }
 
-    /** Updates the active calendar view mode. */
+    val events: List<CalendarEvent>
+        get() = (customEvents + csuciEvents).filter { event ->
+            if (event.isPinned) {
+                filterPinned
+            } else if (event.calendarId == "custom") {
+                filterCustom
+            } else {
+                filterCsuci
+            }
+        }
+
     fun updateMode(newMode: CalendarMode) {
         mode = newMode
     }
+    
+    fun toggleFilterCsuci() {
+        filterCsuci = !filterCsuci
+    }
 
-    /** Loads all events from the CSUCI calendar subscribe link. */
+    fun toggleFilterCustom() {
+        filterCustom = !filterCustom
+    }
+
+    fun toggleFilterPinned() {
+        filterPinned = !filterPinned
+    }
+
+    fun resetFilters() {
+        filterCsuci = true
+        filterCustom = true
+        filterPinned = true
+    }
+
+    fun setHighlightedEvent(eventId: String?) {
+        highlightedEventId = eventId
+    }
+
     fun loadOnlineCalendar() {
         val trimmedUrl = sourceUrl.trim()
         if (trimmedUrl.isBlank()) {
@@ -60,7 +117,7 @@ class CalendarViewModel(
             runCatching {
                 repository.loadEvents(sourceUrl = trimmedUrl)
             }.onSuccess { loadedEvents ->
-                events = loadedEvents
+                csuciEvents = loadedEvents
             }.onFailure { error ->
                 errorMessage = error.message ?: "Failed to load online calendar."
             }
@@ -69,57 +126,75 @@ class CalendarViewModel(
         }
     }
 
-    /** Selects a new date and updates the visible month when needed. */
+    fun loadCustomEvents() {
+        viewModelScope.launch {
+            customEvents = FirestoreManager.fetchCustomEvents()
+        }
+    }
+
+    fun addCustomEvent(event: CalendarEvent) {
+        viewModelScope.launch {
+            FirestoreManager.saveCustomEvent(event)
+            loadCustomEvents()
+        }
+    }
+
+    fun deleteCustomEvent(eventId: String) {
+        viewModelScope.launch {
+            FirestoreManager.deleteCustomEvent(eventId)
+            loadCustomEvents()
+        }
+    }
+
+    fun togglePinEvent(event: CalendarEvent) {
+        viewModelScope.launch {
+            val targetStatus = !event.isPinned
+            FirestoreManager.updateEventPinStatus(event.id, targetStatus)
+            loadCustomEvents()
+        }
+    }
+
     fun onDateSelected(date: LocalDate) {
         selectedDate = date
         visibleMonth = YearMonth.from(date)
     }
 
-    /** Moves the selected date back by one day. */
     fun previousDay() {
         onDateSelected(selectedDate.minusDays(1))
     }
 
-    /** Moves the selected date forward by one day. */
     fun nextDay() {
         onDateSelected(selectedDate.plusDays(1))
     }
 
-    /** Moves the selected date back by one week. */
     fun previousWeek() {
         onDateSelected(selectedDate.minusWeeks(1))
     }
 
-    /** Moves the selected date forward by one week. */
     fun nextWeek() {
         onDateSelected(selectedDate.plusWeeks(1))
     }
 
-    /** Shows the previous month and keeps the selected day inside it. */
     fun previousMonth() {
         visibleMonth = visibleMonth.minusMonths(1)
         selectedDate = clampSelectedDateToVisibleMonth(selectedDate, visibleMonth)
     }
 
-    /** Shows the next month and keeps the selected day inside it. */
     fun nextMonth() {
         visibleMonth = visibleMonth.plusMonths(1)
         selectedDate = clampSelectedDateToVisibleMonth(selectedDate, visibleMonth)
     }
 
-    /** Clears the current error message. */
     fun clearError() {
         errorMessage = null
     }
 
-    /** Keeps the selected day inside the month being shown. */
     private fun clampSelectedDateToVisibleMonth(date: LocalDate, month: YearMonth): LocalDate {
         val safeDay = date.dayOfMonth.coerceAtMost(month.lengthOfMonth())
         return month.atDay(safeDay)
     }
 
     private companion object {
-        /** Holds the CSUCI events feed used by the app. */
         const val CSUCI_CALENDAR_SUBSCRIBE_URL: String =
             "webcal://25livepub.collegenet.com/calendars/csuci-calendar-of-events.ics"
     }

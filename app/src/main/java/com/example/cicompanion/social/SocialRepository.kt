@@ -254,7 +254,7 @@ object SocialRepository {
         collection.whereEqualTo("fromUserId", currentUserId).get()
             .addOnSuccessListener { outgoingSnapshot ->
                 val outgoingDoc = outgoingSnapshot.documents.find { it.getString("toUserId") == targetUserId }
-                
+
                 if (outgoingDoc != null) {
                     outgoingDoc.reference.delete()
                         .addOnSuccessListener { onSuccess() }
@@ -264,7 +264,7 @@ object SocialRepository {
                     collection.whereEqualTo("toUserId", currentUserId).get()
                         .addOnSuccessListener { incomingSnapshot ->
                             val incomingDoc = incomingSnapshot.documents.find { it.getString("fromUserId") == targetUserId }
-                            
+
                             if (incomingDoc != null) {
                                 incomingDoc.reference.delete()
                                     .addOnSuccessListener { onSuccess() }
