@@ -46,7 +46,7 @@ fun UserSearchScreen(navController: NavHostController) {
                 users = loadedUsers
                 isLoading = false
             },
-            onError = { 
+            onError = {
                 errorMessage = it
                 isLoading = false
             }
@@ -67,7 +67,7 @@ fun UserSearchScreen(navController: NavHostController) {
     } else {
         users.filter { user ->
             user.displayName.contains(searchQuery, ignoreCase = true) ||
-            user.email.contains(searchQuery, ignoreCase = true)
+                    user.email.contains(searchQuery, ignoreCase = true)
         }
     }
 

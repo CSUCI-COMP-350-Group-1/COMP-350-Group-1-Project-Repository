@@ -13,7 +13,8 @@ data class CalendarEvent(
     val htmlLink: String?,
     val start: ZonedDateTime,
     val endExclusive: ZonedDateTime,
-    val isAllDay: Boolean
+    val isAllDay: Boolean,
+    val isPinned: Boolean = false
 ) {
     fun lastDateInclusive(): LocalDate {
         return if (isAllDay) {
