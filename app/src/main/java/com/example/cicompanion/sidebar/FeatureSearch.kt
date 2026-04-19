@@ -54,7 +54,7 @@ fun SearchScreen(navController: NavHostController) {
             Routes.USER_SEARCH,
             Routes.FRIEND_REQUESTS
         )
-        
+
         navRoutes.forEach { route ->
             val name = screenTitleForRoute(route)
             features.add(
@@ -71,14 +71,14 @@ fun SearchScreen(navController: NavHostController) {
     }
 
     var searchQuery by remember { mutableStateOf("") }
-    
+
     val filteredResults = remember(searchQuery) {
         if (searchQuery.isBlank()) {
             emptyList()
         } else {
-            appFeaturesList.filter { 
-                it.name.contains(searchQuery, ignoreCase = true) || 
-                it.path.contains(searchQuery, ignoreCase = true)
+            appFeaturesList.filter {
+                it.name.contains(searchQuery, ignoreCase = true) ||
+                        it.path.contains(searchQuery, ignoreCase = true)
             }
         }
     }

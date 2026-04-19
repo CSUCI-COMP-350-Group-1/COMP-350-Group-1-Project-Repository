@@ -31,7 +31,6 @@ import com.example.cicompanion.calendar.CalendarViewModel
 import com.example.cicompanion.calendar.CalendarApp
 import com.example.cicompanion.home.HomeScreen
 import com.example.cicompanion.maps.MapScreen
-import com.example.cicompanion.sidebar.SearchScreen
 import com.example.cicompanion.social.FriendRequestsScreen
 import com.example.cicompanion.social.ProfileScreen
 import com.example.cicompanion.social.UserSearchScreen
@@ -43,6 +42,7 @@ import com.example.cicompanion.ui.theme.CICompanionTheme
 import kotlinx.coroutines.launch
 import android.Manifest
 import com.example.cicompanion.firebase.FriendRequestNotificationSender
+import com.example.cicompanion.sidebar.SearchScreen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
