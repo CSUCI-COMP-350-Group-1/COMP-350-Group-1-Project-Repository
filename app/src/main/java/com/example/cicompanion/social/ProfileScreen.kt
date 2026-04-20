@@ -1,8 +1,6 @@
 package com.example.cicompanion.social
 
 import android.app.Activity
-import android.content.Intent
-import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,9 +29,7 @@ import coil.compose.AsyncImage
 import com.example.cicompanion.firebase.FirebaseAuthManager
 import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.example.cicompanion.ui.Routes
-import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.CICompanionTheme
-import com.example.cicompanion.ui.theme.GrayIcon
 import com.example.cicompanion.ui.theme.NavBackground
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
@@ -42,21 +38,12 @@ import com.google.firebase.auth.FirebaseUser
 
 private val BrandRed = Color(0xFFEF3347)
 
-@Composable
-fun ProfileScreen(navController: NavHostController) {
-    // SWITCH TO TRUE IF YOU WANT TO SEE THE MOCKUP
-    val useNewDesign = true
-
-    if (useNewDesign) {
-        NewProfileScreen(navController)
-    } else {
-        OldProfileScreen(navController)
-    }
-}
+// set to true if you want edit profile and edit settings in profile screen
+private const val SHOW_MOCKUP_BUTTONS = false
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NewProfileScreen(navController: NavHostController) {
+fun ProfileScreen(navController: NavHostController) {
     var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
     var friendCount by remember { mutableIntStateOf(0) }
     val context = LocalContext.current
@@ -73,7 +60,9 @@ fun NewProfileScreen(navController: NavHostController) {
 
     LaunchedEffect(currentUser?.uid) {
         currentUser?.let { signedInUser ->
-            FirestoreManager.saveUserToFirestore(signedInUser)
+            FirestoreManager.saveUserToFirestore(signedInUser) {
+                FriendRequestNotificationSender.syncCurrentUserFcmToken()
+            }
             SocialRepository.fetchFriendCount(
                 currentUserId = signedInUser.uid,
                 onSuccess = { count -> friendCount = count },
@@ -144,132 +133,6 @@ fun NewProfileScreen(navController: NavHostController) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun OldProfileScreen(navController: NavHostController) {
-    var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
-    var friendCount by remember { mutableIntStateOf(0) }
-    val context = LocalContext.current
-
-    DisposableEffect(Unit) {
-        val listener = FirebaseAuth.AuthStateListener { auth ->
-            currentUser = auth.currentUser
-        }
-        FirebaseAuth.getInstance().addAuthStateListener(listener)
-        onDispose {
-            FirebaseAuth.getInstance().removeAuthStateListener(listener)
-        }
-    }
-
-    LaunchedEffect(currentUser?.uid) {
-        currentUser?.let { signedInUser ->
-            FirestoreManager.saveUserToFirestore(signedInUser) {
-                FriendRequestNotificationSender.syncCurrentUserFcmToken()
-            }
-            SocialRepository.fetchFriendCount(
-                currentUserId = signedInUser.uid,
-                onSuccess = { count -> friendCount = count },
-                onError = { friendCount = 0 }
-            )
-        }
-    }
-
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        handleGoogleSignInResult(result)
-    }
-
-    Scaffold(
-        containerColor = AppBackground,
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate(Routes.USER_SEARCH) },
-                shape = CircleShape,
-                containerColor = Color.Red,
-                contentColor = Color.White
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Search Users"
-                )
-            }
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-                .background(AppBackground)
-        ) {
-            ProfileHeader(
-                userDisplayName = currentUser?.displayName ?: "Signed out",
-                userEmail = currentUser?.email ?: "user@example.com",
-                photoUrl = currentUser?.photoUrl?.toString(),
-                friendCount = friendCount,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp)
-                    .border(
-                        width = 1.dp,
-                        color = GrayIcon.copy(alpha = 0.3f),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                    .background(NavBackground)
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                if (currentUser == null) {
-                    Button(onClick = {
-                        val signInClient = FirebaseAuthManager.getGoogleSignInClient(context)
-                        launcher.launch(signInClient.signInIntent)
-                    },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Red,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text("Sign in with Google")
-                    }
-                } else {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { navController.navigate(Routes.FRIEND_REQUESTS) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.Red,
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Text("Friend Requests")
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = {
-                                FirebaseAuth.getInstance().signOut()
-                                FirebaseAuthManager.getGoogleSignInClient(context).signOut()
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.Red,
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Text("Sign Out")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 private fun handleGoogleSignInResult(result: ActivityResult) {
     if (result.resultCode != Activity.RESULT_OK) return
     val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
@@ -301,8 +164,7 @@ private fun ColumnScope.ProfileActionArea(
             Text("Sign in with Google", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     } else {
-        // --- START OF MOCKUP SOCIAL SECTION ---
-        // New "Add Friends" primary button
+        // Add Friends
         Button(
             onClick = onFindFriends,
             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -316,7 +178,7 @@ private fun ColumnScope.ProfileActionArea(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Updated "Friend Requests" button
+        // Friend Requests
         OutlinedButton(
             onClick = onViewFriendRequests,
             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -329,41 +191,43 @@ private fun ColumnScope.ProfileActionArea(
             Text("Friend Requests", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        if (SHOW_MOCKUP_BUTTONS) {
+            /*
+            Spacer(modifier = Modifier.height(24.dp))
 
-        // Additional Mockup Buttons
-        SectionLabel("Account Settings")
-        
-        OutlinedButton(
-            onClick = { /* Mockup Edit */ },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, Color.LightGray),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
-        ) {
-            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(12.dp))
-            Text("Edit Profile", fontSize = 14.sp)
-            Spacer(Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
+            SectionLabel("Account Settings")
+            
+            OutlinedButton(
+                onClick = { /* Mockup Edit */ },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color.LightGray),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(12.dp))
+                Text("Edit Profile", fontSize = 14.sp)
+                Spacer(Modifier.weight(1f))
+                Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedButton(
+                onClick = { /* Mockup Settings */ },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color.LightGray),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
+            ) {
+                Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(12.dp))
+                Text("Settings", fontSize = 14.sp)
+                Spacer(Modifier.weight(1f))
+                Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
+            */
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedButton(
-            onClick = { /* Mockup Settings */ },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, Color.LightGray),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
-        ) {
-            Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(12.dp))
-            Text("Settings", fontSize = 14.sp)
-            Spacer(Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
-        }
-        // --- END OF MOCKUP SOCIAL SECTION ---
 
         Spacer(modifier = Modifier.weight(1f))
 
@@ -441,8 +305,9 @@ fun ProfileHeader(
                 color = BrandRed.copy(alpha = 0.1f),
                 shape = RoundedCornerShape(8.dp)
             ) {
+                val friendText = if (friendCount == 1) "1 Friend" else "$friendCount Friends"
                 Text(
-                    text = "$friendCount Friends",
+                    text = friendText,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,

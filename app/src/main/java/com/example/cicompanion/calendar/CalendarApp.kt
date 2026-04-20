@@ -470,7 +470,7 @@ private fun CalendarModeTabs(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        CalendarMode.entries.forEach { mode ->
+        CalendarMode.values().forEach { mode ->
             ModeCard(
                 mode = mode,
                 isSelected = selectedMode == mode,
@@ -1273,6 +1273,8 @@ private fun AddEventDialog(
     var startTime by remember { mutableStateOf(LocalTime.of(9, 0)) }
     var endTime by remember { mutableStateOf(LocalTime.of(10, 0)) }
 
+    var showTitleError by remember { mutableStateOf(false) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.padding(16.dp),
@@ -1299,14 +1301,31 @@ private fun AddEventDialog(
                     color = SoftText
                 )
                 
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Title") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    singleLine = true
-                )
+                Column {
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { 
+                            title = it
+                            if (it.isNotBlank()) showTitleError = false
+                        },
+                        label = { 
+                            Row {
+                                Text("Title")
+                                Text("*", color = Color.Red)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        isError = showTitleError,
+                        supportingText = {
+                            if (showTitleError) {
+                                Text("Title is required to create event", color = Color.Red)
+                            }
+                        }
+                    )
+                }
+                
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
@@ -1336,9 +1355,14 @@ private fun AddEventDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(title, description, location, startTime, endTime) },
+                onClick = { 
+                    if (title.isBlank()) {
+                        showTitleError = true
+                    } else {
+                        onConfirm(title, description, location, startTime, endTime) 
+                    }
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
-                enabled = title.isNotBlank(),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text("Create", color = Color.White, fontWeight = FontWeight.Bold)
@@ -1363,6 +1387,8 @@ private fun EditEventDialog(
     var location by remember { mutableStateOf(event.location ?: "") }
     var startTime by remember { mutableStateOf(event.start.toLocalTime()) }
     var endTime by remember { mutableStateOf(event.endExclusive?.toLocalTime() ?: event.start.toLocalTime().plusHours(1)) }
+
+    var showTitleError by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1390,14 +1416,31 @@ private fun EditEventDialog(
                     color = SoftText
                 )
                 
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Title") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    singleLine = true
-                )
+                Column {
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { 
+                            title = it 
+                            if (it.isNotBlank()) showTitleError = false
+                        },
+                        label = { 
+                            Row {
+                                Text("Title")
+                                Text("*", color = Color.Red)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        isError = showTitleError,
+                        supportingText = {
+                            if (showTitleError) { // error event
+                                Text("Title is required to save event", color = Color.Red)
+                            }
+                        }
+                    )
+                }
+
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
@@ -1427,9 +1470,14 @@ private fun EditEventDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(title, description, location, startTime, endTime) },
+                onClick = { 
+                    if (title.isBlank()) {
+                        showTitleError = true
+                    } else {
+                        onConfirm(title, description, location, startTime, endTime) 
+                    }
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
-                enabled = title.isNotBlank(),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
@@ -1513,7 +1561,7 @@ fun <T> WheelPicker(
     }
 
     Box(modifier = modifier.height(itemHeight * 3), contentAlignment = Alignment.Center) {
-        // Overlay for selection
+        // Overlay for the selection
         Box(
             modifier = Modifier
                 .fillMaxWidth()
