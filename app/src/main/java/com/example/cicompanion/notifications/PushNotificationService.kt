@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.cicompanion.MainActivity
 import com.example.cicompanion.social.FirestoreManager
+import com.example.cicompanion.ui.Routes
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -41,6 +42,8 @@ class PushNotificationService : FirebaseMessagingService() {
 
         val launchIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+
+            putExtra(EXTRA_DESTINATION_ROUTE, Routes.FRIEND_REQUESTS)
         }
 
         val pendingIntent = PendingIntent.getActivity(
@@ -92,5 +95,7 @@ class PushNotificationService : FirebaseMessagingService() {
     companion object {
         private const val FRIEND_REQUEST_CHANNEL_ID = "friend_request_notifications"
         private const val FRIEND_REQUEST_CHANNEL_NAME = "Friend Requests"
+
+        const val EXTRA_DESTINATION_ROUTE = "destination_route"
     }
 }
