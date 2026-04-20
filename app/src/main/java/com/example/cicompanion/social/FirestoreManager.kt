@@ -25,7 +25,7 @@ object FirestoreManager {
      * Saves the signed-in user's profile data to Firestore.
      * The document ID is the user's Firebase UID.
      */
-    fun saveUserToFirestore(user: FirebaseUser) {
+    fun saveUserToFirestore(user: FirebaseUser,onSuccess: (() -> Unit)? = null) {
         val db = FirebaseFirestore.getInstance()
         val userRef = db.collection("users").document(user.uid)
 
@@ -41,9 +41,38 @@ object FirestoreManager {
         userRef.set(userProfile, SetOptions.merge())
             .addOnSuccessListener {
                 Log.d(TAG, "User profile saved to Firestore for uid=${user.uid}")
+
+                // PUSH NOTIFICATIONS
+                // store this device's FCM token on the user document
+                onSuccess?.invoke()
             }
             .addOnFailureListener { exception ->
                 Log.e(TAG, "Failed to save user profile to Firestore.", exception)
+            }
+    }
+    // PUSH NOTIFICATIONS
+    // store this device's FCM token on the user document
+    fun saveFcmToken(userId: String, token: String) {
+        val db = FirebaseFirestore.getInstance()
+
+        // PUSH NOTIFICATIONS CHANGE:
+        // Store token in the existing owner-only subcollection allowed by your rules.
+        val tokenRef = db.collection("users")
+            .document(userId)
+            .collection("fcmTokens")
+            .document("current")
+
+        val tokenPayload = hashMapOf(
+            "token" to token,
+            "updatedAt" to System.currentTimeMillis()
+        )
+
+        tokenRef.set(tokenPayload, SetOptions.merge())
+            .addOnSuccessListener {
+                Log.d(TAG, "Saved FCM token for uid=$userId")
+            }
+            .addOnFailureListener { exception ->
+                Log.e(TAG, "Failed to save FCM token for uid=$userId", exception)
             }
     }
 
@@ -107,13 +136,13 @@ object FirestoreManager {
     suspend fun fetchCustomEvents(): List<CalendarEvent> {
         val user = FirebaseAuth.getInstance().currentUser ?: return emptyList()
         val db = FirebaseFirestore.getInstance()
-        
+
         return try {
             val snapshot = db.collection("users").document(user.uid)
                 .collection("customEvents")
                 .get()
                 .await()
-            
+
             snapshot.documents.mapNotNull { doc ->
                 val id = doc.getString("id") ?: ""
                 val title = doc.getString("title") ?: ""
@@ -123,7 +152,7 @@ object FirestoreManager {
                 val endStr = doc.getString("end") ?: return@mapNotNull null
                 val isAllDay = doc.getBoolean("isAllDay") ?: false
                 val isPinned = doc.getBoolean("isPinned") ?: false
-                
+
                 CalendarEvent(
                     id = id,
                     calendarId = "custom",
@@ -148,7 +177,7 @@ object FirestoreManager {
         return try {
             val snapshot = db.collection("campusLocations").get().await()
             if (snapshot.isEmpty) return emptyList()
-            
+
             snapshot.documents.mapNotNull { doc ->
                 val name = doc.getString("name") ?: ""
                 val lat = doc.getDouble("latitude") ?: 0.0
@@ -156,7 +185,7 @@ object FirestoreManager {
                 val description = doc.getString("description") ?: ""
                 val typeStr = doc.getString("type") ?: "BUILDING"
                 val colorHex = doc.getString("color") ?: "#D32F2F"
-                
+
                 val type = try { LocationType.valueOf(typeStr) } catch(e: Exception) { LocationType.BUILDING }
                 val color = Color(android.graphics.Color.parseColor(colorHex))
                 val icon = when (type) {

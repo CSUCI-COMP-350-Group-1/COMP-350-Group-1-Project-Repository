@@ -29,6 +29,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.example.cicompanion.firebase.FirebaseAuthManager
+import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.CICompanionTheme
@@ -162,14 +163,14 @@ fun OldProfileScreen(navController: NavHostController) {
 
     LaunchedEffect(currentUser?.uid) {
         currentUser?.let { signedInUser ->
-            FirestoreManager.saveUserToFirestore(signedInUser)
+            FirestoreManager.saveUserToFirestore(signedInUser) {
+                FriendRequestNotificationSender.syncCurrentUserFcmToken()
+            }
             SocialRepository.fetchFriendCount(
                 currentUserId = signedInUser.uid,
                 onSuccess = { count -> friendCount = count },
                 onError = { friendCount = 0 }
             )
-        } ?: run {
-            friendCount = 0
         }
     }
 
