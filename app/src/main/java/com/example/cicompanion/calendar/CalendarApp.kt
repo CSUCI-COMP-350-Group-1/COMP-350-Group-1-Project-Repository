@@ -142,7 +142,6 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                 onDismissError = viewModel::clearError,
                 onDateSelected = { 
                     viewModel.onDateSelected(it)
-                    viewModel.setHighlightedEvent(null) 
                 },
                 onRequestDelete = { eventToDelete = it },
                 onRequestEdit = { eventToEdit = it },
@@ -286,8 +285,7 @@ private fun CalendarScreenBody(
                 onNextMonth = viewModel::nextMonth,
                 onDeleteEvent = onRequestDelete,
                 onEditEvent = onRequestEdit,
-                onTogglePin = onTogglePin,
-                highlightedEventId = viewModel.highlightedEventId
+                onTogglePin = onTogglePin
             )
         }
     }
@@ -534,8 +532,7 @@ private fun CalendarContent(
     onNextMonth: () -> Unit,
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
-    onTogglePin: (CalendarEvent) -> Unit,
-    highlightedEventId: String? = null
+    onTogglePin: (CalendarEvent) -> Unit
 ) {
     when (mode) {
         CalendarMode.MONTH -> MonthView(
@@ -548,8 +545,7 @@ private fun CalendarContent(
             onNextMonth = onNextMonth,
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
-            onTogglePin = onTogglePin,
-            highlightedEventId = highlightedEventId
+            onTogglePin = onTogglePin
         )
         CalendarMode.DAY -> DayView(
             selectedDate = selectedDate,
@@ -558,8 +554,7 @@ private fun CalendarContent(
             onNextDay = onNextDay,
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
-            onTogglePin = onTogglePin,
-            highlightedEventId = highlightedEventId
+            onTogglePin = onTogglePin
         )
         CalendarMode.WEEK -> WeekView(
             selectedDate = selectedDate,
@@ -570,8 +565,7 @@ private fun CalendarContent(
             onNextWeek = onNextWeek,
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
-            onTogglePin = onTogglePin,
-            highlightedEventId = highlightedEventId
+            onTogglePin = onTogglePin
         )
     }
 }
@@ -584,8 +578,7 @@ private fun DayView(
     onNextDay: () -> Unit,
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
-    onTogglePin: (CalendarEvent) -> Unit,
-    highlightedEventId: String? = null
+    onTogglePin: (CalendarEvent) -> Unit
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy") }
 
@@ -603,8 +596,7 @@ private fun DayView(
             events = events,
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
-            onTogglePin = onTogglePin,
-            highlightedEventId = highlightedEventId
+            onTogglePin = onTogglePin
         )
     }
 }
@@ -619,8 +611,7 @@ private fun WeekView(
     onNextWeek: () -> Unit,
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
-    onTogglePin: (CalendarEvent) -> Unit,
-    highlightedEventId: String? = null
+    onTogglePin: (CalendarEvent) -> Unit
 ) {
     val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
     val weekDates = remember(selectedDate, firstDayOfWeek) {
@@ -651,8 +642,7 @@ private fun WeekView(
             events = eventsForSelectedDate,
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
-            onTogglePin = onTogglePin,
-            highlightedEventId = highlightedEventId
+            onTogglePin = onTogglePin
         )
     }
 }
@@ -668,8 +658,7 @@ private fun MonthView(
     onNextMonth: () -> Unit,
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
-    onTogglePin: (CalendarEvent) -> Unit,
-    highlightedEventId: String? = null
+    onTogglePin: (CalendarEvent) -> Unit
 ) {
     val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
     val monthCells = remember(visibleMonth, firstDayOfWeek) {
@@ -700,8 +689,7 @@ private fun MonthView(
             events = selectedDateEvents,
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
-            onTogglePin = onTogglePin,
-            highlightedEventId = highlightedEventId
+            onTogglePin = onTogglePin
         )
     }
 }
@@ -975,8 +963,7 @@ private fun EventsSection(
     events: List<CalendarEvent>,
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
-    onTogglePin: (CalendarEvent) -> Unit,
-    highlightedEventId: String? = null
+    onTogglePin: (CalendarEvent) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionHeading(text = title)
@@ -984,8 +971,7 @@ private fun EventsSection(
             events = events, 
             onDeleteEvent = onDeleteEvent, 
             onEditEvent = onEditEvent,
-            onTogglePin = onTogglePin,
-            highlightedEventId = highlightedEventId
+            onTogglePin = onTogglePin
         )
     }
 }
@@ -995,8 +981,7 @@ private fun EventsList(
     events: List<CalendarEvent>,
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
-    onTogglePin: (CalendarEvent) -> Unit,
-    highlightedEventId: String? = null
+    onTogglePin: (CalendarEvent) -> Unit
 ) {
     if (events.isEmpty()) {
         EmptyEventsMessage()
@@ -1011,8 +996,7 @@ private fun EventsList(
                 event = event,
                 onDelete = { onDeleteEvent(event) },
                 onEdit = { onEditEvent(event) },
-                onTogglePin = { onTogglePin(event) },
-                isHighlighted = event.id == highlightedEventId
+                onTogglePin = { onTogglePin(event) }
             )
         }
     }
@@ -1034,21 +1018,15 @@ private fun EventCard(
     event: CalendarEvent, 
     onDelete: () -> Unit, 
     onEdit: () -> Unit,
-    onTogglePin: () -> Unit, 
-    isHighlighted: Boolean = false
+    onTogglePin: () -> Unit
 ) {
     val isCustom = event.calendarId == "custom"
 
-    val containerColor = if (isHighlighted) PinnedEventPurple.copy(alpha = 0.1f) else CardOffWhite
-    val borderColor = if (isHighlighted) PinnedEventPurple else Color.Transparent
-
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(if (isHighlighted) 2.dp else 0.dp, borderColor, RoundedCornerShape(22.dp)),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 8.dp else if (isCustom) 5.dp else 3.dp)
+        colors = CardDefaults.cardColors(containerColor = CardOffWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isCustom) 5.dp else 3.dp)
     ) {
         Column(
             modifier = Modifier
