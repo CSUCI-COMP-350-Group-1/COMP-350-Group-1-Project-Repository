@@ -5,12 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Book
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,21 +20,36 @@ import com.example.cicompanion.ui.theme.*
 
 data class FeatureItem(val route: String, val icon: ImageVector, val label: String)
 
-val featureItems = listOf(
-    FeatureItem(Routes.CALENDAR, Icons.Default.DateRange, "Calendar"),
-    FeatureItem(Routes.STUDY_ROOM, Icons.Default.MenuBook, "Study Room")
+// Premade Feature Definitions
+val CalendarFeature = FeatureItem(Routes.CALENDAR, Icons.Default.CalendarMonth, "Calendar")
+val StudyRoomFeature = FeatureItem(Routes.STUDY_ROOM, Icons.AutoMirrored.Filled.MenuBook, "Study Room")
+val MapFeature = FeatureItem(Routes.MAP, Icons.Default.LocationOn, "Map")
+val ProfileFeature = FeatureItem(Routes.PROFILE, Icons.Default.Person, "Profile")
+val FriendsAndRequestsFeature = FeatureItem(Routes.FRIENDS_AND_REQUESTS, Icons.Default.People, "Friends & Requests")
+
+val allAvailableFeatures = listOf(
+    CalendarFeature,
+    StudyRoomFeature,
+    MapFeature,
+    ProfileFeature,
+    FriendsAndRequestsFeature
+)
+
+val defaultFeatureItems = listOf(
+    CalendarFeature,
+    StudyRoomFeature
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FeatureCard(feature: FeatureItem, onClick: () -> Unit) {
+fun FeatureCard(feature: FeatureItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val buttonGradient = Brush.linearGradient(
         colors = listOf(BrandOrange, BrandCrimson, BrandPink)
     )
 
     Card(
         onClick = onClick,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(110.dp),
         shape = RoundedCornerShape(16.dp),
@@ -51,12 +61,13 @@ fun FeatureCard(feature: FeatureItem, onClick: () -> Unit) {
                 .background(buttonGradient),
             contentAlignment = Alignment.Center
         ) {
+            @Suppress("DEPRECATION")
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
                     imageVector = feature.icon,
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(30.dp)
+                    modifier = Modifier.size(36.dp)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(

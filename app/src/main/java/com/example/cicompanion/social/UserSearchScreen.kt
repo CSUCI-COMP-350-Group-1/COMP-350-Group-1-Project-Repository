@@ -163,7 +163,7 @@ private fun UserSearchResultCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                UserAvatar(photoUrl = user.photoUrl)
+                UserAvatarSearch(photoUrl = user.photoUrl)
                 Column {
                     Text(
                         text = SocialRepository.displayNameOrEmail(user),
@@ -214,7 +214,7 @@ private fun UserSearchResultCard(
 }
 
 @Composable
-private fun UserAvatar(photoUrl: String) {
+private fun UserAvatarSearch(photoUrl: String) {
     if (photoUrl.isNotEmpty()) {
         AsyncImage(
             model = photoUrl,

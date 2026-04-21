@@ -30,10 +30,10 @@ import com.example.cicompanion.appNavigation.screenTitleForRoute
 import com.example.cicompanion.calendar.CalendarViewModel
 import com.example.cicompanion.calendar.CalendarApp
 import com.example.cicompanion.home.HomeScreen
+import com.example.cicompanion.home.HomeViewModel
 import com.example.cicompanion.maps.MapScreen
-import com.example.cicompanion.social.FriendRequestsScreen
+import com.example.cicompanion.social.FriendsAndRequestsScreen
 import com.example.cicompanion.social.ProfileScreen
-import com.example.cicompanion.social.UserSearchScreen
 import com.example.cicompanion.studyRoom.RoomListScreen
 import com.example.cicompanion.ui.NavBar
 import com.example.cicompanion.ui.Routes
@@ -124,8 +124,9 @@ fun AppNavigation(notificationRoute: String? = null,
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // Create shared CalendarViewModel here to sync across Home and Calendar screens
+    // Create shared ViewModels here to sync across screens and persist during navigation
     val calendarViewModel: CalendarViewModel = viewModel()
+    val homeViewModel: HomeViewModel = viewModel()
 
     LaunchedEffect(notificationRoute) {
         if (!notificationRoute.isNullOrBlank()) {
@@ -160,7 +161,7 @@ fun AppNavigation(notificationRoute: String? = null,
             topBar = {
                 TopBar(
                     title = currentScreenTitle,
-                    showBackButton = currentRoute == Routes.USER_SEARCH || currentRoute == Routes.FRIEND_REQUESTS,
+                    showBackButton = currentRoute == Routes.FRIENDS_AND_REQUESTS,
                     onHamburgerClick = {
                         scope.launch { drawerState.open() }
                     },
@@ -181,7 +182,7 @@ fun AppNavigation(notificationRoute: String? = null,
             Box(modifier = Modifier.padding(paddingValues)) {
                 NavHost(navController = navController, startDestination = Routes.HOME) {
                     composable(Routes.HOME) {
-                        HomeScreen(navController, calendarViewModel)
+                        HomeScreen(navController, calendarViewModel, homeViewModel)
                     }
                     composable(Routes.MAP) {
                         MapScreen(navController, calendarViewModel)
@@ -201,11 +202,8 @@ fun AppNavigation(notificationRoute: String? = null,
                     composable(Routes.SOCIAL) {
                         ProfileScreen(navController)
                     }
-                    composable(Routes.USER_SEARCH) {
-                        UserSearchScreen(navController)
-                    }
-                    composable(Routes.FRIEND_REQUESTS) {
-                        FriendRequestsScreen(navController)
+                    composable(Routes.FRIENDS_AND_REQUESTS) {
+                        FriendsAndRequestsScreen(navController)
                     }
                 }
             }

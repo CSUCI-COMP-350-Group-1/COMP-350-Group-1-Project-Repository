@@ -39,6 +39,7 @@ fun screenTitleForRoute(route: String?): String {
         Routes.NOTIFICATIONS -> "Notifications"
         Routes.USER_SEARCH -> "User Search"
         Routes.FRIEND_REQUESTS -> "Friend Requests"
+        Routes.FRIENDS_AND_REQUESTS -> "Friends & Requests"
         Routes.SEARCH -> "Search"
         else -> "CI Companion"
     }
@@ -207,4 +208,3 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
             }
         }
     }
-
