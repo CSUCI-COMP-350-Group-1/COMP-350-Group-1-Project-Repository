@@ -207,6 +207,9 @@ fun AppNavigation(notificationRoute: String? = null,
                     composable(Routes.FRIEND_REQUESTS) {
                         FriendRequestsScreen(navController)
                     }
+                    composable(Routes.CONVERSATIONS) {
+                        ConversationsScreen(navController)
+                    }
                 }
             }
         }

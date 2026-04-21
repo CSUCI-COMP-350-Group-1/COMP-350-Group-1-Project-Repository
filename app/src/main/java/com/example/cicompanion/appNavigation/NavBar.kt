@@ -41,13 +41,14 @@ object Routes {
     const val USER_SEARCH = "user_search"
     const val FRIEND_REQUESTS = "friendRequests"
     const val SEARCH = "search"
+    const val CONVERSATIONS = "conversations"
 }
 
 @Composable
 fun NavBar(navController: NavHostController) {
     val items = listOf(
         NavBarItem("Home", Routes.HOME, Icons.Filled.Home),
-        NavBarItem("Social", Routes.SOCIAL, Icons.Filled.People),
+        NavBarItem("Social", Routes.CONVERSATIONS, Icons.Filled.People),
         NavBarItem("Calendar", Routes.CALENDAR, Icons.Filled.CalendarMonth),
         NavBarItem("Map", Routes.MAP, Icons.Filled.LocationOn)
     )
