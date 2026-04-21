@@ -173,19 +173,6 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Friends & Requests Button
-            NavigationDrawerItem(
-                label = { Text("Friends & Requests") },
-                selected = false,
-                icon = { Icon(Icons.Default.People, contentDescription = null) },
-                onClick = {
-                    navController.navigate(Routes.FRIENDS_AND_REQUESTS)
-                    scope.launch { drawerState.close() }
-                }
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
             // Search Button (which was moved from the bottom to here)
             NavigationDrawerItem(
                 label = { Text("Search for Feature") },
