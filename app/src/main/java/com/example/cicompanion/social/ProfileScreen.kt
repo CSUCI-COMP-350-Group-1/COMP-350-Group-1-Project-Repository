@@ -1,8 +1,6 @@
 package com.example.cicompanion.social
 
 import android.app.Activity
-import android.content.Intent
-import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,22 +42,32 @@ import com.google.firebase.auth.FirebaseUser
 private val BrandRed = Color(0xFFEF3347)
 
 @Composable
-fun ProfileScreen(navController: NavHostController) {
+fun ProfileScreen(navController: NavHostController, userId: String? = null) {
     // SWITCH TO TRUE IF YOU WANT TO SEE THE MOCKUP
-    val useNewDesign = true
+    // val useNewDesign = true
 
-    if (useNewDesign) {
-        NewProfileScreen(navController)
-    } else {
-        OldProfileScreen(navController)
-    }
+    NewProfileScreen(navController, userId)
+
+//    if (useNewDesign) {
+//        NewProfileScreen(navController)
+//    } else {
+//        OldProfileScreen(navController)
+//    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NewProfileScreen(navController: NavHostController) {
-    var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
+fun NewProfileScreen(navController: NavHostController, userId: String? = null) {
+    val isOwnProfile = userId == null || userId == FirebaseAuth.getInstance().currentUser?.uid
+    
+    var displayName by remember { mutableStateOf("Loading...") }
+    var email by remember { mutableStateOf("") }
+    var photoUrl by remember { mutableStateOf<String?>(null) }
     var friendCount by remember { mutableIntStateOf(0) }
+    var requestStatus by remember { mutableStateOf<String?>(null) }
+    var targetUserProfile by remember { mutableStateOf<UserProfile?>(null) }
+    
+    var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
     val context = LocalContext.current
 
     DisposableEffect(Unit) {
@@ -71,16 +80,44 @@ fun NewProfileScreen(navController: NavHostController) {
         }
     }
 
-    LaunchedEffect(currentUser?.uid) {
-        currentUser?.let { signedInUser ->
-            FirestoreManager.saveUserToFirestore(signedInUser)
+    LaunchedEffect(userId, currentUser?.uid) {
+        val targetUid = userId ?: currentUser?.uid
+        if (targetUid != null) {
+            SocialRepository.fetchUserProfile(
+                userId = targetUid,
+                onSuccess = { profile ->
+                    targetUserProfile = profile
+                    displayName = profile.displayName.ifBlank { profile.email }
+                    email = profile.email
+                    photoUrl = profile.photoUrl
+                },
+                onError = {
+                    if (isOwnProfile) {
+                        displayName = currentUser?.displayName ?: "Guest User"
+                        email = currentUser?.email ?: ""
+                        photoUrl = currentUser?.photoUrl?.toString()
+                    }
+                }
+            )
+
             SocialRepository.fetchFriendCount(
-                currentUserId = signedInUser.uid,
+                currentUserId = targetUid,
                 onSuccess = { count -> friendCount = count },
                 onError = { friendCount = 0 }
             )
-        } ?: run {
-            friendCount = 0
+
+            if (!isOwnProfile && currentUser != null) {
+                SocialRepository.fetchAllFriendRequestStatuses(
+                    currentUserId = currentUser!!.uid,
+                    onSuccess = { statuses ->
+                        requestStatus = statuses[targetUid]
+                    },
+                    onError = { /* Handle error */ }
+                )
+            }
+        } else {
+            displayName = "Guest User"
+            email = "Sign in to sync your data"
         }
     }
 
@@ -100,9 +137,9 @@ fun NewProfileScreen(navController: NavHostController) {
                 .background(Color.White)
         ) {
             ProfileHeader(
-                userDisplayName = currentUser?.displayName ?: "Guest User",
-                userEmail = currentUser?.email ?: "Sign in to sync your data",
-                photoUrl = currentUser?.photoUrl?.toString(),
+                userDisplayName = displayName,
+                userEmail = email,
+                photoUrl = photoUrl,
                 friendCount = friendCount,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -122,25 +159,120 @@ fun NewProfileScreen(navController: NavHostController) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Top
             ) {
-                ProfileActionArea(
-                    currentUser = currentUser,
-                    onSignIn = {
-                        val signInClient = FirebaseAuthManager.getGoogleSignInClient(context)
-                        launcher.launch(signInClient.signInIntent)
-                    },
-                    onFindFriends = {
-                        navController.navigate(Routes.USER_SEARCH)
-                    },
-                    onViewFriendRequests = {
-                        navController.navigate(Routes.FRIEND_REQUESTS)
-                    },
-                    onSignOut = {
-                        FirebaseAuth.getInstance().signOut()
-                        FirebaseAuthManager.getGoogleSignInClient(context).signOut()
-                    }
-                )
+                if (isOwnProfile) {
+                    ProfileActionArea(
+                        currentUser = currentUser,
+                        onSignIn = {
+                            val signInClient = FirebaseAuthManager.getGoogleSignInClient(context)
+                            launcher.launch(signInClient.signInIntent)
+                        },
+                        onFindFriends = {
+                            navController.navigate(Routes.USER_SEARCH)
+                        },
+                        onViewFriendRequests = {
+                            navController.navigate(Routes.FRIEND_REQUESTS)
+                        },
+                        onSignOut = {
+                            FirebaseAuth.getInstance().signOut()
+                            FirebaseAuthManager.getGoogleSignInClient(context).signOut()
+                        }
+                    )
+                } else {
+                    ViewOnlyProfileActions(
+                        navController = navController,
+                        targetUser = targetUserProfile,
+                        requestStatus = requestStatus,
+                        onStatusChange = { newStatus -> requestStatus = newStatus }
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+fun ViewOnlyProfileActions(
+    navController: NavHostController,
+    targetUser: UserProfile?,
+    requestStatus: String?,
+    onStatusChange: (String?) -> Unit
+) {
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    SectionLabel("Actions")
+
+    // Friend Request Logic
+    if (targetUser != null && currentUser != null) {
+        if (requestStatus == null) {
+            Button(
+                onClick = {
+                    SocialRepository.sendFriendRequest(
+                        currentUser = currentUser,
+                        targetUser = targetUser,
+                        onSuccess = { onStatusChange("pending") },
+                        onError = { /* Handle error */ }
+                    )
+                },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+            ) {
+                Icon(Icons.Default.PersonAdd, contentDescription = null)
+                Spacer(Modifier.width(12.dp))
+                Text("Send Friend Request", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        } else {
+            // Already friends or pending
+            OutlinedButton(
+                onClick = {
+                    if (requestStatus == "accepted") {
+                        SocialRepository.removeFriend(
+                            currentUserId = currentUser.uid,
+                            targetUserId = targetUser.uid,
+                            onSuccess = { onStatusChange(null) },
+                            onError = { /* Handle error */ }
+                        )
+                    } else if (requestStatus == "pending") {
+                        // For now we use removeFriend to cancel a pending request too
+                        SocialRepository.removeFriend(
+                            currentUserId = currentUser.uid,
+                            targetUserId = targetUser.uid,
+                            onSuccess = { onStatusChange(null) },
+                            onError = { /* Handle error */ }
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.5.dp, if (requestStatus == "accepted") Color.Gray else BrandRed),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = if (requestStatus == "accepted") Color.Gray else BrandRed)
+            ) {
+                val icon = if (requestStatus == "accepted") Icons.Default.Close else Icons.Default.Check
+                val label = if (requestStatus == "accepted") "Remove Friend" else "Request Sent (Cancel)"
+                Icon(icon, contentDescription = null)
+                Spacer(Modifier.width(12.dp))
+                Text(label, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    OutlinedButton(
+        onClick = { /* TODO: Start conversation */ },
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.5.dp, BrandRed),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = BrandRed)
+    ) {
+        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
+        Spacer(Modifier.width(12.dp))
+        Text("Send Message", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    TextButton(onClick = { navController.popBackStack() }) {
+        Text("Go Back", color = Color.Gray)
     }
 }
 
@@ -301,8 +433,6 @@ private fun ColumnScope.ProfileActionArea(
             Text("Sign in with Google", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     } else {
-        // --- START OF MOCKUP SOCIAL SECTION ---
-        // New "Add Friends" primary button
         Button(
             onClick = onFindFriends,
             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -316,7 +446,6 @@ private fun ColumnScope.ProfileActionArea(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Updated "Friend Requests" button
         OutlinedButton(
             onClick = onViewFriendRequests,
             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -331,7 +460,6 @@ private fun ColumnScope.ProfileActionArea(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Additional Mockup Buttons
         SectionLabel("Account Settings")
         
         OutlinedButton(
@@ -363,11 +491,9 @@ private fun ColumnScope.ProfileActionArea(
             Spacer(Modifier.weight(1f))
             Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
         }
-        // --- END OF MOCKUP SOCIAL SECTION ---
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Sign Out at the bottom
         TextButton(
             onClick = onSignOut,
             modifier = Modifier.padding(bottom = 16.dp)

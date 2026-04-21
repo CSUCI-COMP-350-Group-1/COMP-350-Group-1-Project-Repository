@@ -31,9 +31,7 @@ import com.example.cicompanion.calendar.CalendarViewModel
 import com.example.cicompanion.calendar.CalendarApp
 import com.example.cicompanion.home.HomeScreen
 import com.example.cicompanion.maps.MapScreen
-import com.example.cicompanion.social.FriendRequestsScreen
-import com.example.cicompanion.social.ProfileScreen
-import com.example.cicompanion.social.UserSearchScreen
+import com.example.cicompanion.social.*
 import com.example.cicompanion.studyRoom.RoomListScreen
 import com.example.cicompanion.ui.NavBar
 import com.example.cicompanion.ui.Routes
@@ -46,6 +44,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.example.cicompanion.notifications.PushNotificationService
 import com.example.cicompanion.sidebar.SearchScreen
@@ -160,14 +160,18 @@ fun AppNavigation(notificationRoute: String? = null,
             topBar = {
                 TopBar(
                     title = currentScreenTitle,
-                    showBackButton = currentRoute == Routes.USER_SEARCH || currentRoute == Routes.FRIEND_REQUESTS,
+                    showBackButton = currentRoute == Routes.USER_SEARCH || currentRoute == Routes.FRIEND_REQUESTS || currentRoute?.startsWith(Routes.PROFILE) == true,
                     onHamburgerClick = {
                         scope.launch { drawerState.open() }
                     },
                     onBackClick = {
-                        navController.navigate(Routes.PROFILE) {
-                            popUpTo(Routes.PROFILE) { inclusive = false }
-                            launchSingleTop = true
+                        if (navController.previousBackStackEntry != null) {
+                            navController.popBackStack()
+                        } else {
+                            navController.navigate(Routes.PROFILE) {
+                                popUpTo(Routes.PROFILE) { inclusive = false }
+                                launchSingleTop = true
+                            }
                         }
                     },
                     onNotificationClick = {
@@ -195,9 +199,21 @@ fun AppNavigation(notificationRoute: String? = null,
                     composable(Routes.SEARCH) {
                         SearchScreen(navController)
                     }
+                    
+                    // Base profile route
                     composable(Routes.PROFILE) {
                         ProfileScreen(navController)
                     }
+                    
+                    // Profile route with userId path parameter
+                    composable(
+                        route = "${Routes.PROFILE}/{userId}",
+                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userId = backStackEntry.arguments?.getString("userId")
+                        ProfileScreen(navController, userId)
+                    }
+
                     composable(Routes.SOCIAL) {
                         ProfileScreen(navController)
                     }

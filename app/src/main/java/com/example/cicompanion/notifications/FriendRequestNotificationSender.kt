@@ -23,7 +23,7 @@ object FriendRequestNotificationSender {
     //
     // Physical phone:
     // private const val KTOR_BASE_URL = "http://YOUR_COMPUTER_LAN_IP:8080/"
-    private const val KTOR_BASE_URL = "http://10.0.2.2:8080/"
+    private const val KTOR_BASE_URL = "http://192.168.1.146:8080/"
 
 
     //For push notif

@@ -1,6 +1,7 @@
 package com.example.cicompanion.social
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
+import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.google.firebase.auth.FirebaseAuth
 
@@ -112,6 +114,9 @@ fun UserSearchScreen(navController: NavHostController) {
                             UserSearchResultCard(
                                 user = user,
                                 requestStatus = requestStatuses[user.uid],
+                                onCardClick = {
+                                    navController.navigate("${Routes.PROFILE}/${user.uid}")
+                                },
                                 onSendRequest = {
                                     SocialRepository.sendFriendRequest(
                                         currentUser = currentUser,
@@ -147,10 +152,15 @@ fun UserSearchScreen(navController: NavHostController) {
 private fun UserSearchResultCard(
     user: UserProfile,
     requestStatus: String?,
+    onCardClick: () -> Unit,
     onSendRequest: () -> Unit,
     onRemoveFriend: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCardClick() }
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
