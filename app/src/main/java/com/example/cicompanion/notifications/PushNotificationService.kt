@@ -30,20 +30,31 @@ class PushNotificationService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
 
-        // PUSH NOTIFICATION show a local notification when a message is received
+        // MESSAGING allow routing + channel selection from FCM data
+        val destinationRoute = message.data["destination_route"] ?: Routes.FRIEND_REQUESTS
+        val channelId = message.data["channel_id"] ?: FRIEND_REQUEST_CHANNEL_ID
+
         showNotification(
             title = message.notification?.title ?: "New notification",
-            body = message.notification?.body ?: "You have a new update."
+            body = message.notification?.body ?: "You have a new update.",
+            destinationRoute = destinationRoute,
+            channelId = channelId
         )
     }
 
-    private fun showNotification(title: String, body: String) {
-        createNotificationChannelIfNeeded()
+    private fun showNotification(
+        title: String,
+        body: String,
+        destinationRoute: String,
+        channelId: String
+    ) {
+        createNotificationChannelsIfNeeded()
 
         val launchIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
 
-            putExtra(EXTRA_DESTINATION_ROUTE, Routes.FRIEND_REQUESTS)
+            // MESSAGING notification tap route is now dynamic
+            putExtra(EXTRA_DESTINATION_ROUTE, destinationRoute)
         }
 
         val pendingIntent = PendingIntent.getActivity(
@@ -53,7 +64,7 @@ class PushNotificationService : FirebaseMessagingService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(this, FRIEND_REQUEST_CHANNEL_ID)
+        val notification = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(applicationInfo.icon)
             .setContentTitle(title)
             .setContentText(body)
@@ -77,10 +88,10 @@ class PushNotificationService : FirebaseMessagingService() {
             .notify(System.currentTimeMillis().toInt(), notification)
     }
 
-    private fun createNotificationChannelIfNeeded() {
+    private fun createNotificationChannelsIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
-        val channel = NotificationChannel(
+        val friendRequestChannel = NotificationChannel(
             FRIEND_REQUEST_CHANNEL_ID,
             FRIEND_REQUEST_CHANNEL_NAME,
             NotificationManager.IMPORTANCE_HIGH
@@ -88,13 +99,27 @@ class PushNotificationService : FirebaseMessagingService() {
             description = "Friend request notifications"
         }
 
+        // MESSAGING new high-importance direct message channel
+        val directMessageChannel = NotificationChannel(
+            DIRECT_MESSAGE_CHANNEL_ID,
+            DIRECT_MESSAGE_CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Direct message notifications"
+        }
+
         val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(channel)
+        manager.createNotificationChannel(friendRequestChannel)
+        manager.createNotificationChannel(directMessageChannel)
     }
 
     companion object {
         private const val FRIEND_REQUEST_CHANNEL_ID = "friend_request_notifications"
         private const val FRIEND_REQUEST_CHANNEL_NAME = "Friend Requests"
+
+        // MESSAGING CHANGE
+        const val DIRECT_MESSAGE_CHANNEL_ID = "direct_message_notifications"
+        private const val DIRECT_MESSAGE_CHANNEL_NAME = "Direct Messages"
 
         const val EXTRA_DESTINATION_ROUTE = "destination_route"
     }

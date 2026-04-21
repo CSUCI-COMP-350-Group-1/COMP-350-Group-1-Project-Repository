@@ -7,6 +7,29 @@ import com.google.firebase.firestore.QuerySnapshot
 
 object SocialRepository {
 
+    // MESSAGING: reusable helper for accepted friends only
+    fun fetchAcceptedFriends(
+        currentUserId: String,
+        onSuccess: (List<UserProfile>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        fetchSearchableUsers(
+            currentUserId = currentUserId,
+            onSuccess = { allUsers ->
+                fetchAllFriendRequestStatuses(
+                    currentUserId = currentUserId,
+                    onSuccess = { statuses ->
+                        onSuccess(
+                            allUsers.filter { statuses[it.uid] == "accepted" }
+                        )
+                    },
+                    onError = onError
+                )
+            },
+            onError = onError
+        )
+    }
+
     fun fetchSearchableUsers(
         currentUserId: String,
         onSuccess: (List<UserProfile>) -> Unit,

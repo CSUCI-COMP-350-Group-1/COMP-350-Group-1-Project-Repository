@@ -50,6 +50,8 @@ import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.example.cicompanion.notifications.PushNotificationService
 import com.example.cicompanion.sidebar.SearchScreen
 import com.google.firebase.auth.FirebaseAuth
+import com.example.cicompanion.social.MessagesScreen
+import com.example.cicompanion.social.MessageThreadScreen
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
 
@@ -161,14 +163,20 @@ fun AppNavigation(notificationRoute: String? = null,
             topBar = {
                 TopBar(
                     title = currentScreenTitle,
-                    showBackButton = currentRoute == Routes.FRIENDS_AND_REQUESTS,
+                    showBackButton =
+                        currentRoute == Routes.FRIENDS_AND_REQUESTS ||
+                                currentRoute?.startsWith(Routes.MESSAGE_THREAD_BASE) == true, // MESSAGING
                     onHamburgerClick = {
                         scope.launch { drawerState.open() }
                     },
                     onBackClick = {
-                        navController.navigate(Routes.PROFILE) {
-                            popUpTo(Routes.PROFILE) { inclusive = false }
-                            launchSingleTop = true
+                        // MESSAGING  prefer normal back-stack behavior for thread screens
+                        val popped = navController.popBackStack()
+                        if (!popped) {
+                            navController.navigate(Routes.PROFILE) {
+                                popUpTo(Routes.PROFILE) { inclusive = false }
+                                launchSingleTop = true
+                            }
                         }
                     },
                     onNotificationClick = {
@@ -200,7 +208,19 @@ fun AppNavigation(notificationRoute: String? = null,
                         ProfileScreen(navController)
                     }
                     composable(Routes.SOCIAL) {
-                        ProfileScreen(navController)
+                        // MESSAGING
+                        MessagesScreen(navController)
+                    }
+                    composable(Routes.MESSAGE_THREAD) { backStackEntry ->
+                        // MESSAGING CHANGE
+                        val conversationId = backStackEntry.arguments?.getString("conversationId").orEmpty()
+                        val friendUserId = backStackEntry.arguments?.getString("friendUserId").orEmpty()
+
+                        MessageThreadScreen(
+                            navController = navController,
+                            conversationId = conversationId,
+                            friendUserId = friendUserId
+                        )
                     }
                     composable(Routes.FRIENDS_AND_REQUESTS) {
                         FriendsAndRequestsScreen(navController)
