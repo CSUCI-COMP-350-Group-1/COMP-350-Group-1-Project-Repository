@@ -196,13 +196,17 @@ fun AddFriendsTab(currentUser: FirebaseUser) {
         )
     }
 
-    val filteredUsers = if (searchQuery.isBlank()) {
-        users
-    } else {
-        users.filter { user ->
-            user.displayName.contains(searchQuery, ignoreCase = true) ||
-                    user.email.contains(searchQuery, ignoreCase = true)
+    // Filter out users who are already friends to avoid the empty spaces
+    val displayUsers = remember(users, searchQuery, requestStatuses.toMap()) {
+        val filtered = if (searchQuery.isBlank()) {
+            users
+        } else {
+            users.filter { user ->
+                user.displayName.contains(searchQuery, ignoreCase = true) ||
+                        user.email.contains(searchQuery, ignoreCase = true)
+            }
         }
+        filtered.filter { requestStatuses[it.uid] != "accepted" }
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -231,30 +235,35 @@ fun AddFriendsTab(currentUser: FirebaseUser) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Color(0xFFEF3347))
             }
+        } else if (displayUsers.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    text = if (searchQuery.isBlank()) "No users left to add." else "No users found matching \"$searchQuery\"",
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center
+                )
+            }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(top = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(filteredUsers, key = { it.uid }) { user ->
-                    val status = requestStatuses[user.uid]
-                    if (status != "accepted") {
-                        UserSearchCard(
-                            user = user,
-                            requestStatus = status,
-                            onSendRequest = {
-                                SocialRepository.sendFriendRequest(
-                                    currentUser = currentUser,
-                                    targetUser = user,
-                                    onSuccess = {
-                                        requestStatuses[user.uid] = "pending"
-                                        statusMessage = "Friend request sent to ${SocialRepository.displayNameOrEmail(user)}."
-                                    },
-                                    onError = { errorMessage = it }
-                                )
-                            }
-                        )
-                    }
+                items(displayUsers, key = { it.uid }) { user ->
+                    UserSearchCard(
+                        user = user,
+                        requestStatus = requestStatuses[user.uid],
+                        onSendRequest = {
+                            SocialRepository.sendFriendRequest(
+                                currentUser = currentUser,
+                                targetUser = user,
+                                onSuccess = {
+                                    requestStatuses[user.uid] = "pending"
+                                    statusMessage = "Friend request sent to ${SocialRepository.displayNameOrEmail(user)}."
+                                },
+                                onError = { errorMessage = it }
+                            )
+                        }
+                    )
                 }
             }
         }
