@@ -41,6 +41,7 @@ object Routes {
     const val USER_SEARCH = "user_search"
     const val FRIEND_REQUESTS = "friendRequests"
     const val SEARCH = "search"
+    const val FRIENDS_AND_REQUESTS = "friends_and_requests"
 }
 
 @Composable

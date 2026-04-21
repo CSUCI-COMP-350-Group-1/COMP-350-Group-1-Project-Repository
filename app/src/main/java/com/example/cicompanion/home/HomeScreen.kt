@@ -5,12 +5,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,16 +20,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.cicompanion.appNavigation.FeatureCard
-import com.example.cicompanion.appNavigation.featureItems
+import com.example.cicompanion.appNavigation.allAvailableFeatures
+import com.example.cicompanion.appNavigation.defaultFeatureItems
 import com.example.cicompanion.calendar.CalendarViewModel
 import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.social.FirestoreManager
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.BrandRedDark
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
@@ -37,7 +40,8 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun HomeScreen(
     navController: NavHostController,
-    calendarViewModel: CalendarViewModel = viewModel()
+    calendarViewModel: CalendarViewModel = viewModel(),
+    homeViewModel: HomeViewModel = viewModel()
 ) {
     val widgetEvents = remember(calendarViewModel.events) {
         upcomingHomeWidgetEvents(calendarViewModel.events)
@@ -47,6 +51,14 @@ fun HomeScreen(
         calendarViewModel.events.filter { it.isPinned }
     }
 
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    var showCustomizer by remember { mutableStateOf(false) }
+
+    // Use ViewModel to manage state and persistence
+    LaunchedEffect(currentUser?.uid) {
+        homeViewModel.loadCustomization()
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -54,7 +66,6 @@ fun HomeScreen(
             .padding(top = 16.dp)
     ) {
         item {
-            // Upcoming events widget at the top
             CalendarWidget(
                 events = widgetEvents,
                 modifier = Modifier.padding(horizontal = 16.dp)
@@ -85,19 +96,46 @@ fun HomeScreen(
         }
 
         item {
-            Text(
-                text = "Quick Access",
-                modifier = Modifier.padding(start = 16.dp, top = 24.dp),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 8.dp, top = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Quick Access",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                if (currentUser != null) {
+                    IconButton(onClick = { showCustomizer = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Customize",
+                            tint = BrandRedDark
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
-        item {
-            // Feature grid items
-            featureItems.chunked(2).forEach { rowItems ->
+        if (homeViewModel.isLoadingCustomization) {
+            item {
+                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = BrandRedDark)
+                }
+            }
+        } else if (homeViewModel.displayedFeatures.isEmpty()) {
+            item {
+                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    Text("No Quick Access buttons added.", color = Color.Gray)
+                }
+            }
+        } else {
+            items(homeViewModel.displayedFeatures.chunked(2)) { rowItems ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -105,21 +143,122 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     rowItems.forEach { feature ->
-                        Box(modifier = Modifier.weight(1f)) {
-                            FeatureCard(
-                                feature = feature,
-                                onClick = { navController.navigate(feature.route) }
-                            )
-                        }
+                        FeatureCard(
+                            feature = feature,
+                            onClick = { navController.navigate(feature.route) },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                     if (rowItems.size == 1) {
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
+
+    if (showCustomizer && currentUser != null) {
+        QuickAccessCustomizerDialog(
+            currentSelection = homeViewModel.displayedFeatures.map { it.route },
+            onDismiss = { showCustomizer = false },
+            onSave = { selectedRoutes ->
+                homeViewModel.updateCustomization(selectedRoutes)
+                showCustomizer = false
+            }
+        )
+    }
+}
+
+@Composable
+fun QuickAccessCustomizerDialog(
+    currentSelection: List<String>,
+    onDismiss: () -> Unit,
+    onSave: (List<String>) -> Unit
+) {
+    var selected by remember { mutableStateOf(currentSelection) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { 
+            Text(
+                "Customize Quick Access", 
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLarge
+            ) 
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 400.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                allAvailableFeatures.forEach { feature ->
+                    val isFeatureSelected = selected.contains(feature.route)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                selected = if (isFeatureSelected) {
+                                    selected.filter { it != feature.route }
+                                } else {
+                                    selected + feature.route
+                                }
+                            }
+                            .padding(vertical = 12.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = isFeatureSelected,
+                            onCheckedChange = null,
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = BrandRedDark,
+                                checkmarkColor = Color.White
+                            )
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Icon(
+                            imageVector = feature.icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = if (isFeatureSelected) BrandRedDark else Color.Gray
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = feature.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (isFeatureSelected) Color.Black else Color.Gray
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { 
+                    onSave(selected) 
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = BrandRedDark),
+                shape = RoundedCornerShape(50)
+            ) {
+                Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = BrandRedDark)
+            ) {
+                Text("Cancel", fontWeight = FontWeight.Bold)
+            }
+        },
+        containerColor = Color.White,
+        shape = RoundedCornerShape(24.dp)
+    )
 }
 
 @Composable
@@ -160,7 +299,6 @@ fun PinnedEventItem(event: CalendarEvent, onNavigateToEvent: () -> Unit) {
                 )
             }
             
-            // Replaced '...' button with circular calendar button to match MapScreen
             Box(
                 modifier = Modifier
                     .size(36.dp)

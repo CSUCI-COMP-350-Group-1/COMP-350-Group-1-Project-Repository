@@ -39,6 +39,7 @@ fun screenTitleForRoute(route: String?): String {
         Routes.NOTIFICATIONS -> "Notifications"
         Routes.USER_SEARCH -> "User Search"
         Routes.FRIEND_REQUESTS -> "Friend Requests"
+        Routes.FRIENDS_AND_REQUESTS -> "Friends & Requests"
         Routes.SEARCH -> "Search"
         else -> "CI Companion"
     }
@@ -172,6 +173,19 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Friends & Requests Button
+            NavigationDrawerItem(
+                label = { Text("Friends & Requests") },
+                selected = false,
+                icon = { Icon(Icons.Default.People, contentDescription = null) },
+                onClick = {
+                    navController.navigate(Routes.FRIENDS_AND_REQUESTS)
+                    scope.launch { drawerState.close() }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             // Search Button (which was moved from the bottom to here)
             NavigationDrawerItem(
                 label = { Text("Search for Feature") },
@@ -207,4 +221,3 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
             }
         }
     }
-

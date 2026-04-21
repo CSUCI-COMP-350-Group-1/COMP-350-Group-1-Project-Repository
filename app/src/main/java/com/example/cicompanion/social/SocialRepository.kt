@@ -176,41 +176,33 @@ object SocialRepository {
         onSuccess: (List<FriendRequest>) -> Unit,
         onError: (String) -> Unit
     ) {
-        buildIncomingFriendRequestsQuery(currentUserId)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                handleIncomingRequestsSuccess(snapshot, onSuccess)
-            }
-            .addOnFailureListener { exception ->
-                onError(incomingRequestsErrorMessage(exception))
-            }
-    }
-
-    private fun buildIncomingFriendRequestsQuery(currentUserId: String) =
         friendRequestsCollection()
             .whereEqualTo("toUserId", currentUserId)
             .whereEqualTo("status", "pending")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                onSuccess(snapshot.documents.mapNotNull { it.toObject(FriendRequest::class.java) })
+            }
+            .addOnFailureListener { exception ->
+                onError(exception.message ?: "Could not load incoming friend requests.")
+            }
+    }
 
-    private fun handleIncomingRequestsSuccess(
-        snapshot: QuerySnapshot,
-        onSuccess: (List<FriendRequest>) -> Unit
+    fun fetchOutgoingFriendRequests(
+        currentUserId: String,
+        onSuccess: (List<FriendRequest>) -> Unit,
+        onError: (String) -> Unit
     ) {
-        val requests = mapIncomingFriendRequests(snapshot)
-        onSuccess(requests)
-    }
-
-    private fun mapIncomingFriendRequests(snapshot: QuerySnapshot): List<FriendRequest> {
-        return snapshot.documents
-            .mapNotNull { it.toObject(FriendRequest::class.java) }
-            .sortedBy { incomingRequestDisplayName(it).lowercase() }
-    }
-
-    private fun incomingRequestDisplayName(request: FriendRequest): String {
-        return request.fromDisplayName.ifBlank { request.fromEmail }
-    }
-
-    private fun incomingRequestsErrorMessage(exception: Exception): String {
-        return exception.message ?: "Could not load incoming friend requests."
+        friendRequestsCollection()
+            .whereEqualTo("fromUserId", currentUserId)
+            .whereEqualTo("status", "pending")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                onSuccess(snapshot.documents.mapNotNull { it.toObject(FriendRequest::class.java) })
+            }
+            .addOnFailureListener { exception ->
+                onError(exception.message ?: "Could not load outgoing friend requests.")
+            }
     }
 
     fun acceptFriendRequest(

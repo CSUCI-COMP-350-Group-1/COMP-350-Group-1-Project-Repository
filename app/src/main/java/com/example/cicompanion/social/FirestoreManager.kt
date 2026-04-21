@@ -203,4 +203,32 @@ object FirestoreManager {
             emptyList()
         }
     }
+
+    suspend fun saveQuickAccessButtons(buttonRoutes: List<String>): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        val db = FirebaseFirestore.getInstance()
+        return try {
+            val data = hashMapOf("quickAccessButtons" to buttonRoutes)
+            db.collection("users").document(user.uid)
+                .set(data, SetOptions.merge())
+                .await()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving quick access buttons", e)
+            false
+        }
+    }
+
+    suspend fun fetchQuickAccessButtons(): List<String>? {
+        val user = FirebaseAuth.getInstance().currentUser ?: return null
+        val db = FirebaseFirestore.getInstance()
+        return try {
+            val doc = db.collection("users").document(user.uid).get().await()
+            @Suppress("UNCHECKED_CAST")
+            doc.get("quickAccessButtons") as? List<String>
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching quick access buttons", e)
+            null
+        }
+    }
 }

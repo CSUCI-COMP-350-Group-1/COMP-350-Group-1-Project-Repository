@@ -29,12 +29,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.ui.theme.BrandRedDark
 import com.example.cicompanion.ui.theme.BrandRedLighter
+import com.example.cicompanion.utils.HtmlUtils
 import com.google.firebase.auth.FirebaseAuth
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -210,8 +212,11 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { eventToDelete = null }) {
-                    Text("Cancel")
+                TextButton(
+                    onClick = { eventToDelete = null },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
+                ) {
+                    Text("Cancel", fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -1071,7 +1076,7 @@ private fun EventCard(
                 }
                 
                 Text(
-                    text = event.title,
+                    text = HtmlUtils.stripHtml(event.title),
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
@@ -1126,8 +1131,8 @@ private fun EventCard(
             }
 
             EventMetaLine(text = event.timeLabel())
-            event.location?.let { EventMetaLine(text = "Location: $it") }
-            event.description?.let { EventDescription(text = it) }
+            event.location?.let { EventMetaLine(text = "Location: ${HtmlUtils.stripHtml(it)}") }
+            event.description?.let { EventDescription(text = HtmlUtils.stripHtml(it)) }
         }
     }
 }
