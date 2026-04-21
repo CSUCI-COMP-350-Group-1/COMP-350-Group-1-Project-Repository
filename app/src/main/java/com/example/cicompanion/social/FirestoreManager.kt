@@ -224,8 +224,10 @@ object FirestoreManager {
         val db = FirebaseFirestore.getInstance()
         return try {
             val doc = db.collection("users").document(user.uid).get().await()
-            @Suppress("UNCHECKED_CAST")
-            doc.get("quickAccessButtons") as? List<String>
+            if (!doc.exists()) return null
+            
+            val rawList = doc.get("quickAccessButtons") as? List<*>
+            rawList?.mapNotNull { it as? String }
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching quick access buttons", e)
             null

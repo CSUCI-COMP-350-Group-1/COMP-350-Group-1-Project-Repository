@@ -24,15 +24,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.cicompanion.appNavigation.FeatureCard
 import com.example.cicompanion.appNavigation.allAvailableFeatures
-import com.example.cicompanion.appNavigation.defaultFeatureItems
 import com.example.cicompanion.calendar.CalendarViewModel
 import com.example.cicompanion.calendar.model.CalendarEvent
-import com.example.cicompanion.social.FirestoreManager
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.BrandRedDark
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.launch
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
@@ -43,6 +40,19 @@ fun HomeScreen(
     calendarViewModel: CalendarViewModel = viewModel(),
     homeViewModel: HomeViewModel = viewModel()
 ) {
+    // Observe auth state to ensure customization is loaded when user signs in/out
+    var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
+
+    DisposableEffect(Unit) {
+        val listener = FirebaseAuth.AuthStateListener { auth ->
+            currentUser = auth.currentUser
+        }
+        FirebaseAuth.getInstance().addAuthStateListener(listener)
+        onDispose {
+            FirebaseAuth.getInstance().removeAuthStateListener(listener)
+        }
+    }
+
     val widgetEvents = remember(calendarViewModel.events) {
         upcomingHomeWidgetEvents(calendarViewModel.events)
     }
@@ -51,10 +61,9 @@ fun HomeScreen(
         calendarViewModel.events.filter { it.isPinned }
     }
 
-    val currentUser = FirebaseAuth.getInstance().currentUser
     var showCustomizer by remember { mutableStateOf(false) }
 
-    // Use ViewModel to manage state and persistence
+    // Trigger load customization whenever the user ID changes (login, logout, or swap)
     LaunchedEffect(currentUser?.uid) {
         homeViewModel.loadCustomization()
     }
