@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -140,9 +141,13 @@ fun MessagesScreen(navController: NavHostController) {
                 .padding(16.dp)
         ) {
             // keep friend-management reachable
-            OutlinedButton(
+            Button(
                 onClick = { navController.navigate(Routes.FRIENDS_AND_REQUESTS) },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFEF3347), // same red
+                    contentColor = Color.White
+                )
             ) {
                 Text("Manage Friends")
             }
