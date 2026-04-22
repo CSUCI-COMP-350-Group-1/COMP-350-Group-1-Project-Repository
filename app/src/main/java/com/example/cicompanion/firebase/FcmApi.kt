@@ -20,4 +20,9 @@ interface FcmApi {
     suspend fun sendFriendRequestPush(
         @Body body: Map<String, String>
     )
+    // MESSAGING: minimal backend endpoint for newmessage notifications
+    @POST("/send-direct-message")
+    suspend fun sendDirectMessagePush(
+        @Body body: Map<String, String>
+    )
 }

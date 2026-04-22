@@ -42,6 +42,15 @@ object Routes {
     const val FRIEND_REQUESTS = "friendRequests"
     const val SEARCH = "search"
     const val FRIENDS_AND_REQUESTS = "friends_and_requests"
+
+    // MESSAGING: new thread route
+    const val MESSAGE_THREAD_BASE = "message_thread"
+    const val MESSAGE_THREAD = "$MESSAGE_THREAD_BASE/{conversationId}/{friendUserId}"
+
+    // MESSAGING: helper to build a concrete route
+    fun messageThread(conversationId: String, friendUserId: String): String {
+        return "$MESSAGE_THREAD_BASE/$conversationId/$friendUserId"
+    }
 }
 
 @Composable
