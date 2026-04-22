@@ -50,15 +50,51 @@ import androidx.navigation.NavHostController
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
+
+
+@Composable
+private fun rememberAuthUser(): FirebaseUser? {
+    val auth = FirebaseAuth.getInstance()
+    var currentUser by remember { mutableStateOf(auth.currentUser) }
+
+    // React to sign-in/sign-out immediately while already on the messaging UI.
+    DisposableEffect(auth) {
+        val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+            currentUser = firebaseAuth.currentUser
+        }
+
+        auth.addAuthStateListener(listener)
+
+        onDispose {
+            auth.removeAuthStateListener(listener)
+        }
+    }
+
+    return currentUser
+}
 
 @Composable
 fun MessagesScreen(navController: NavHostController) {
-    val currentUser = FirebaseAuth.getInstance().currentUser
+    // This now updates immediately when the user signs out.
+    val currentUser = rememberAuthUser()
 
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var conversations by remember { mutableStateOf<List<ConversationSummary>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoadingFriends by remember { mutableStateOf(currentUser != null) }
+
+    // Clear stale messaging UI state when the user signs out.
+    LaunchedEffect(currentUser?.uid) {
+        if (currentUser == null) {
+            friends = emptyList()
+            conversations = emptyList()
+            errorMessage = null
+            isLoadingFriends = false
+        } else {
+            isLoadingFriends = true
+        }
+    }
 
     if (currentUser == null) {
         SignedOutMessagingMessage()
@@ -218,19 +254,30 @@ fun MessageThreadScreen(
     conversationId: String,
     friendUserId: String
 ) {
-    val currentUser = FirebaseAuth.getInstance().currentUser
+    // MESSAGING CHANGE:
+    // React immediately to sign-out while already inside a thread.
+    val currentUser = rememberAuthUser()
 
     var friend by remember { mutableStateOf<UserProfile?>(null) }
     var messages by remember { mutableStateOf<List<DirectMessage>>(emptyList()) }
     var messageText by rememberSaveable { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSending by remember { mutableStateOf(false) }
-
-
-    // Only attach the Firestore message listener after the conversation document exists.
     var conversationExists by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
+
+    // Clear stale thread data when the user signs out.
+    LaunchedEffect(currentUser?.uid) {
+        if (currentUser == null) {
+            friend = null
+            messages = emptyList()
+            messageText = ""
+            errorMessage = null
+            isSending = false
+            conversationExists = false
+        }
+    }
 
     if (currentUser == null) {
         SignedOutMessagingMessage()
