@@ -47,11 +47,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 
 @Composable
@@ -81,7 +85,7 @@ fun MessagesScreen(navController: NavHostController) {
     val currentUser = rememberAuthUser()
 
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
-    var conversations by remember { mutableStateOf<List<ConversationSummary>>(emptyList()) }
+    var rawConversations by remember { mutableStateOf<List<ConversationSummary>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoadingFriends by remember { mutableStateOf(currentUser != null) }
 
@@ -89,7 +93,7 @@ fun MessagesScreen(navController: NavHostController) {
     LaunchedEffect(currentUser?.uid) {
         if (currentUser == null) {
             friends = emptyList()
-            conversations = emptyList()
+            rawConversations = emptyList()
             errorMessage = null
             isLoadingFriends = false
         } else {
@@ -119,7 +123,7 @@ fun MessagesScreen(navController: NavHostController) {
     DisposableEffect(currentUser.uid) {
         val registration = MessagingRepository.listenToConversations(
             currentUserId = currentUser.uid,
-            onUpdate = { conversations = it },
+            onUpdate = { rawConversations = it },
             onError = { errorMessage = it }
         )
 
@@ -129,6 +133,14 @@ fun MessagesScreen(navController: NavHostController) {
     }
 
     val friendsById = remember(friends) { friends.associateBy { it.uid } }
+    
+    // Only show conversations if the other participant is still a friend
+    val activeConversations = remember(rawConversations, friendsById) {
+        rawConversations.filter { conversation ->
+            val otherId = MessagingRepository.findOtherParticipantId(conversation, currentUser.uid)
+            otherId != null && friendsById.containsKey(otherId)
+        }
+    }
 
     Scaffold(
         containerColor = AppBackground
@@ -221,14 +233,14 @@ fun MessagesScreen(navController: NavHostController) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (conversations.isEmpty()) {
+            if (activeConversations.isEmpty()) {
                 EmptyCard("No conversations yet.")
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(conversations, key = { it.id }) { conversation ->
+                    items(activeConversations, key = { it.id }) { conversation ->
                         val friendUserId = MessagingRepository.findOtherParticipantId(
                             conversation = conversation,
                             currentUserId = currentUser.uid
@@ -269,6 +281,7 @@ fun MessageThreadScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSending by remember { mutableStateOf(false) }
     var conversationExists by remember { mutableStateOf(false) }
+    var isFriend by remember { mutableStateOf(true) }
 
     val listState = rememberLazyListState()
 
@@ -289,13 +302,20 @@ fun MessageThreadScreen(
         return
     }
 
-    LaunchedEffect(friendUserId) {
+    LaunchedEffect(currentUser.uid, friendUserId) {
+        // Check if they are still friends
+        SocialRepository.fetchAllFriendRequestStatuses(
+            currentUserId = currentUser.uid,
+            onSuccess = { statuses ->
+                isFriend = statuses[friendUserId] == "accepted"
+            },
+            onError = { isFriend = false }
+        )
+
         MessagingRepository.fetchUserProfile(
             userId = friendUserId,
             onSuccess = {
                 friend = it
-
-
                 // Clear any old/stale error once profile loading succeeds.
                 errorMessage = null
             },
@@ -351,54 +371,70 @@ fun MessageThreadScreen(
     Scaffold(
         containerColor = AppBackground,
         bottomBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = messageText,
-                    onValueChange = { messageText = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("Type a message") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                IconButton(
-                    onClick = {
-                        val targetFriend = friend ?: return@IconButton
-                        isSending = true
-
-                        MessagingRepository.sendMessage(
-                            currentUser = currentUser,
-                            friend = targetFriend,
-                            messageText = messageText,
-                            onSuccess = {
-                                messageText = ""
-                                isSending = false
-
-                                // The first sent message creates the conversation doc,
-                                // so start listening immediately after send succeeds.
-                                conversationExists = true
-                                errorMessage = null
-                            },
-                            onError = {
-                                errorMessage = it
-                                isSending = false
-                            }
-                        )
-                    },
-                    enabled = messageText.isNotBlank() && !isSending && friend != null
+            if (isFriend) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Default.Send,
-                        contentDescription = "Send",
-                        tint = Color(0xFFEF3347)
+                    OutlinedTextField(
+                        value = messageText,
+                        onValueChange = { messageText = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("Type a message") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    IconButton(
+                        onClick = {
+                            val targetFriend = friend ?: return@IconButton
+                            isSending = true
+
+                            MessagingRepository.sendMessage(
+                                currentUser = currentUser,
+                                friend = targetFriend,
+                                messageText = messageText,
+                                onSuccess = {
+                                    messageText = ""
+                                    isSending = false
+
+                                    // The first sent message creates the conversation doc,
+                                    // so start listening immediately after send succeeds.
+                                    conversationExists = true
+                                    errorMessage = null
+                                },
+                                onError = {
+                                    errorMessage = it
+                                    isSending = false
+                                }
+                            )
+                        },
+                        enabled = messageText.isNotBlank() && !isSending && friend != null
+                    ) {
+                        Icon(
+                            Icons.Default.Send,
+                            contentDescription = "Send",
+                            tint = Color(0xFFEF3347)
+                        )
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "You must be friends to send messages.",
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
@@ -454,6 +490,7 @@ fun MessageThreadScreen(
                     items(messages, key = { it.id }) { message ->
                         MessageBubble(
                             text = message.text,
+                            sentAt = message.sentAt,
                             isMine = message.senderId == currentUser.uid
                         )
                     }
@@ -516,11 +553,17 @@ private fun ConversationCard(
 @Composable
 private fun MessageBubble(
     text: String,
+    sentAt: Long,
     isMine: Boolean
 ) {
-    Row(
+    val timeString = remember(sentAt) {
+        val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
+        sdf.format(Date(sentAt))
+    }
+
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
+        horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
     ) {
         Card(
             shape = RoundedCornerShape(14.dp),
@@ -534,6 +577,12 @@ private fun MessageBubble(
                 color = if (isMine) Color.White else Color.Black
             )
         }
+        Text(
+            text = timeString,
+            fontSize = 10.sp,
+            color = Color.Gray,
+            modifier = Modifier.padding(top = 2.dp, start = 4.dp, end = 4.dp)
+        )
     }
 }
 

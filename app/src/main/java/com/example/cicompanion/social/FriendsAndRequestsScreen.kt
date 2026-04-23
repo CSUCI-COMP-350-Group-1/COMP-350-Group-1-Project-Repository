@@ -1,6 +1,7 @@
 package com.example.cicompanion.social
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,14 +22,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
+import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 
 @Composable
-fun FriendsAndRequestsScreen(navController: NavHostController) {
+fun FriendsAndRequestsScreen(
+    navController: NavHostController,
+    initialTab: Int = 1
+) {
     val currentUser = FirebaseAuth.getInstance().currentUser
-    var selectedTab by remember { mutableIntStateOf(1) } // Default to "Add Friends" (Middle Tab)
+    // PUSH NOTIFICATIONS CHANGE:
+    // Allow callers to choose which tab opens first.
+    var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab) }
 
     if (currentUser == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -72,15 +79,15 @@ fun FriendsAndRequestsScreen(navController: NavHostController) {
         }
 
         when (selectedTab) {
-            0 -> FriendsTab(currentUser)
-            1 -> AddFriendsTab(currentUser)
-            2 -> RequestsTab(currentUser)
+            0 -> FriendsTab(currentUser, navController)
+            1 -> AddFriendsTab(currentUser, navController)
+            2 -> RequestsTab(currentUser, navController)
         }
     }
 }
 
 @Composable
-fun FriendsTab(currentUser: FirebaseUser) {
+fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var friendToRemove by remember { mutableStateOf<UserProfile?>(null) }
@@ -126,6 +133,7 @@ fun FriendsTab(currentUser: FirebaseUser) {
                 items(friends, key = { it.uid }) { friend ->
                     FriendCard(
                         user = friend,
+                        onCardClick = { navController.navigate("${Routes.PROFILE}/${friend.uid}") },
                         onRemove = { friendToRemove = friend }
                     )
                 }
@@ -169,7 +177,7 @@ fun FriendsTab(currentUser: FirebaseUser) {
 }
 
 @Composable
-fun AddFriendsTab(currentUser: FirebaseUser) {
+fun AddFriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
     var searchQuery by remember { mutableStateOf("") }
     var users by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -252,6 +260,7 @@ fun AddFriendsTab(currentUser: FirebaseUser) {
                     UserSearchCard(
                         user = user,
                         requestStatus = requestStatuses[user.uid],
+                        onCardClick = { navController.navigate("${Routes.PROFILE}/${user.uid}") },
                         onSendRequest = {
                             SocialRepository.sendFriendRequest(
                                 currentUser = currentUser,
@@ -271,7 +280,7 @@ fun AddFriendsTab(currentUser: FirebaseUser) {
 }
 
 @Composable
-fun RequestsTab(currentUser: FirebaseUser) {
+fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
     var incomingRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
     var outgoingRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -327,6 +336,7 @@ fun RequestsTab(currentUser: FirebaseUser) {
                         items(incomingRequests, key = { it.id }) { request ->
                             IncomingRequestCard(
                                 request = request,
+                                onCardClick = { navController.navigate("${Routes.PROFILE}/${request.fromUserId}") },
                                 onAccept = {
                                     SocialRepository.acceptFriendRequest(
                                         request = request,
@@ -353,6 +363,7 @@ fun RequestsTab(currentUser: FirebaseUser) {
                         items(outgoingRequests, key = { it.id }) { request ->
                             OutgoingRequestCard(
                                 request = request,
+                                onCardClick = { navController.navigate("${Routes.PROFILE}/${request.toUserId}") },
                                 onCancel = {
                                     SocialRepository.declineFriendRequest( // Reuse decline logic to delete outgoing too
                                         request = request,
@@ -370,9 +381,11 @@ fun RequestsTab(currentUser: FirebaseUser) {
 }
 
 @Composable
-fun FriendCard(user: UserProfile, onRemove: () -> Unit) {
+fun FriendCard(user: UserProfile, onCardClick: () -> Unit, onRemove: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCardClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(2.dp)
@@ -395,9 +408,11 @@ fun FriendCard(user: UserProfile, onRemove: () -> Unit) {
 }
 
 @Composable
-fun UserSearchCard(user: UserProfile, requestStatus: String?, onSendRequest: () -> Unit) {
+fun UserSearchCard(user: UserProfile, requestStatus: String?, onCardClick: () -> Unit, onSendRequest: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCardClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(2.dp)
@@ -424,9 +439,11 @@ fun UserSearchCard(user: UserProfile, requestStatus: String?, onSendRequest: () 
 }
 
 @Composable
-fun IncomingRequestCard(request: FriendRequest, onAccept: () -> Unit, onDecline: () -> Unit) {
+fun IncomingRequestCard(request: FriendRequest, onCardClick: () -> Unit, onAccept: () -> Unit, onDecline: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCardClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(2.dp)
@@ -454,9 +471,11 @@ fun IncomingRequestCard(request: FriendRequest, onAccept: () -> Unit, onDecline:
 }
 
 @Composable
-fun OutgoingRequestCard(request: FriendRequest, onCancel: () -> Unit) {
+fun OutgoingRequestCard(request: FriendRequest, onCardClick: () -> Unit, onCancel: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCardClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(2.dp)

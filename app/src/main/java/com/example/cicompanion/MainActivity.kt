@@ -34,6 +34,7 @@ import com.example.cicompanion.home.HomeViewModel
 import com.example.cicompanion.maps.MapScreen
 import com.example.cicompanion.social.FriendsAndRequestsScreen
 import com.example.cicompanion.social.ProfileScreen
+import com.example.cicompanion.social.*
 import com.example.cicompanion.studyRoom.RoomListScreen
 import com.example.cicompanion.ui.NavBar
 import com.example.cicompanion.ui.Routes
@@ -46,6 +47,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.example.cicompanion.notifications.PushNotificationService
 import com.example.cicompanion.sidebar.SearchScreen
@@ -190,7 +193,7 @@ fun AppNavigation(notificationRoute: String? = null,
             Box(modifier = Modifier.padding(paddingValues)) {
                 NavHost(navController = navController, startDestination = Routes.HOME) {
                     composable(Routes.HOME) {
-                        HomeScreen(navController, calendarViewModel, homeViewModel)
+                        HomeScreen(navController, calendarViewModel)
                     }
                     composable(Routes.MAP) {
                         MapScreen(navController, calendarViewModel)
@@ -204,9 +207,21 @@ fun AppNavigation(notificationRoute: String? = null,
                     composable(Routes.SEARCH) {
                         SearchScreen(navController)
                     }
+
+                    // Base profile route
                     composable(Routes.PROFILE) {
                         ProfileScreen(navController)
                     }
+
+                    // Profile route with userId path parameter
+                    composable(
+                        route = "${Routes.PROFILE}/{userId}",
+                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userId = backStackEntry.arguments?.getString("userId")
+                        ProfileScreen(navController, userId)
+                    }
+
                     composable(Routes.SOCIAL) {
                         // MESSAGING
                         MessagesScreen(navController)
@@ -223,7 +238,18 @@ fun AppNavigation(notificationRoute: String? = null,
                         )
                     }
                     composable(Routes.FRIENDS_AND_REQUESTS) {
-                        FriendsAndRequestsScreen(navController)
+                        FriendsAndRequestsScreen(
+                            navController = navController,
+                            initialTab = 1
+                        )
+                    }
+                    // PUSH NOTIFICATIONS CHANGE:
+                    // Notification alias route: opens the same screen, but directly on the Requests tab.
+                    composable(Routes.FRIEND_REQUESTS) {
+                        FriendsAndRequestsScreen(
+                            navController = navController,
+                            initialTab = 2
+                        )
                     }
                 }
             }

@@ -49,6 +49,28 @@ object SocialRepository {
             }
     }
 
+    /**
+     * Fetches a specific user's profile data by their UID.
+     */
+    fun fetchUserProfile(
+        userId: String,
+        onSuccess: (UserProfile) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        usersCollection().document(userId).get()
+            .addOnSuccessListener { document ->
+                val user = document.toObject(UserProfile::class.java)
+                if (user != null) {
+                    onSuccess(user)
+                } else {
+                    onError("User profile not found.")
+                }
+            }
+            .addOnFailureListener { exception ->
+                onError(exception.message ?: "Could not load user profile.")
+            }
+    }
+
     private fun handleSearchableUsersSuccess(
         snapshot: QuerySnapshot,
         currentUserId: String,
@@ -125,7 +147,7 @@ object SocialRepository {
     }
 
 
-    private fun createFriendRequestId(fromUserId: String, toUserId: String): String {
+    fun createFriendRequestId(fromUserId: String, toUserId: String): String {
         return "${fromUserId}_$toUserId"
     }
 
@@ -240,6 +262,19 @@ object SocialRepository {
             onError = onError
         )
     }
+    
+    fun acceptFriendRequestById(
+        requestId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        updateFriendRequestStatus(
+            requestId = requestId,
+            newStatus = "accepted",
+            onSuccess = onSuccess,
+            onError = onError
+        )
+    }
 
     fun declineFriendRequest(
         request: FriendRequest,
@@ -329,7 +364,7 @@ object SocialRepository {
                 outgoingSnapshot.documents.forEach { doc ->
                     val request = doc.toObject(FriendRequest::class.java)
                     if (request != null && request.toUserId.isNotBlank()) {
-                        allStatuses[request.toUserId] = request.status
+                        allStatuses[request.toUserId] = if (request.status == "pending") "pending_sent" else request.status
                     }
                 }
 
@@ -343,7 +378,7 @@ object SocialRepository {
                                 val existingStatus = allStatuses[request.fromUserId]
                                 // Accepted status takes priority
                                 if (existingStatus != "accepted") {
-                                    allStatuses[request.fromUserId] = request.status
+                                    allStatuses[request.fromUserId] = if (request.status == "pending") "pending_received" else request.status
                                 }
                             }
                         }
