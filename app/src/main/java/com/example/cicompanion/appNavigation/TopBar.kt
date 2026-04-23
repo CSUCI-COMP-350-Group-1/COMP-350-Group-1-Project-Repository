@@ -30,17 +30,17 @@ import kotlinx.coroutines.launch
 
 fun screenTitleForRoute(route: String?): String {
     return when {
-        route ==Routes.HOME -> "Home"
-        route ==Routes.SOCIAL -> "Messages" //Changed to messages from Social
-        route ==Routes.MAP -> "Map"
-        route ==Routes.CALENDAR -> "Calendar"
-        route ==Routes.STUDY_ROOM -> "Study Room"
-        route ==Routes.PROFILE -> "Profile"
-        route ==Routes.NOTIFICATIONS -> "Notifications"
-        route ==Routes.USER_SEARCH -> "User Search"
-        route ==Routes.FRIEND_REQUESTS -> "Friend Requests"
-        route ==Routes.FRIENDS_AND_REQUESTS -> "Friends & Requests"
-        route ==Routes.SEARCH -> "Search"
+        route == Routes.HOME -> "Home"
+        route == Routes.SOCIAL -> "Messages" //Changed to messages from Social
+        route == Routes.MAP -> "Map"
+        route == Routes.CALENDAR -> "Calendar"
+        route == Routes.STUDY_ROOM -> "Study Room"
+        route == Routes.PROFILE || route?.startsWith("${Routes.PROFILE}/") == true -> "Profile"
+        route == Routes.NOTIFICATIONS -> "Notifications"
+        route == Routes.USER_SEARCH -> "User Search"
+        route == Routes.FRIEND_REQUESTS -> "Friend Requests"
+        route == Routes.FRIENDS_AND_REQUESTS -> "Friends & Requests"
+        route == Routes.SEARCH -> "Search"
         route?.startsWith(Routes.MESSAGE_THREAD_BASE) == true -> "Chat" // MESSAGING
         else -> "CI Companion"
     }
@@ -206,6 +206,6 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
                     )
                 )
             }
-            }
         }
     }
+}
