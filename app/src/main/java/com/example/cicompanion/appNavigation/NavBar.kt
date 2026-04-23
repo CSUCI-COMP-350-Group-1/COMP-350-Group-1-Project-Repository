@@ -41,14 +41,23 @@ object Routes {
     const val USER_SEARCH = "user_search"
     const val FRIEND_REQUESTS = "friendRequests"
     const val SEARCH = "search"
-    const val CONVERSATIONS = "conversations"
+    const val FRIENDS_AND_REQUESTS = "friends_and_requests"
+
+    // MESSAGING: new thread route
+    const val MESSAGE_THREAD_BASE = "message_thread"
+    const val MESSAGE_THREAD = "$MESSAGE_THREAD_BASE/{conversationId}/{friendUserId}"
+
+    // MESSAGING: helper to build a concrete route
+    fun messageThread(conversationId: String, friendUserId: String): String {
+        return "$MESSAGE_THREAD_BASE/$conversationId/$friendUserId"
+    }
 }
 
 @Composable
 fun NavBar(navController: NavHostController) {
     val items = listOf(
         NavBarItem("Home", Routes.HOME, Icons.Filled.Home),
-        NavBarItem("Social", Routes.CONVERSATIONS, Icons.Filled.People),
+        NavBarItem("Social", Routes.SOCIAL, Icons.Filled.People),
         NavBarItem("Calendar", Routes.CALENDAR, Icons.Filled.CalendarMonth),
         NavBarItem("Map", Routes.MAP, Icons.Filled.LocationOn)
     )

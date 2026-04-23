@@ -6,9 +6,29 @@ import com.google.firebase.firestore.QuerySnapshot
 
 object SocialRepository {
 
-    /**
-     * Loads all searchable users except the currently signed-in user.
-     */
+    // MESSAGING: reusable helper for accepted friends only
+    fun fetchAcceptedFriends(
+        currentUserId: String,
+        onSuccess: (List<UserProfile>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        fetchSearchableUsers(
+            currentUserId = currentUserId,
+            onSuccess = { allUsers ->
+                fetchAllFriendRequestStatuses(
+                    currentUserId = currentUserId,
+                    onSuccess = { statuses ->
+                        onSuccess(
+                            allUsers.filter { statuses[it.uid] == "accepted" }
+                        )
+                    },
+                    onError = onError
+                )
+            },
+            onError = onError
+        )
+    }
+
     fun fetchSearchableUsers(
         currentUserId: String,
         onSuccess: (List<UserProfile>) -> Unit,
@@ -116,8 +136,15 @@ object SocialRepository {
         }
 
         val request = buildFriendRequest(currentUser, targetUser, requestId)
-        saveFriendRequest(request, onSuccess, onError)
+        saveFriendRequest(
+            request = request,
+            currentUser = currentUser,
+            targetUser = targetUser,
+            onSuccess = onSuccess,
+            onError = onError
+        )
     }
+
 
     private fun createFriendRequestId(fromUserId: String, toUserId: String): String {
         return "${fromUserId}_$toUserId"
@@ -164,6 +191,8 @@ object SocialRepository {
 
     private fun saveFriendRequest(
         request: FriendRequest,
+        currentUser: FirebaseUser,
+        targetUser: UserProfile,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
@@ -171,6 +200,10 @@ object SocialRepository {
             .document(request.id)
             .set(request)
             .addOnSuccessListener {
+                FriendRequestNotificationSender.sendFriendRequestNotification(
+                    targetUserId = targetUser.uid,
+                    senderDisplayName = currentUser.displayName ?: currentUser.email ?: "Someone"
+                )
                 onSuccess()
             }
             .addOnFailureListener { exception ->
@@ -187,41 +220,33 @@ object SocialRepository {
         onSuccess: (List<FriendRequest>) -> Unit,
         onError: (String) -> Unit
     ) {
-        buildIncomingFriendRequestsQuery(currentUserId)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                handleIncomingRequestsSuccess(snapshot, onSuccess)
-            }
-            .addOnFailureListener { exception ->
-                onError(incomingRequestsErrorMessage(exception))
-            }
-    }
-
-    private fun buildIncomingFriendRequestsQuery(currentUserId: String) =
         friendRequestsCollection()
             .whereEqualTo("toUserId", currentUserId)
             .whereEqualTo("status", "pending")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                onSuccess(snapshot.documents.mapNotNull { it.toObject(FriendRequest::class.java) })
+            }
+            .addOnFailureListener { exception ->
+                onError(exception.message ?: "Could not load incoming friend requests.")
+            }
+    }
 
-    private fun handleIncomingRequestsSuccess(
-        snapshot: QuerySnapshot,
-        onSuccess: (List<FriendRequest>) -> Unit
+    fun fetchOutgoingFriendRequests(
+        currentUserId: String,
+        onSuccess: (List<FriendRequest>) -> Unit,
+        onError: (String) -> Unit
     ) {
-        val requests = mapIncomingFriendRequests(snapshot)
-        onSuccess(requests)
-    }
-
-    private fun mapIncomingFriendRequests(snapshot: QuerySnapshot): List<FriendRequest> {
-        return snapshot.documents
-            .mapNotNull { it.toObject(FriendRequest::class.java) }
-            .sortedBy { incomingRequestDisplayName(it).lowercase() }
-    }
-
-    private fun incomingRequestDisplayName(request: FriendRequest): String {
-        return request.fromDisplayName.ifBlank { request.fromEmail }
-    }
-
-    private fun incomingRequestsErrorMessage(exception: Exception): String {
-        return exception.message ?: "Could not load incoming friend requests."
+        friendRequestsCollection()
+            .whereEqualTo("fromUserId", currentUserId)
+            .whereEqualTo("status", "pending")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                onSuccess(snapshot.documents.mapNotNull { it.toObject(FriendRequest::class.java) })
+            }
+            .addOnFailureListener { exception ->
+                onError(exception.message ?: "Could not load outgoing friend requests.")
+            }
     }
 
     fun acceptFriendRequest(
@@ -237,9 +262,6 @@ object SocialRepository {
         )
     }
 
-    /**
-     * Resets the friend request by deleting it, allowing a fresh start (Plus icon).
-     */
     fun declineFriendRequest(
         request: FriendRequest,
         onSuccess: () -> Unit,
@@ -256,9 +278,6 @@ object SocialRepository {
             }
     }
 
-    /**
-     * Removes a friendship or pending request.
-     */
     fun removeFriend(
         currentUserId: String,
         targetUserId: String,
@@ -267,19 +286,21 @@ object SocialRepository {
     ) {
         val collection = friendRequestsCollection()
 
+        // 1. Check requests sent BY me
         collection.whereEqualTo("fromUserId", currentUserId).get()
             .addOnSuccessListener { outgoingSnapshot ->
                 val outgoingDoc = outgoingSnapshot.documents.find { it.getString("toUserId") == targetUserId }
-                
+
                 if (outgoingDoc != null) {
                     outgoingDoc.reference.delete()
                         .addOnSuccessListener { onSuccess() }
                         .addOnFailureListener { onError("Permission Denied: Only the receiver can remove this friend. Please check your Firestore Security Rules.") }
                 } else {
+                    // 2. Check requests sent TO me
                     collection.whereEqualTo("toUserId", currentUserId).get()
                         .addOnSuccessListener { incomingSnapshot ->
                             val incomingDoc = incomingSnapshot.documents.find { it.getString("fromUserId") == targetUserId }
-                            
+
                             if (incomingDoc != null) {
                                 incomingDoc.reference.delete()
                                     .addOnSuccessListener { onSuccess() }
@@ -341,6 +362,7 @@ object SocialRepository {
                             val request = doc.toObject(FriendRequest::class.java)
                             if (request != null && request.fromUserId.isNotBlank()) {
                                 val existingStatus = allStatuses[request.fromUserId]
+                                // Accepted status takes priority
                                 if (existingStatus != "accepted") {
                                     allStatuses[request.fromUserId] = request.status
                                 }

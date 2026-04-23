@@ -52,7 +52,7 @@ fun SearchScreen(navController: NavHostController) {
             Routes.STUDY_ROOM,
             Routes.PROFILE,
             Routes.USER_SEARCH,
-            Routes.FRIEND_REQUESTS
+            Routes.FRIENDS_AND_REQUESTS
         )
 
         navRoutes.forEach { route ->

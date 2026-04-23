@@ -20,6 +20,7 @@ import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.ui.theme.BrandRedLight
 import com.example.cicompanion.ui.theme.GrayIcon
 import com.example.cicompanion.ui.theme.NavBackground
+import com.example.cicompanion.utils.HtmlUtils
 import java.time.format.DateTimeFormatter
 
 private val CustomEventOrange = Color(0xFFFF9800)
@@ -132,7 +133,7 @@ private fun EventWidgetCard(event: CalendarEvent) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = event.title,
+                text = HtmlUtils.stripHtml(event.title),
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
@@ -172,7 +173,7 @@ private fun EventWidgetCard(event: CalendarEvent) {
         )
         if (!event.location.isNullOrBlank()) {
             Text(
-                text = event.location,
+                text = HtmlUtils.stripHtml(event.location),
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

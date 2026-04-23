@@ -11,7 +11,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,11 +29,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.example.cicompanion.firebase.FirebaseAuthManager
-import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.example.cicompanion.ui.Routes
-import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.CICompanionTheme
-import com.example.cicompanion.ui.theme.GrayIcon
 import com.example.cicompanion.ui.theme.NavBackground
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
@@ -41,33 +39,19 @@ import com.google.firebase.auth.FirebaseUser
 
 private val BrandRed = Color(0xFFEF3347)
 
-@Composable
-fun ProfileScreen(navController: NavHostController, userId: String? = null) {
-    // SWITCH TO TRUE IF YOU WANT TO SEE THE MOCKUP
-    // val useNewDesign = true
-
-    NewProfileScreen(navController, userId)
-
-//    if (useNewDesign) {
-//        NewProfileScreen(navController)
-//    } else {
-//        OldProfileScreen(navController)
-//    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NewProfileScreen(navController: NavHostController, userId: String? = null) {
+fun ProfileScreen(navController: NavHostController, userId: String? = null) {
+    var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
     val isOwnProfile = userId == null || userId == FirebaseAuth.getInstance().currentUser?.uid
-    
+
     var displayName by remember { mutableStateOf("Loading...") }
     var email by remember { mutableStateOf("") }
     var photoUrl by remember { mutableStateOf<String?>(null) }
     var friendCount by remember { mutableIntStateOf(0) }
     var requestStatus by remember { mutableStateOf<String?>(null) }
     var targetUserProfile by remember { mutableStateOf<UserProfile?>(null) }
-    
-    var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
+
     val context = LocalContext.current
 
     DisposableEffect(Unit) {
@@ -421,6 +405,8 @@ private fun ColumnScope.ProfileActionArea(
     onViewFriendRequests: () -> Unit,
     onSignOut: () -> Unit
 ) {
+    val showEditAndSettings = false // Toggle for edit profile and settings buttons
+
     if (currentUser == null) {
         Button(
             onClick = onSignIn,
@@ -428,11 +414,12 @@ private fun ColumnScope.ProfileActionArea(
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
         ) {
-            Icon(Icons.Default.Login, contentDescription = null)
+            Icon(Icons.AutoMirrored.Filled.Login, contentDescription = null)
             Spacer(Modifier.width(12.dp))
             Text("Sign in with Google", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     } else {
+        // --- START OF SOCIAL SECTION ---
         Button(
             onClick = onFindFriends,
             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -446,6 +433,7 @@ private fun ColumnScope.ProfileActionArea(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // Updated "Friend Requests" button
         OutlinedButton(
             onClick = onViewFriendRequests,
             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -455,50 +443,54 @@ private fun ColumnScope.ProfileActionArea(
         ) {
             Icon(Icons.Default.Group, contentDescription = null)
             Spacer(Modifier.width(12.dp))
-            Text("Friend Requests", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text("Friends & Requests", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        SectionLabel("Account Settings")
-        
-        OutlinedButton(
-            onClick = { /* Mockup Edit */ },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, Color.LightGray),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
-        ) {
-            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(12.dp))
-            Text("Edit Profile", fontSize = 14.sp)
-            Spacer(Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
-        }
+        if (showEditAndSettings) {
+            SectionLabel("Account Settings")
 
-        Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { /* Mockup Edit */ },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color.LightGray),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(12.dp))
+                Text("Edit Profile", fontSize = 14.sp)
+                Spacer(Modifier.weight(1f))
+                Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
 
-        OutlinedButton(
-            onClick = { /* Mockup Settings */ },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, Color.LightGray),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
-        ) {
-            Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(12.dp))
-            Text("Settings", fontSize = 14.sp)
-            Spacer(Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedButton(
+                onClick = { /* Mockup Settings */ },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color.LightGray),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
+            ) {
+                Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(12.dp))
+                Text("Settings", fontSize = 14.sp)
+                Spacer(Modifier.weight(1f))
+                Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
         }
+        // --- END OF SOCIAL SECTION ---
 
         Spacer(modifier = Modifier.weight(1f))
 
+        // Sign Out at the bottom
         TextButton(
             onClick = onSignOut,
             modifier = Modifier.padding(bottom = 16.dp)
         ) {
-            Icon(Icons.Default.Logout, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
             Text("Sign Out", color = Color.Gray, fontWeight = FontWeight.Medium)
         }
@@ -567,8 +559,9 @@ fun ProfileHeader(
                 color = BrandRed.copy(alpha = 0.1f),
                 shape = RoundedCornerShape(8.dp)
             ) {
+                val friendText = if (friendCount == 1) "1 Friend" else "$friendCount Friends"
                 Text(
-                    text = "$friendCount Friends",
+                    text = friendText,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,

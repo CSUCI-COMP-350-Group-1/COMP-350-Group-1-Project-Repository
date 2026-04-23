@@ -30,7 +30,10 @@ import com.example.cicompanion.appNavigation.screenTitleForRoute
 import com.example.cicompanion.calendar.CalendarViewModel
 import com.example.cicompanion.calendar.CalendarApp
 import com.example.cicompanion.home.HomeScreen
+import com.example.cicompanion.home.HomeViewModel
 import com.example.cicompanion.maps.MapScreen
+import com.example.cicompanion.social.FriendsAndRequestsScreen
+import com.example.cicompanion.social.ProfileScreen
 import com.example.cicompanion.social.*
 import com.example.cicompanion.studyRoom.RoomListScreen
 import com.example.cicompanion.ui.NavBar
@@ -50,6 +53,8 @@ import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.example.cicompanion.notifications.PushNotificationService
 import com.example.cicompanion.sidebar.SearchScreen
 import com.google.firebase.auth.FirebaseAuth
+import com.example.cicompanion.social.MessagesScreen
+import com.example.cicompanion.social.MessageThreadScreen
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
 
@@ -124,8 +129,9 @@ fun AppNavigation(notificationRoute: String? = null,
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // Create shared CalendarViewModel here to sync across Home and Calendar screens
+    // Create shared ViewModels here to sync across screens and persist during navigation
     val calendarViewModel: CalendarViewModel = viewModel()
+    val homeViewModel: HomeViewModel = viewModel()
 
     LaunchedEffect(notificationRoute) {
         if (!notificationRoute.isNullOrBlank()) {
@@ -160,14 +166,16 @@ fun AppNavigation(notificationRoute: String? = null,
             topBar = {
                 TopBar(
                     title = currentScreenTitle,
-                    showBackButton = currentRoute == Routes.USER_SEARCH || currentRoute == Routes.FRIEND_REQUESTS || currentRoute?.startsWith(Routes.PROFILE) == true,
+                    showBackButton =
+                        currentRoute == Routes.FRIENDS_AND_REQUESTS ||
+                                currentRoute?.startsWith(Routes.MESSAGE_THREAD_BASE) == true, // MESSAGING
                     onHamburgerClick = {
                         scope.launch { drawerState.open() }
                     },
                     onBackClick = {
-                        if (navController.previousBackStackEntry != null) {
-                            navController.popBackStack()
-                        } else {
+                        // MESSAGING  prefer normal back-stack behavior for thread screens
+                        val popped = navController.popBackStack()
+                        if (!popped) {
                             navController.navigate(Routes.PROFILE) {
                                 popUpTo(Routes.PROFILE) { inclusive = false }
                                 launchSingleTop = true
@@ -185,7 +193,7 @@ fun AppNavigation(notificationRoute: String? = null,
             Box(modifier = Modifier.padding(paddingValues)) {
                 NavHost(navController = navController, startDestination = Routes.HOME) {
                     composable(Routes.HOME) {
-                        HomeScreen(navController, calendarViewModel)
+                        HomeScreen(navController, calendarViewModel, homeViewModel)
                     }
                     composable(Routes.MAP) {
                         MapScreen(navController, calendarViewModel)
@@ -199,12 +207,12 @@ fun AppNavigation(notificationRoute: String? = null,
                     composable(Routes.SEARCH) {
                         SearchScreen(navController)
                     }
-                    
+
                     // Base profile route
                     composable(Routes.PROFILE) {
                         ProfileScreen(navController)
                     }
-                    
+
                     // Profile route with userId path parameter
                     composable(
                         route = "${Routes.PROFILE}/{userId}",
@@ -215,16 +223,22 @@ fun AppNavigation(notificationRoute: String? = null,
                     }
 
                     composable(Routes.SOCIAL) {
-                        ProfileScreen(navController)
+                        // MESSAGING
+                        MessagesScreen(navController)
                     }
-                    composable(Routes.USER_SEARCH) {
-                        UserSearchScreen(navController)
+                    composable(Routes.MESSAGE_THREAD) { backStackEntry ->
+                        // MESSAGING CHANGE
+                        val conversationId = backStackEntry.arguments?.getString("conversationId").orEmpty()
+                        val friendUserId = backStackEntry.arguments?.getString("friendUserId").orEmpty()
+
+                        MessageThreadScreen(
+                            navController = navController,
+                            conversationId = conversationId,
+                            friendUserId = friendUserId
+                        )
                     }
-                    composable(Routes.FRIEND_REQUESTS) {
-                        FriendRequestsScreen(navController)
-                    }
-                    composable(Routes.CONVERSATIONS) {
-                        ConversationsScreen(navController)
+                    composable(Routes.FRIENDS_AND_REQUESTS) {
+                        FriendsAndRequestsScreen(navController)
                     }
                 }
             }
