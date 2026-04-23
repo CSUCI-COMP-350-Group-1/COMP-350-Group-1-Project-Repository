@@ -147,7 +147,7 @@ object SocialRepository {
     }
 
 
-    private fun createFriendRequestId(fromUserId: String, toUserId: String): String {
+    fun createFriendRequestId(fromUserId: String, toUserId: String): String {
         return "${fromUserId}_$toUserId"
     }
 
@@ -262,6 +262,19 @@ object SocialRepository {
             onError = onError
         )
     }
+    
+    fun acceptFriendRequestById(
+        requestId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        updateFriendRequestStatus(
+            requestId = requestId,
+            newStatus = "accepted",
+            onSuccess = onSuccess,
+            onError = onError
+        )
+    }
 
     fun declineFriendRequest(
         request: FriendRequest,
@@ -351,7 +364,7 @@ object SocialRepository {
                 outgoingSnapshot.documents.forEach { doc ->
                     val request = doc.toObject(FriendRequest::class.java)
                     if (request != null && request.toUserId.isNotBlank()) {
-                        allStatuses[request.toUserId] = request.status
+                        allStatuses[request.toUserId] = if (request.status == "pending") "pending_sent" else request.status
                     }
                 }
 
@@ -365,7 +378,7 @@ object SocialRepository {
                                 val existingStatus = allStatuses[request.fromUserId]
                                 // Accepted status takes priority
                                 if (existingStatus != "accepted") {
-                                    allStatuses[request.fromUserId] = request.status
+                                    allStatuses[request.fromUserId] = if (request.status == "pending") "pending_received" else request.status
                                 }
                             }
                         }

@@ -29,7 +29,8 @@ import androidx.core.net.toUri
 data class AppFeature(
     val name: String,
     val path: String,
-    val action: FeatureAction
+    val action: FeatureAction,
+    val keywords: List<String> = emptyList()
 )
 
 sealed class FeatureAction {
@@ -52,16 +53,27 @@ fun SearchScreen(navController: NavHostController) {
             Routes.STUDY_ROOM,
             Routes.PROFILE,
             Routes.USER_SEARCH,
-            Routes.FRIENDS_AND_REQUESTS
+            Routes.FRIENDS_AND_REQUESTS,
+            Routes.SOCIAL
         )
 
         navRoutes.forEach { route ->
             val name = screenTitleForRoute(route)
+            val keywords = when (route) {
+                Routes.PROFILE -> listOf("my profile", "account", "settings", "me")
+                Routes.SOCIAL -> listOf("social", "messaging", "chat", "messages", "inbox")
+                Routes.FRIENDS_AND_REQUESTS -> listOf("friends", "requests", "add friends", "pending")
+                Routes.USER_SEARCH -> listOf("find users", "search people", "discover")
+                Routes.STUDY_ROOM -> listOf("rooms", "study", "booking")
+                else -> emptyList()
+            }
+            
             features.add(
                 AppFeature(
                     name = name,
                     path = if (route == Routes.HOME) "Home" else "Home > $name",
-                    action = FeatureAction.Navigate(route)
+                    action = FeatureAction.Navigate(route),
+                    keywords = keywords
                 )
             )
         }
@@ -78,7 +90,8 @@ fun SearchScreen(navController: NavHostController) {
         } else {
             appFeaturesList.filter {
                 it.name.contains(searchQuery, ignoreCase = true) ||
-                        it.path.contains(searchQuery, ignoreCase = true)
+                        it.path.contains(searchQuery, ignoreCase = true) ||
+                        it.keywords.any { keyword -> keyword.contains(searchQuery, ignoreCase = true) }
             }
         }
     }

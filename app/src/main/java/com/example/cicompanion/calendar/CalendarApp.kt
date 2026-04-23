@@ -959,7 +959,8 @@ private fun EventDots(
                     .size(8.dp)
                     .background(PinnedEventPurple, CircleShape)
             )
-        } else if (info.hasCustom) {
+        }
+        if (info.hasCustom) {
             Box(
                 modifier = Modifier
                     .size(8.dp)
@@ -1039,16 +1040,18 @@ private fun EventCard(
 ) {
     val isCustom = event.calendarId == "custom"
 
-    val containerColor = if (isHighlighted) PinnedEventPurple.copy(alpha = 0.1f) else CardOffWhite
-    val borderColor = if (isHighlighted) PinnedEventPurple else Color.Transparent
+    // Removed the purple highlight when navigating from pinned events.
+    // Using normal CardOffWhite and no border.
+    val containerColor = CardOffWhite
+    val borderColor = Color.Transparent
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(if (isHighlighted) 2.dp else 0.dp, borderColor, RoundedCornerShape(22.dp)),
+            .border(0.dp, borderColor, RoundedCornerShape(22.dp)),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 8.dp else if (isCustom) 5.dp else 3.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isCustom) 5.dp else 3.dp)
     ) {
         Column(
             modifier = Modifier
@@ -1488,7 +1491,7 @@ fun WheelTimePicker(
         )
         WheelPicker(
             items = listOf("AM", "PM"),
-            initialIndex = if (amPm == "AM") 0 else 1,
+            initialIndex = if (amPm == "AM") 0 else if (amPm == "PM") 1 else 0,
             onItemSelected = { amPm = it },
             modifier = Modifier.weight(1f)
         )

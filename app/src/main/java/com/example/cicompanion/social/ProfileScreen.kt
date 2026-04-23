@@ -47,7 +47,11 @@ private val BrandRed = Color(0xFFEF3347)
 @Composable
 fun ProfileScreen(navController: NavHostController, userId: String? = null) {
     var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
-    val isOwnProfile = userId == null || userId == FirebaseAuth.getInstance().currentUser?.uid
+    
+    // Immediately clear target user data when sign-out is detected
+    val isOwnProfile = remember(userId, currentUser?.uid) {
+        userId == null || (currentUser != null && userId == currentUser?.uid)
+    }
 
     var displayName by remember { mutableStateOf("Loading...") }
     var email by remember { mutableStateOf("") }
@@ -69,6 +73,16 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
     }
 
     LaunchedEffect(userId, currentUser?.uid) {
+        if (currentUser == null && userId != null) {
+            displayName = "Guest User"
+            email = "Sign in to sync your data"
+            photoUrl = null
+            friendCount = 0
+            requestStatus = null
+            targetUserProfile = null
+            return@LaunchedEffect
+        }
+
         val targetUid = userId ?: currentUser?.uid
         if (targetUid != null) {
             SocialRepository.fetchUserProfile(
@@ -106,6 +120,10 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
         } else {
             displayName = "Guest User"
             email = "Sign in to sync your data"
+            photoUrl = null
+            friendCount = 0
+            requestStatus = null
+            targetUserProfile = null
         }
     }
 
@@ -147,7 +165,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Top
             ) {
-                if (isOwnProfile) {
+                if (isOwnProfile || currentUser == null) {
                     ProfileActionArea(
                         currentUser = currentUser,
                         onSignIn = {
@@ -166,6 +184,14 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                         }
                     )
                 } else {
+                    if (requestStatus == "accepted") {
+                        FriendshipIndicator("You are Friends", Color(0xFF4CAF50), Icons.Default.CheckCircle)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    } else if (requestStatus == "pending_received") {
+                        FriendshipIndicator("${targetUserProfile?.displayName ?: "This user"} sent you a friend request!", BrandRed, Icons.Default.PersonAdd)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
                     ViewOnlyProfileActions(
                         navController = navController,
                         targetUser = targetUserProfile,
@@ -179,6 +205,28 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
 }
 
 @Composable
+fun FriendshipIndicator(text: String, color: Color, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.1f))
+            .padding(12.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = color)
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = text,
+            color = color,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp
+        )
+    }
+}
+
+@Composable
 fun ViewOnlyProfileActions(
     navController: NavHostController,
     targetUser: UserProfile?,
@@ -186,80 +234,154 @@ fun ViewOnlyProfileActions(
     onStatusChange: (String?) -> Unit
 ) {
     val currentUser = FirebaseAuth.getInstance().currentUser
+    var showRemoveDialog by remember { mutableStateOf(false) }
+    
     SectionLabel("Actions")
 
-    // Friend Request Logic
     if (targetUser != null && currentUser != null) {
-        if (requestStatus == null) {
-            Button(
-                onClick = {
-                    SocialRepository.sendFriendRequest(
-                        currentUser = currentUser,
-                        targetUser = targetUser,
-                        onSuccess = { onStatusChange("pending") },
-                        onError = { /* Handle error */ }
-                    )
-                },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
-            ) {
-                Icon(Icons.Default.PersonAdd, contentDescription = null)
-                Spacer(Modifier.width(12.dp))
-                Text("Send Friend Request", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        when (requestStatus) {
+            null -> {
+                Button(
+                    onClick = {
+                        SocialRepository.sendFriendRequest(
+                            currentUser = currentUser,
+                            targetUser = targetUser,
+                            onSuccess = { onStatusChange("pending_sent") },
+                            onError = { /* Handle error */ }
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+                ) {
+                    Icon(Icons.Default.PersonAdd, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Send Friend Request", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
             }
-        } else {
-            // Already friends or pending
-            OutlinedButton(
-                onClick = {
-                    if (requestStatus == "accepted") {
+            "pending_received" -> {
+                Button(
+                    onClick = {
+                        val requestId = SocialRepository.createFriendRequestId(targetUser.uid, currentUser.uid)
+                        SocialRepository.acceptFriendRequestById(
+                            requestId = requestId,
+                            onSuccess = { onStatusChange("accepted") },
+                            onError = { /* Handle error */ }
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Accept Friend Request", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                OutlinedButton(
+                    onClick = {
+                        val requestId = SocialRepository.createFriendRequestId(targetUser.uid, currentUser.uid)
+                        // Using a dummy request object since we just need the ID to decline/delete
+                        SocialRepository.declineFriendRequest(
+                            request = FriendRequest(id = requestId),
+                            onSuccess = { onStatusChange(null) },
+                            onError = { /* Handle error */ }
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, Color.Gray),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Decline Request", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            "pending_sent" -> {
+                OutlinedButton(
+                    onClick = {
                         SocialRepository.removeFriend(
                             currentUserId = currentUser.uid,
                             targetUserId = targetUser.uid,
                             onSuccess = { onStatusChange(null) },
                             onError = { /* Handle error */ }
                         )
-                    } else if (requestStatus == "pending") {
-                        // For now we use removeFriend to cancel a pending request too
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, BrandRed),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = BrandRed)
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Request Sent (Cancel)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            "accepted" -> {
+                OutlinedButton(
+                    onClick = { showRemoveDialog = true },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, Color.Gray),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Remove Friend", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        val conversationId = MessagingRepository.createConversationId(currentUser.uid, targetUser.uid)
+                        navController.navigate(Routes.messageThread(conversationId, targetUser.uid))
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, BrandRed),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = BrandRed)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Send Message", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+
+    if (showRemoveDialog && targetUser != null && currentUser != null) {
+        AlertDialog(
+            onDismissRequest = { showRemoveDialog = false },
+            title = { Text("Remove ${SocialRepository.displayNameOrEmail(targetUser)}?") },
+            text = { Text("Do you really want to remove this person from your friends list?") },
+            confirmButton = {
+                Button(
+                    onClick = {
                         SocialRepository.removeFriend(
                             currentUserId = currentUser.uid,
                             targetUserId = targetUser.uid,
-                            onSuccess = { onStatusChange(null) },
-                            onError = { /* Handle error */ }
+                            onSuccess = {
+                                showRemoveDialog = false
+                                onStatusChange(null)
+                            },
+                            onError = { showRemoveDialog = false }
                         )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.5.dp, if (requestStatus == "accepted") Color.Gray else BrandRed),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = if (requestStatus == "accepted") Color.Gray else BrandRed)
-            ) {
-                val icon = if (requestStatus == "accepted") Icons.Default.Close else Icons.Default.Check
-                val label = if (requestStatus == "accepted") "Remove Friend" else "Request Sent (Cancel)"
-                Icon(icon, contentDescription = null)
-                Spacer(Modifier.width(12.dp))
-                Text(label, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+                ) {
+                    Text("Remove")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemoveDialog = false }) {
+                    Text("Cancel", color = Color.Gray)
+                }
             }
-        }
-
-        if (requestStatus == "accepted") {
-            Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedButton(
-                onClick = {
-                    val conversationId = MessagingRepository.createConversationId(currentUser.uid, targetUser.uid)
-                    navController.navigate(Routes.messageThread(conversationId, targetUser.uid))
-                },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.5.dp, BrandRed),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = BrandRed)
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
-                Spacer(Modifier.width(12.dp))
-                Text("Send Message", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            }
-        }
+        )
     }
 
     Spacer(modifier = Modifier.height(16.dp))
