@@ -246,7 +246,10 @@ fun ViewOnlyProfileActions(
             Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedButton(
-                onClick = { /* TODO: Start conversation */ },
+                onClick = {
+                    val conversationId = MessagingRepository.createConversationId(currentUser.uid, targetUser.uid)
+                    navController.navigate(Routes.messageThread(conversationId, targetUser.uid))
+                },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 border = BorderStroke(1.5.dp, BrandRed),
