@@ -193,7 +193,7 @@ fun AppNavigation(notificationRoute: String? = null,
             Box(modifier = Modifier.padding(paddingValues)) {
                 NavHost(navController = navController, startDestination = Routes.HOME) {
                     composable(Routes.HOME) {
-                        HomeScreen(navController, calendarViewModel, homeViewModel)
+                        HomeScreen(navController, calendarViewModel)
                     }
                     composable(Routes.MAP) {
                         MapScreen(navController, calendarViewModel)

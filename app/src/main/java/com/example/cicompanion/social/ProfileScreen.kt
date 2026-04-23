@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
@@ -29,8 +30,11 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.example.cicompanion.firebase.FirebaseAuthManager
+import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.example.cicompanion.ui.Routes
+import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.CICompanionTheme
+import com.example.cicompanion.ui.theme.GrayIcon
 import com.example.cicompanion.ui.theme.NavBackground
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
@@ -154,7 +158,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                             navController.navigate(Routes.USER_SEARCH)
                         },
                         onViewFriendRequests = {
-                            navController.navigate(Routes.FRIEND_REQUESTS)
+                            navController.navigate(Routes.FRIENDS_AND_REQUESTS)
                         },
                         onSignOut = {
                             FirebaseAuth.getInstance().signOut()
@@ -358,7 +362,7 @@ fun OldProfileScreen(navController: NavHostController) {
                         verticalArrangement = Arrangement.Center
                     ) {
                         Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { navController.navigate(Routes.FRIEND_REQUESTS) },
+                        Button(onClick = { navController.navigate(Routes.FRIENDS_AND_REQUESTS) },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color.Red,
                                 contentColor = Color.White

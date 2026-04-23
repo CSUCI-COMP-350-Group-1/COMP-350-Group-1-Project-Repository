@@ -1,5 +1,6 @@
 package com.example.cicompanion.social
 
+import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.QuerySnapshot
