@@ -424,26 +424,26 @@ private fun ColumnScope.ProfileActionArea(
         }
     } else {
         // --- START OF SOCIAL SECTION ---
-        Button(
-            onClick = onFindFriends,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
-        ) {
-            Icon(Icons.Default.PersonAdd, contentDescription = null)
-            Spacer(Modifier.width(12.dp))
-            Text("Add Friends", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        }
+//        Button(
+//            onClick = onFindFriends,
+//            modifier = Modifier.fillMaxWidth().height(56.dp),
+//            shape = RoundedCornerShape(16.dp),
+//            colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+//        ) {
+//            Icon(Icons.Default.PersonAdd, contentDescription = null)
+//            Spacer(Modifier.width(12.dp))
+//            Text("Add Friends", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+//        }
 
         Spacer(modifier = Modifier.height(12.dp))
 
         // Updated "Friend Requests" button
-        OutlinedButton(
+        Button(
             onClick = onViewFriendRequests,
             modifier = Modifier.fillMaxWidth().height(56.dp),
             shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.5.dp, BrandRed),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = BrandRed)
+            // border = BorderStroke(1.5.dp, BrandRed),
+            colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
         ) {
             Icon(Icons.Default.Group, contentDescription = null)
             Spacer(Modifier.width(12.dp))
