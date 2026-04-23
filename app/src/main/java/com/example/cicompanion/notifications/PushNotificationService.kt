@@ -31,7 +31,7 @@ class PushNotificationService : FirebaseMessagingService() {
         super.onMessageReceived(message)
 
         // MESSAGING allow routing + channel selection from FCM data
-        val destinationRoute = message.data["destination_route"] ?: Routes.FRIEND_REQUESTS
+        val destinationRoute = message.data["destination_route"] ?: Routes.FRIENDS_AND_REQUESTS
         val channelId = message.data["channel_id"] ?: FRIEND_REQUEST_CHANNEL_ID
 
         showNotification(

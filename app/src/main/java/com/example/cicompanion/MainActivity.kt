@@ -238,7 +238,18 @@ fun AppNavigation(notificationRoute: String? = null,
                         )
                     }
                     composable(Routes.FRIENDS_AND_REQUESTS) {
-                        FriendsAndRequestsScreen(navController)
+                        FriendsAndRequestsScreen(
+                            navController = navController,
+                            initialTab = 1
+                        )
+                    }
+                    // PUSH NOTIFICATIONS CHANGE:
+                    // Notification alias route: opens the same screen, but directly on the Requests tab.
+                    composable(Routes.FRIEND_REQUESTS) {
+                        FriendsAndRequestsScreen(
+                            navController = navController,
+                            initialTab = 2
+                        )
                     }
                 }
             }

@@ -28,9 +28,14 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 
 @Composable
-fun FriendsAndRequestsScreen(navController: NavHostController) {
+fun FriendsAndRequestsScreen(
+    navController: NavHostController,
+    initialTab: Int = 1
+) {
     val currentUser = FirebaseAuth.getInstance().currentUser
-    var selectedTab by remember { mutableIntStateOf(1) } // Default to "Add Friends" (Middle Tab)
+    // PUSH NOTIFICATIONS CHANGE:
+    // Allow callers to choose which tab opens first.
+    var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab) }
 
     if (currentUser == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
