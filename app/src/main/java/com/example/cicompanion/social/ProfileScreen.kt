@@ -241,20 +241,22 @@ fun ViewOnlyProfileActions(
                 Text(label, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
         }
-    }
 
-    Spacer(modifier = Modifier.height(12.dp))
+        if (requestStatus == "accepted") {
+            Spacer(modifier = Modifier.height(12.dp))
 
-    OutlinedButton(
-        onClick = { /* TODO: Start conversation */ },
-        modifier = Modifier.fillMaxWidth().height(56.dp),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.5.dp, BrandRed),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = BrandRed)
-    ) {
-        Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
-        Spacer(Modifier.width(12.dp))
-        Text("Send Message", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            OutlinedButton(
+                onClick = { /* TODO: Start conversation */ },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.5.dp, BrandRed),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = BrandRed)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
+                Spacer(Modifier.width(12.dp))
+                Text("Send Message", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
     }
 
     Spacer(modifier = Modifier.height(16.dp))
