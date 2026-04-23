@@ -1,18 +1,20 @@
 package com.example.cicompanion.social
 
 import android.app.Activity
-import android.content.Intent
-import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +30,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.example.cicompanion.firebase.FirebaseAuthManager
+import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.CICompanionTheme
@@ -38,9 +41,359 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 
+private val BrandRed = Color(0xFFEF3347)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(navController: NavHostController) {
+fun ProfileScreen(navController: NavHostController, userId: String? = null) {
+    var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
+    
+    // Immediately clear target user data when sign-out is detected
+    val isOwnProfile = remember(userId, currentUser?.uid) {
+        userId == null || (currentUser != null && userId == currentUser?.uid)
+    }
+
+    var displayName by remember { mutableStateOf("Loading...") }
+    var email by remember { mutableStateOf("") }
+    var photoUrl by remember { mutableStateOf<String?>(null) }
+    var friendCount by remember { mutableIntStateOf(0) }
+    var requestStatus by remember { mutableStateOf<String?>(null) }
+    var targetUserProfile by remember { mutableStateOf<UserProfile?>(null) }
+
+    val context = LocalContext.current
+
+    DisposableEffect(Unit) {
+        val listener = FirebaseAuth.AuthStateListener { auth ->
+            currentUser = auth.currentUser
+        }
+        FirebaseAuth.getInstance().addAuthStateListener(listener)
+        onDispose {
+            FirebaseAuth.getInstance().removeAuthStateListener(listener)
+        }
+    }
+
+    LaunchedEffect(userId, currentUser?.uid) {
+        if (currentUser == null && userId != null) {
+            displayName = "Guest User"
+            email = "Sign in to sync your data"
+            photoUrl = null
+            friendCount = 0
+            requestStatus = null
+            targetUserProfile = null
+            return@LaunchedEffect
+        }
+
+        val targetUid = userId ?: currentUser?.uid
+        if (targetUid != null) {
+            SocialRepository.fetchUserProfile(
+                userId = targetUid,
+                onSuccess = { profile ->
+                    targetUserProfile = profile
+                    displayName = profile.displayName.ifBlank { profile.email }
+                    email = profile.email
+                    photoUrl = profile.photoUrl
+                },
+                onError = {
+                    if (isOwnProfile) {
+                        displayName = currentUser?.displayName ?: "Guest User"
+                        email = currentUser?.email ?: ""
+                        photoUrl = currentUser?.photoUrl?.toString()
+                    }
+                }
+            )
+
+            SocialRepository.fetchFriendCount(
+                currentUserId = targetUid,
+                onSuccess = { count -> friendCount = count },
+                onError = { friendCount = 0 }
+            )
+
+            if (!isOwnProfile && currentUser != null) {
+                SocialRepository.fetchAllFriendRequestStatuses(
+                    currentUserId = currentUser!!.uid,
+                    onSuccess = { statuses ->
+                        requestStatus = statuses[targetUid]
+                    },
+                    onError = { /* Handle error */ }
+                )
+            }
+        } else {
+            displayName = "Guest User"
+            email = "Sign in to sync your data"
+            photoUrl = null
+            friendCount = 0
+            requestStatus = null
+            targetUserProfile = null
+        }
+    }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        handleGoogleSignInResult(result)
+    }
+
+    Scaffold(
+        containerColor = Color.White
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .background(Color.White)
+        ) {
+            ProfileHeader(
+                userDisplayName = displayName,
+                userEmail = email,
+                photoUrl = photoUrl,
+                friendCount = friendCount,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(NavBackground.copy(alpha = 0.5f))
+                    .padding(20.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Top
+            ) {
+                if (isOwnProfile || currentUser == null) {
+                    ProfileActionArea(
+                        currentUser = currentUser,
+                        onSignIn = {
+                            val signInClient = FirebaseAuthManager.getGoogleSignInClient(context)
+                            launcher.launch(signInClient.signInIntent)
+                        },
+                        onFindFriends = {
+                            navController.navigate(Routes.USER_SEARCH)
+                        },
+                        onViewFriendRequests = {
+                            navController.navigate(Routes.FRIENDS_AND_REQUESTS)
+                        },
+                        onSignOut = {
+                            FirebaseAuth.getInstance().signOut()
+                            FirebaseAuthManager.getGoogleSignInClient(context).signOut()
+                        }
+                    )
+                } else {
+                    if (requestStatus == "accepted") {
+                        FriendshipIndicator("You are Friends", Color(0xFF4CAF50), Icons.Default.CheckCircle)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    } else if (requestStatus == "pending_received") {
+                        FriendshipIndicator("${targetUserProfile?.displayName ?: "This user"} sent you a friend request!", BrandRed, Icons.Default.PersonAdd)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    ViewOnlyProfileActions(
+                        navController = navController,
+                        targetUser = targetUserProfile,
+                        requestStatus = requestStatus,
+                        onStatusChange = { newStatus -> requestStatus = newStatus }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FriendshipIndicator(text: String, color: Color, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.1f))
+            .padding(12.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = color)
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = text,
+            color = color,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp
+        )
+    }
+}
+
+@Composable
+fun ViewOnlyProfileActions(
+    navController: NavHostController,
+    targetUser: UserProfile?,
+    requestStatus: String?,
+    onStatusChange: (String?) -> Unit
+) {
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    var showRemoveDialog by remember { mutableStateOf(false) }
+    
+    SectionLabel("Actions")
+
+    if (targetUser != null && currentUser != null) {
+        when (requestStatus) {
+            null -> {
+                Button(
+                    onClick = {
+                        SocialRepository.sendFriendRequest(
+                            currentUser = currentUser,
+                            targetUser = targetUser,
+                            onSuccess = { onStatusChange("pending_sent") },
+                            onError = { /* Handle error */ }
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+                ) {
+                    Icon(Icons.Default.PersonAdd, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Send Friend Request", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            "pending_received" -> {
+                Button(
+                    onClick = {
+                        val requestId = SocialRepository.createFriendRequestId(targetUser.uid, currentUser.uid)
+                        SocialRepository.acceptFriendRequestById(
+                            requestId = requestId,
+                            onSuccess = { onStatusChange("accepted") },
+                            onError = { /* Handle error */ }
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Accept Friend Request", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                OutlinedButton(
+                    onClick = {
+                        val requestId = SocialRepository.createFriendRequestId(targetUser.uid, currentUser.uid)
+                        // Using a dummy request object since we just need the ID to decline/delete
+                        SocialRepository.declineFriendRequest(
+                            request = FriendRequest(id = requestId),
+                            onSuccess = { onStatusChange(null) },
+                            onError = { /* Handle error */ }
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, Color.Gray),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Decline Request", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            "pending_sent" -> {
+                OutlinedButton(
+                    onClick = {
+                        SocialRepository.removeFriend(
+                            currentUserId = currentUser.uid,
+                            targetUserId = targetUser.uid,
+                            onSuccess = { onStatusChange(null) },
+                            onError = { /* Handle error */ }
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, BrandRed),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = BrandRed)
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Request Sent (Cancel)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            "accepted" -> {
+                OutlinedButton(
+                    onClick = { showRemoveDialog = true },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, Color.Gray),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Remove Friend", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        val conversationId = MessagingRepository.createConversationId(currentUser.uid, targetUser.uid)
+                        navController.navigate(Routes.messageThread(conversationId, targetUser.uid))
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, BrandRed),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = BrandRed)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Send Message", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+
+    if (showRemoveDialog && targetUser != null && currentUser != null) {
+        AlertDialog(
+            onDismissRequest = { showRemoveDialog = false },
+            title = { Text("Remove ${SocialRepository.displayNameOrEmail(targetUser)}?") },
+            text = { Text("Do you really want to remove this person from your friends list?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        SocialRepository.removeFriend(
+                            currentUserId = currentUser.uid,
+                            targetUserId = targetUser.uid,
+                            onSuccess = {
+                                showRemoveDialog = false
+                                onStatusChange(null)
+                            },
+                            onError = { showRemoveDialog = false }
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+                ) {
+                    Text("Remove")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemoveDialog = false }) {
+                    Text("Cancel", color = Color.Gray)
+                }
+            }
+        )
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
+
+    TextButton(onClick = { navController.popBackStack() }) {
+        Text("Go Back", color = Color.Gray)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OldProfileScreen(navController: NavHostController) {
     var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
     var friendCount by remember { mutableIntStateOf(0) }
     val context = LocalContext.current
@@ -57,14 +410,14 @@ fun ProfileScreen(navController: NavHostController) {
 
     LaunchedEffect(currentUser?.uid) {
         currentUser?.let { signedInUser ->
-            FirestoreManager.saveUserToFirestore(signedInUser)
+            FirestoreManager.saveUserToFirestore(signedInUser) {
+                FriendRequestNotificationSender.syncCurrentUserFcmToken()
+            }
             SocialRepository.fetchFriendCount(
                 currentUserId = signedInUser.uid,
                 onSuccess = { count -> friendCount = count },
                 onError = { friendCount = 0 }
             )
-        } ?: run {
-            friendCount = 0
         }
     }
 
@@ -118,23 +471,47 @@ fun ProfileScreen(navController: NavHostController) {
                     .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                ProfileActionArea(
-                    currentUser = currentUser,
-                    onSignIn = {
+                if (currentUser == null) {
+                    Button(onClick = {
                         val signInClient = FirebaseAuthManager.getGoogleSignInClient(context)
                         launcher.launch(signInClient.signInIntent)
                     },
-                    onFindFriends = {
-                        navController.navigate(Routes.USER_SEARCH)
-                    },
-                    onViewFriendRequests = {
-                        navController.navigate(Routes.FRIEND_REQUESTS)
-                    },
-                    onSignOut = {
-                        FirebaseAuth.getInstance().signOut()
-                        FirebaseAuthManager.getGoogleSignInClient(context).signOut()
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Red,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text("Sign in with Google")
                     }
-                )
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = { navController.navigate(Routes.FRIENDS_AND_REQUESTS) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Red,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Text("Friend Requests")
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = {
+                                FirebaseAuth.getInstance().signOut()
+                                FirebaseAuthManager.getGoogleSignInClient(context).signOut()
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Red,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Text("Sign Out")
+                        }
+                    }
+                }
             }
         }
     }
@@ -152,54 +529,102 @@ private fun handleGoogleSignInResult(result: ActivityResult) {
 }
 
 @Composable
-private fun ProfileActionArea(
+private fun ColumnScope.ProfileActionArea(
     currentUser: FirebaseUser?,
     onSignIn: () -> Unit,
     onFindFriends: () -> Unit,
     onViewFriendRequests: () -> Unit,
     onSignOut: () -> Unit
 ) {
+    val showEditAndSettings = false // Toggle for edit profile and settings buttons
+
     if (currentUser == null) {
-        Button(onClick = onSignIn,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Red,
-                contentColor = Color.White
-            )
-            ) {
-            Text("Sign in with Google")
+        Button(
+            onClick = onSignIn,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+        ) {
+            Icon(Icons.AutoMirrored.Filled.Login, contentDescription = null)
+            Spacer(Modifier.width(12.dp))
+            Text("Sign in with Google", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     } else {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        // --- START OF SOCIAL SECTION ---
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Updated "Friend Requests" button
+        Button(
+            onClick = onViewFriendRequests,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
         ) {
-            /* Commented out: Plus button replaces this
-            Button(onClick = onFindFriends) {
-                Text("Find Friends")
-            }
-             */
-            Spacer(modifier = Modifier.height(16.dp))
-            // Commented out Friend Requests button
-            Button(onClick = onViewFriendRequests,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Red,
-                    contentColor = Color.White
-                )
+            Icon(Icons.Default.Group, contentDescription = null)
+            Spacer(Modifier.width(12.dp))
+            Text("Friends & Requests", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        if (showEditAndSettings) {
+            SectionLabel("Account Settings")
+
+            OutlinedButton(
+                onClick = { /* Mockup Edit */ },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color.LightGray),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
             ) {
-                Text("Friend Requests")
+                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(12.dp))
+                Text("Edit Profile", fontSize = 14.sp)
+                Spacer(Modifier.weight(1f))
+                Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onSignOut,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Red,
-                    contentColor = Color.White
-                )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedButton(
+                onClick = { /* Mockup Settings */ },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color.LightGray),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
             ) {
-                Text("Sign Out")
+                Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(12.dp))
+                Text("Settings", fontSize = 14.sp)
+                Spacer(Modifier.weight(1f))
+                Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
             }
         }
+        // --- END OF SOCIAL SECTION ---
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Sign Out at the bottom
+        TextButton(
+            onClick = onSignOut,
+            modifier = Modifier.padding(bottom = 16.dp)
+        ) {
+            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Sign Out", color = Color.Gray, fontWeight = FontWeight.Medium)
+        }
     }
+}
+
+@Composable
+fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        style = MaterialTheme.typography.labelLarge,
+        color = Color.Gray,
+        fontWeight = FontWeight.Bold
+    )
 }
 
 @Composable
@@ -211,14 +636,15 @@ fun ProfileHeader(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier.padding(16.dp),
+        modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(100.dp)
+                .size(80.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFE6E0F8)),
+                .background(Color.White)
+                .border(2.dp, Color.White, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             if (photoUrl != null) {
@@ -232,51 +658,47 @@ fun ProfileHeader(
             }
         }
 
-        Spacer(modifier = Modifier.width(24.dp))
+        Spacer(modifier = Modifier.width(20.dp))
 
         Column {
             Text(
                 text = userDisplayName,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 22.sp,
                 color = Color.Black
             )
             Text(
                 text = userEmail,
                 color = Color.DarkGray,
-                fontSize = 14.sp
+                fontSize = 14.sp,
+                maxLines = 1
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "$friendCount Friends",
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = Color.Black
-            )
+            Surface(
+                color = BrandRed.copy(alpha = 0.1f),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                val friendText = if (friendCount == 1) "1 Friend" else "$friendCount Friends"
+                Text(
+                    text = friendText,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = BrandRed
+                )
+            }
         }
     }
 }
 
 @Composable
 fun DefaultAvatar() {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(30.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF6750A4))
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Box(
-            modifier = Modifier
-                .size(60.dp, 30.dp)
-                .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
-                .background(Color(0xFF6750A4))
-        )
-    }
+    Icon(
+        imageVector = Icons.Default.Person,
+        contentDescription = null,
+        modifier = Modifier.size(40.dp),
+        tint = Color.LightGray
+    )
 }
 
 @Preview(showBackground = true)

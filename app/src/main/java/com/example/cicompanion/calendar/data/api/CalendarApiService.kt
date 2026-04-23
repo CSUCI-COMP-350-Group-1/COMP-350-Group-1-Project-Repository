@@ -110,7 +110,10 @@ class CalendarApiService {
         text.replace("\r\n", "\n").split("\n").forEach { rawLine ->
             if (rawLine.startsWith(" ") || rawLine.startsWith("\t")) {
                 if (unfoldedLines.isNotEmpty()) {
-                    val previous = unfoldedLines.removeLast()
+                    // CALENDAR FIX:
+                    // removeLast() can crash on some Android runtimes.
+                    // removeAt(lastIndex) is safer here.
+                    val previous = unfoldedLines.removeAt(unfoldedLines.lastIndex)
                     unfoldedLines.add(previous + rawLine.trimStart())
                 }
             } else {

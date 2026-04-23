@@ -1,9 +1,12 @@
 package com.example.cicompanion
 
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DrawerValue
@@ -15,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -23,37 +27,124 @@ import androidx.navigation.compose.rememberNavController
 import com.example.cicompanion.appNavigation.DrawerProfileContent
 import com.example.cicompanion.appNavigation.TopBar
 import com.example.cicompanion.appNavigation.screenTitleForRoute
-import com.example.cicompanion.calendar.CalendarScreen
+import com.example.cicompanion.calendar.CalendarViewModel
+import com.example.cicompanion.calendar.CalendarApp
 import com.example.cicompanion.home.HomeScreen
+import com.example.cicompanion.home.HomeViewModel
 import com.example.cicompanion.maps.MapScreen
-import com.example.cicompanion.social.FriendRequestsScreen
+import com.example.cicompanion.social.FriendsAndRequestsScreen
 import com.example.cicompanion.social.ProfileScreen
-import com.example.cicompanion.social.UserSearchScreen
+import com.example.cicompanion.social.*
 import com.example.cicompanion.studyRoom.RoomListScreen
 import com.example.cicompanion.ui.NavBar
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.CICompanionTheme
 import kotlinx.coroutines.launch
+import android.Manifest
+import android.content.Intent
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import com.example.cicompanion.firebase.FriendRequestNotificationSender
+import com.example.cicompanion.notifications.PushNotificationService
+import com.example.cicompanion.sidebar.SearchScreen
+import com.google.firebase.auth.FirebaseAuth
+import com.example.cicompanion.social.MessagesScreen
+import com.example.cicompanion.social.MessageThreadScreen
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.messaging.FirebaseMessaging
+
 
 class MainActivity : ComponentActivity() {
+    // FOR PUSH NOTIFICATIONS runtime permission launcher for Android 13+
+    private val requestNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+
+    private var pendingNotificationRoute by mutableStateOf<String?>(null)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        requestNotificationPermissionIfNeeded()
+
+        pendingNotificationRoute = intent.getStringExtra(
+            PushNotificationService.EXTRA_DESTINATION_ROUTE
+        )
+
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser != null) {
+            FriendRequestNotificationSender.syncCurrentUserFcmToken()
+        }
+
+        //PRINTS FCM TOKEN
+        /*FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+            android.util.Log.d("FCM_TOKEN", "Token: $token")
+        }*/
         enableEdgeToEdge()
         setContent {
             CICompanionTheme {
-                AppNavigation()
+                AppNavigation(
+                    notificationRoute = pendingNotificationRoute,
+                    onNotificationRouteConsumed = {
+                        pendingNotificationRoute = null
+                    }
+                )
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+
+        pendingNotificationRoute = intent.getStringExtra(
+            PushNotificationService.EXTRA_DESTINATION_ROUTE
+        )
+    }
+    // PUSH NOTIFICATIONS helper for Android 13+ notification permission
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+        val alreadyGranted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!alreadyGranted) {
+            requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 }
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppNavigation() {
+fun AppNavigation(notificationRoute: String? = null,
+                  onNotificationRouteConsumed: () -> Unit = {}) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
+    // Create shared ViewModels here to sync across screens and persist during navigation
+    val calendarViewModel: CalendarViewModel = viewModel()
+    val homeViewModel: HomeViewModel = viewModel()
+
+    LaunchedEffect(notificationRoute) {
+        if (!notificationRoute.isNullOrBlank()) {
+            navController.navigate(notificationRoute) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
+            }
+            onNotificationRouteConsumed()
+        }
+    }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -75,14 +166,20 @@ fun AppNavigation() {
             topBar = {
                 TopBar(
                     title = currentScreenTitle,
-                    showBackButton = currentRoute == Routes.USER_SEARCH || currentRoute == Routes.FRIEND_REQUESTS,
+                    showBackButton =
+                        currentRoute == Routes.FRIENDS_AND_REQUESTS ||
+                                currentRoute?.startsWith(Routes.MESSAGE_THREAD_BASE) == true, // MESSAGING
                     onHamburgerClick = {
                         scope.launch { drawerState.open() }
                     },
                     onBackClick = {
-                        navController.navigate(Routes.PROFILE) {
-                            popUpTo(Routes.PROFILE) { inclusive = false }
-                            launchSingleTop = true
+                        // MESSAGING  prefer normal back-stack behavior for thread screens
+                        val popped = navController.popBackStack()
+                        if (!popped) {
+                            navController.navigate(Routes.PROFILE) {
+                                popUpTo(Routes.PROFILE) { inclusive = false }
+                                launchSingleTop = true
+                            }
                         }
                     },
                     onNotificationClick = {
@@ -96,13 +193,13 @@ fun AppNavigation() {
             Box(modifier = Modifier.padding(paddingValues)) {
                 NavHost(navController = navController, startDestination = Routes.HOME) {
                     composable(Routes.HOME) {
-                        HomeScreen(navController)
+                        HomeScreen(navController, calendarViewModel)
                     }
                     composable(Routes.MAP) {
-                        MapScreen(navController)
+                        MapScreen(navController, calendarViewModel)
                     }
                     composable(Routes.CALENDAR) {
-                        CalendarScreen(navController = navController)
+                        CalendarApp(viewModel = calendarViewModel)
                     }
                     composable(Routes.STUDY_ROOM) {
                         RoomListScreen(viewModel = viewModel(), navController = navController)
@@ -110,14 +207,49 @@ fun AppNavigation() {
                     composable(Routes.SEARCH) {
                         SearchScreen(navController)
                     }
+
+                    // Base profile route
                     composable(Routes.PROFILE) {
                         ProfileScreen(navController)
                     }
-                    composable(Routes.USER_SEARCH) {
-                        UserSearchScreen(navController)
+
+                    // Profile route with userId path parameter
+                    composable(
+                        route = "${Routes.PROFILE}/{userId}",
+                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userId = backStackEntry.arguments?.getString("userId")
+                        ProfileScreen(navController, userId)
                     }
+
+                    composable(Routes.SOCIAL) {
+                        // MESSAGING
+                        MessagesScreen(navController)
+                    }
+                    composable(Routes.MESSAGE_THREAD) { backStackEntry ->
+                        // MESSAGING CHANGE
+                        val conversationId = backStackEntry.arguments?.getString("conversationId").orEmpty()
+                        val friendUserId = backStackEntry.arguments?.getString("friendUserId").orEmpty()
+
+                        MessageThreadScreen(
+                            navController = navController,
+                            conversationId = conversationId,
+                            friendUserId = friendUserId
+                        )
+                    }
+                    composable(Routes.FRIENDS_AND_REQUESTS) {
+                        FriendsAndRequestsScreen(
+                            navController = navController,
+                            initialTab = 1
+                        )
+                    }
+                    // PUSH NOTIFICATIONS CHANGE:
+                    // Notification alias route: opens the same screen, but directly on the Requests tab.
                     composable(Routes.FRIEND_REQUESTS) {
-                        FriendRequestsScreen(navController)
+                        FriendsAndRequestsScreen(
+                            navController = navController,
+                            initialTab = 2
+                        )
                     }
                 }
             }

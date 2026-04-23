@@ -12,6 +12,7 @@ data class FriendRequest(
     val fromPhotoUrl: String = "",
     val toDisplayName: String = "",
     val toEmail: String = "",
+    //val toPhotoUrl: String = "", // Added toPhotoUrl for outgoing requests
     val status: String = "pending",
     val sentAt: Long = System.currentTimeMillis()
 )

@@ -11,8 +11,8 @@ import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -32,7 +32,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 //For easy mapping in other files
 object Routes {
     const val HOME = "home"
-    const val SEARCH = "search"
+    const val SOCIAL = "social" 
     const val MAP = "map"
     const val CALENDAR = "calendar"
     const val STUDY_ROOM = "studyRoom"
@@ -40,14 +40,26 @@ object Routes {
     const val NOTIFICATIONS = "notifications"
     const val USER_SEARCH = "user_search"
     const val FRIEND_REQUESTS = "friendRequests"
+    const val SEARCH = "search"
+    const val FRIENDS_AND_REQUESTS = "friends_and_requests"
+
+    // MESSAGING: new thread route
+    const val MESSAGE_THREAD_BASE = "message_thread"
+    const val MESSAGE_THREAD = "$MESSAGE_THREAD_BASE/{conversationId}/{friendUserId}"
+
+    // MESSAGING: helper to build a concrete route
+    fun messageThread(conversationId: String, friendUserId: String): String {
+        return "$MESSAGE_THREAD_BASE/$conversationId/$friendUserId"
+    }
 }
 
 @Composable
 fun NavBar(navController: NavHostController) {
     val items = listOf(
-        NavBarItem("Home", "home", Icons.Filled.Home),
-        NavBarItem("Search", "search", Icons.Filled.Search),
-        NavBarItem("Map", "map", Icons.Filled.LocationOn)
+        NavBarItem("Home", Routes.HOME, Icons.Filled.Home),
+        NavBarItem("Social", Routes.SOCIAL, Icons.Filled.People),
+        NavBarItem("Calendar", Routes.CALENDAR, Icons.Filled.CalendarMonth),
+        NavBarItem("Map", Routes.MAP, Icons.Filled.LocationOn)
     )
     val navBarBackground = NavBackground
     val borderColor = Color.Gray.copy(alpha = 0.3f)
@@ -56,7 +68,7 @@ fun NavBar(navController: NavHostController) {
         containerColor = navBarBackground,
         windowInsets = NavigationBarDefaults.windowInsets,
         modifier = Modifier
-            .heightIn(min = 72.dp)
+            .heightIn(min = 80.dp)
             .drawWithContent {
                 drawContent()
                 drawLine(color =
@@ -80,7 +92,12 @@ fun NavBar(navController: NavHostController) {
                     contentDescription = item.title,
                     tint = if(isSelected) BrandRedLight else GrayIcon
                 ) },
-                label = null,
+                label = { 
+                    Text(
+                        text = item.title,
+                        color = if(isSelected) BrandRedLight else GrayIcon
+                    )
+                },
                 selected = isSelected,
                 colors = NavigationBarItemDefaults.colors(
                     indicatorColor = Color.Transparent

@@ -1,5 +1,6 @@
 package com.example.cicompanion.calendar
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -17,6 +18,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun ScrollablePage(
     modifier: Modifier = Modifier,
+    scrollState: ScrollState = rememberScrollState(),
     contentPadding: PaddingValues = PaddingValues(16.dp),
     verticalArrangement: Arrangement.Vertical = Arrangement.Top,
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
@@ -25,7 +27,7 @@ fun ScrollablePage(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(contentPadding),
         verticalArrangement = verticalArrangement,
         horizontalAlignment = horizontalAlignment,

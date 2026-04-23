@@ -8,6 +8,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import com.example.cicompanion.firebase.FriendRequestNotificationSender
 
 object FirebaseAuthManager {
 
@@ -39,7 +40,10 @@ object FirebaseAuthManager {
                     val user = FirebaseAuth.getInstance().currentUser
 
                     if (user != null) {
-                        FirestoreManager.saveUserToFirestore(user)
+                        FirestoreManager.saveUserToFirestore(user) {
+                            FriendRequestNotificationSender.syncCurrentUserFcmToken()
+                        }
+
                         Log.d(TAG, "Signed in successfully as: ${user.email}")
                     } else {
                         Log.e(TAG, "Sign-in succeeded, but currentUser was null.")
