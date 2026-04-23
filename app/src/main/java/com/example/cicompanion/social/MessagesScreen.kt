@@ -47,11 +47,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 
 @Composable
@@ -486,6 +490,7 @@ fun MessageThreadScreen(
                     items(messages, key = { it.id }) { message ->
                         MessageBubble(
                             text = message.text,
+                            sentAt = message.sentAt,
                             isMine = message.senderId == currentUser.uid
                         )
                     }
@@ -548,11 +553,17 @@ private fun ConversationCard(
 @Composable
 private fun MessageBubble(
     text: String,
+    sentAt: Long,
     isMine: Boolean
 ) {
-    Row(
+    val timeString = remember(sentAt) {
+        val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
+        sdf.format(Date(sentAt))
+    }
+
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
+        horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
     ) {
         Card(
             shape = RoundedCornerShape(14.dp),
@@ -566,6 +577,12 @@ private fun MessageBubble(
                 color = if (isMine) Color.White else Color.Black
             )
         }
+        Text(
+            text = timeString,
+            fontSize = 10.sp,
+            color = Color.Gray,
+            modifier = Modifier.padding(top = 2.dp, start = 4.dp, end = 4.dp)
+        )
     }
 }
 
