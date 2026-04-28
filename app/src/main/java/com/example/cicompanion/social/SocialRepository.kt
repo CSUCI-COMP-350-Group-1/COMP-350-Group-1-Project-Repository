@@ -1,9 +1,13 @@
 package com.example.cicompanion.social
 
+import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.QuerySnapshot
+import kotlinx.coroutines.tasks.await
+import java.time.format.DateTimeFormatter
 
 object SocialRepository {
 
@@ -57,6 +61,10 @@ object SocialRepository {
         onSuccess: (UserProfile) -> Unit,
         onError: (String) -> Unit
     ) {
+        if (userId.isBlank()) {
+            onError("Invalid user ID.")
+            return
+        }
         usersCollection().document(userId).get()
             .addOnSuccessListener { document ->
                 val user = document.toObject(UserProfile::class.java)
@@ -240,8 +248,7 @@ object SocialRepository {
     ) {
         friendRequestsCollection()
             .whereEqualTo("fromUserId", currentUserId)
-            .whereEqualTo("status", "pending")
-            .get()
+            .get() 
             .addOnSuccessListener { snapshot ->
                 onSuccess(snapshot.documents.mapNotNull { it.toObject(FriendRequest::class.java) })
             }
@@ -431,8 +438,216 @@ object SocialRepository {
         return user.displayName.ifBlank { user.email }
     }
 
+    // --- EVENT INVITES ---
+
+    fun sendEventInvite(
+        currentUser: FirebaseUser,
+        targetUserId: String,
+        event: CalendarEvent,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val inviteId = "${currentUser.uid}_${targetUserId}_${event.id}"
+        
+        val invite = EventInvite(
+            id = inviteId,
+            fromUserId = currentUser.uid,
+            toUserId = targetUserId,
+            fromDisplayName = currentUser.displayName ?: currentUser.email ?: "Friend",
+            eventId = event.id,
+            eventTitle = event.title,
+            eventDescription = event.description,
+            eventLocation = event.location,
+            eventStart = event.start.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
+            eventEnd = event.endExclusive.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
+            isAllDay = event.isAllDay,
+            isPinnedByLeader = event.isPinned,
+            status = "pending",
+            sentAt = System.currentTimeMillis()
+        )
+
+        eventInvitesCollection().document(inviteId).set(invite)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { onError(it.message ?: "Could not send event invite.") }
+    }
+
+    fun fetchIncomingEventInvites(
+        currentUserId: String,
+        onSuccess: (List<EventInvite>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        eventInvitesCollection()
+            .whereEqualTo("toUserId", currentUserId)
+            .whereEqualTo("status", "pending")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                onSuccess(snapshot.documents.mapNotNull { it.toObject(EventInvite::class.java) })
+            }
+            .addOnFailureListener { exception ->
+                onError(exception.message ?: "Could not fetch event invites.") }
+    }
+
+    fun acceptEventInvite(
+        invite: EventInvite,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val db = FirebaseFirestore.getInstance()
+        val inviteRef = eventInvitesCollection().document(invite.id)
+        
+        db.runTransaction { transaction ->
+            transaction.update(inviteRef, "status", "accepted")
+            
+            // Also save to receiver's custom events
+            val eventData = hashMapOf(
+                "id" to invite.eventId,
+                "title" to invite.eventTitle,
+                "description" to (invite.eventDescription ?: ""),
+                "location" to (invite.eventLocation ?: ""),
+                "start" to invite.eventStart,
+                "end" to invite.eventEnd,
+                "isAllDay" to invite.isAllDay,
+                "calendarId" to "custom",
+                "isPinned" to false,
+                "ownerId" to invite.fromUserId,
+                "isPinnedByLeader" to invite.isPinnedByLeader
+            )
+            
+            val eventRef = db.collection("users").document(invite.toUserId)
+                .collection("customEvents").document(invite.eventId)
+            transaction.set(eventRef, eventData)
+        }.addOnSuccessListener { onSuccess() }
+        .addOnFailureListener { onError(it.message ?: "Could not accept event invite.") }
+    }
+
+    fun declineEventInvite(
+        invite: EventInvite,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        eventInvitesCollection().document(invite.id).delete()
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { onError(it.message ?: "Could not decline event invite.") }
+    }
+
+    /**
+     * Real-time listener for event members
+     */
+    fun listenToEventMembers(
+        eventId: String,
+        onMembersChanged: (List<UserProfile>) -> Unit,
+        onError: (String) -> Unit
+    ): ListenerRegistration {
+        return eventInvitesCollection()
+            .whereEqualTo("eventId", eventId)
+            .whereEqualTo("status", "accepted")
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    onError(e.message ?: "Error listening to members.")
+                    return@addSnapshotListener
+                }
+                
+                if (snapshot == null || snapshot.isEmpty) {
+                    onMembersChanged(emptyList())
+                    return@addSnapshotListener
+                }
+                
+                val memberIds = snapshot.documents.mapNotNull { it.getString("toUserId") }.toSet()
+                
+                if (memberIds.isEmpty()) {
+                    onMembersChanged(emptyList())
+                    return@addSnapshotListener
+                }
+
+                val profiles = mutableListOf<UserProfile>()
+                var loadedCount = 0
+                memberIds.forEach { uid ->
+                    fetchUserProfile(uid, 
+                        onSuccess = { 
+                            profiles.add(it)
+                            if (++loadedCount == memberIds.size) onMembersChanged(profiles) 
+                        },
+                        onError = { 
+                            if (++loadedCount == memberIds.size) onMembersChanged(profiles) 
+                        }
+                    )
+                }
+            }
+    }
+    
+    fun leaveEvent(
+        userId: String,
+        eventId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val db = FirebaseFirestore.getInstance()
+        val eventRef = db.collection("users").document(userId).collection("customEvents").document(eventId)
+        
+        eventInvitesCollection()
+            .whereEqualTo("toUserId", userId)
+            .whereEqualTo("eventId", eventId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                db.runBatch { batch ->
+                    batch.delete(eventRef)
+                    snapshot.documents.forEach { batch.delete(it.reference) }
+                }.addOnSuccessListener { onSuccess() }
+                .addOnFailureListener { onError(it.message ?: "Failed to leave event.") }
+            }
+    }
+
+    fun kickFromEvent(
+        ownerId: String,
+        targetUserId: String,
+        eventId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val db = FirebaseFirestore.getInstance()
+        val inviteId = "${ownerId}_${targetUserId}_${eventId}"
+        val inviteRef = eventInvitesCollection().document(inviteId)
+        val eventRef = db.collection("users").document(targetUserId).collection("customEvents").document(eventId)
+        
+        db.runBatch { batch ->
+            batch.delete(inviteRef)
+            batch.delete(eventRef)
+        }.addOnSuccessListener { onSuccess() }
+        .addOnFailureListener { onError(it.message ?: "Failed to kick user.") }
+    }
+
+    fun deleteEventForAll(
+        ownerId: String,
+        eventId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val db = FirebaseFirestore.getInstance()
+        
+        eventInvitesCollection()
+            .whereEqualTo("eventId", eventId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                db.runTransaction { transaction ->
+                    transaction.delete(db.collection("users").document(ownerId).collection("customEvents").document(eventId))
+                    
+                    snapshot.documents.forEach { doc ->
+                        val memberId = doc.getString("toUserId")
+                        if (memberId != null) {
+                            transaction.delete(db.collection("users").document(memberId).collection("customEvents").document(eventId))
+                        }
+                        transaction.delete(doc.reference)
+                    }
+                }.addOnSuccessListener { onSuccess() }
+                .addOnFailureListener { onError(it.message ?: "Failed to delete event globally.") }
+            }
+    }
+
     private fun usersCollection() = FirebaseFirestore.getInstance().collection("users")
 
     private fun friendRequestsCollection() =
         FirebaseFirestore.getInstance().collection("friend_requests")
+
+    private fun eventInvitesCollection() =
+        FirebaseFirestore.getInstance().collection("event_invites")
 }

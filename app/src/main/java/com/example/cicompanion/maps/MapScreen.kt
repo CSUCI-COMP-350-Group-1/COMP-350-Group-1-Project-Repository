@@ -1,6 +1,7 @@
 package com.example.cicompanion.maps
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,8 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,11 +35,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.cicompanion.calendar.CalendarViewModel
 import com.example.cicompanion.calendar.model.CalendarEvent
@@ -78,91 +79,84 @@ private val MAP_STYLE_JSON = """
     ]
 """.trimIndent()
 
-enum class LocationType { BUILDING, PARKING, FOOD, AREA, HOUSING }
-
-data class CampusLocation(
-    val name: String,
-    val position: LatLng,
-    val description: String,
-    val type: LocationType,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val color: Color
-)
-
 val campusLocations = listOf(
-    CampusLocation("Bell Tower", LatLng(34.16138604361421, -119.0432651672823), "Center of Campus", LocationType.BUILDING, Icons.Default.Business, Color(0xFFD32F2F)),
-    CampusLocation("Bell Tower East", LatLng(34.16134665298329, -119.04189180309578), "", LocationType.BUILDING, Icons.Default.Business, Color(0xFFD32F2F)),
-    CampusLocation("Bell Tower West", LatLng(34.16070116130278, -119.04439859472768), "", LocationType.BUILDING, Icons.Default.Business, Color(0xFFD32F2F)),
-    CampusLocation("John Spoor Broome Library", LatLng(34.16269668565898, -119.04094849136715), "Main Library", LocationType.BUILDING, Icons.AutoMirrored.Filled.MenuBook, Color(0xFF388E3C)),
-    CampusLocation("Student Union", LatLng(34.1610, -119.0436), "Dining and Lounge", LocationType.BUILDING, Icons.Default.Groups, Color(0xFF388E3C)),
-    CampusLocation("Marin Hall", LatLng(34.164528096869034, -119.04507117740494), "Faculty Offices for Mathematics and Data Science", LocationType.BUILDING, Icons.Default.Business, Color(0xFFD32F2F)),
-    CampusLocation("Shasta Hall", LatLng(34.164576865185516, -119.04472618829523), "Faculty Offices for Computer Science and Engineering", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Gateway Hall", LatLng(34.16483652693463, -119.04547452459948), "Large building with classrooms and study rooms", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Napa Hall", LatLng(34.16377605025435, -119.04540741204008), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Solano Hall", LatLng(34.16340620613301, -119.0450085042822), "Offices for faculty, Division of Technology and Innovation", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Martin V. Smith Hall", LatLng(34.162909062826785, -119.04476226672068), "Houses Nursing Program", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Sierra Hall", LatLng(34.16229510038971, -119.04461124101422), "Multimode lecture halls, classrooms and faculty offices.", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Del Norte Hall", LatLng(34.163180726190696, -119.04410235004629), "Lecture classrooms", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Madera Hall", LatLng(34.1629335125641, -119.04394147483745), "Lecture classrooms", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Placer Hall", LatLng(34.163344972360754, -119.04300312204607), "Offices of University Police and Parking Services", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Richard R. Rush Hall", LatLng(34.162673963555044, -119.04342008432133), "Houses the University President and administration.", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Chaparral Hall", LatLng(34.162096255189496, -119.04560917381353), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Ironwood Hall", LatLng(34.16245544107054, -119.04645265103974), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("El Dorado Hall", LatLng(34.16423447296913, -119.04710369220899), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Aliso Hall", LatLng(34.16133147263596, -119.04535150727516), "8 Science Labs and 16 Faculty Offices", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Yuba Hall", LatLng(34.16407767205871, -119.04109248173509), "Houses the Student Health Center", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Sage Hall", LatLng(34.164167218645936, -119.04222881533492), "The Enrollment Center.", LocationType.BUILDING, Icons.Default.School, Color(0xFF388E3C)),
-    CampusLocation("Malibu Hall", LatLng(34.16126160533967, -119.04086506383092), "", LocationType.BUILDING, Icons.Default.School, Color(0xFF388E3C)),
-    CampusLocation("Topanga Hall", LatLng(34.16019137315942, -119.04169333763335), "Art Program facilities and labs.", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Arroyo Hall", LatLng(34.160354318454424, -119.04489629947327), "Wellness and Athletics Office. Recreation Center.", LocationType.BUILDING, Icons.Default.School, Color(0xFF388E3C)),
-    CampusLocation("Trinity Hall", LatLng(34.15934671289535, -119.0423644726643), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Lindero Hall", LatLng(34.15956619235504, -119.04141202350661), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
-    CampusLocation("Ojai Hall", LatLng(34.16173923354911, -119.04257933412188), "", LocationType.BUILDING, Icons.Default.School, Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_bell_tower", name = "Bell Tower", position = LatLng(34.16138604361421, -119.0432651672823), description = "Center of Campus", type = LocationType.BUILDING, icon = Icons.Default.Business, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_bell_tower_east", name = "Bell Tower East", position = LatLng(34.16134665298329, -119.04189180309578), description = "", type = LocationType.BUILDING, icon = Icons.Default.Business, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_bell_tower_west", name = "Bell Tower West", position = LatLng(34.16070116130278, -119.04439859472768), description = "", type = LocationType.BUILDING, icon = Icons.Default.Business, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_library", name = "John Spoor Broome Library", position = LatLng(34.16269668565898, -119.04094849136715), description = "Main Library", type = LocationType.BUILDING, icon = Icons.AutoMirrored.Filled.MenuBook, color = Color(0xFF388E3C)),
+    CampusLocation(id = "loc_union", name = "Student Union", position = LatLng(34.1610, -119.0436), description = "Dining and Lounge", type = LocationType.BUILDING, icon = Icons.Default.Groups, color = Color(0xFF388E3C)),
+    CampusLocation(id = "loc_marin", name = "Marin Hall", position = LatLng(34.164528096869034, -119.04507117740494), description = "Faculty Offices for Mathematics and Data Science", type = LocationType.BUILDING, icon = Icons.Default.Business, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_shasta", name = "Shasta Hall", position = LatLng(34.164576865185516, -119.04472618829523), description = "Faculty Offices for Computer Science and Engineering", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_gateway", name = "Gateway Hall", position = LatLng(34.16483652693463, -119.04547452459948), description = "Large building with classrooms and study rooms", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_napa", name = "Napa Hall", position = LatLng(34.16377605025435, -119.04540741204008), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_solano", name = "Solano Hall", position = LatLng(34.16340620613301, -119.0450085042822), description = "Offices for faculty, Division of Technology and Innovation", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_mvs", name = "Martin V. Smith Hall", position = LatLng(34.162909062826785, -119.04476226672068), description = "Houses Nursing Program", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_sierra", name = "Sierra Hall", position = LatLng(34.16229510038971, -119.04461124101422), description = "Multimode lecture halls, classrooms and faculty offices.", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_del_norte", name = "Del Norte Hall", position = LatLng(34.163180726190696, -119.04410235004629), description = "Lecture classrooms", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_madera", name = "Madera Hall", position = LatLng(34.1629335125641, -119.04394147483745), description = "Lecture classrooms", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_placer", name = "Placer Hall", position = LatLng(34.163344972360754, -119.04300312204607), description = "Offices of University Police and Parking Services", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_rush", name = "Richard R. Rush Hall", position = LatLng(34.162673963555044, -119.04342008432133), description = "Houses the University President and administration.", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_chaparral", name = "Chaparral Hall", position = LatLng(34.162096255189496, -119.04560917381353), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_ironwood", name = "Ironwood Hall", position = LatLng(34.16245544107054, -119.04645265103974), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_el_dorado", name = "El Dorado Hall", position = LatLng(34.16423447296913, -119.04710369220899), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_aliso", name = "Aliso Hall", position = LatLng(34.16133147263596, -119.04535150727516), description = "8 Science Labs and 16 Faculty Offices", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_yuba", name = "Yuba Hall", position = LatLng(34.16407767205871, -119.04109248173509), description = "Houses the Student Health Center", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_sage", name = "Sage Hall", position = LatLng(34.164167218645936, -119.04222881533492), description = "The Enrollment Center.", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFF388E3C)),
+    CampusLocation(id = "loc_malibu", name = "Malibu Hall", position = LatLng(34.16126160533967, -119.04086506383092), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFF388E3C)),
+    CampusLocation(id = "loc_topanga", name = "Topanga Hall", position = LatLng(34.16019137315942, -119.04169333763335), description = "Art Program facilities and labs.", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_arroyo", name = "Arroyo Hall", position = LatLng(34.160354318454424, -119.04489629947327), description = "Wellness and Athletics Office. Recreation Center.", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFF388E3C)),
+    CampusLocation(id = "loc_trinity", name = "Trinity Hall", position = LatLng(34.15934671289535, -119.0423644726643), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_lindero", name = "Lindero Hall", position = LatLng(34.15956619235504, -119.04141202350661), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
+    CampusLocation(id = "loc_ojai", name = "Ojai Hall", position = LatLng(34.16173923354911, -119.04257933412188), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F)),
 
     // Food category
-    CampusLocation("Islands Cafe", LatLng(34.16046259918211, -119.04156950739008), "Dining commons for students and employees.", LocationType.FOOD, Icons.Default.Restaurant, Color(0xFFFF9800)),
-    CampusLocation("Coastal Cup", LatLng(34.16517607999232, -119.04492439787398), "A coffee shop inside Gateway Hall.", LocationType.FOOD, Icons.Default.Restaurant, Color(0xFFFF9800)),
-    CampusLocation("Mom Wong Kitchen", LatLng(34.162865389467136, -119.03934866185736), "Camarillo’s Premier Chinese Restaurant", LocationType.FOOD, Icons.Default.Restaurant, Color(0xFFFF9800)),
-    CampusLocation("Tortillas Grill", LatLng(34.16304512832548, -119.03936598760045), "Mexican Food", LocationType.FOOD, Icons.Default.Restaurant, Color(0xFFFF9800)),
+    CampusLocation(id = "food_islands", name = "Islands Cafe", position = LatLng(34.16046259918211, -119.04156950739008), description = "Dining commons for students and employees.", type = LocationType.FOOD, icon = Icons.Default.Restaurant, color = Color(0xFFFF9800)),
+    CampusLocation(id = "food_coastal", name = "Coastal Cup", position = LatLng(34.16517607999232, -119.04492439787398), description = "A coffee shop inside Gateway Hall.", type = LocationType.FOOD, icon = Icons.Default.Restaurant, color = Color(0xFFFF9800)),
+    CampusLocation(id = "food_mom_wong", name = "Mom Wong Kitchen", position = LatLng(34.162865389467136, -119.03934866185736), description = "Camarillo\u2019s Premier Chinese Restaurant", type = LocationType.FOOD, icon = Icons.Default.Restaurant, color = Color(0xFFFF9800)),
+    CampusLocation(id = "food_tortillas", name = "Tortillas Grill", position = LatLng(34.16304512832548, -119.03936598760045), description = "Mexican Food", type = LocationType.FOOD, icon = Icons.Default.Restaurant, color = Color(0xFFFF9800)),
 
     // Areas category
-    CampusLocation("North Quad", LatLng(34.163869256675795, -119.04439875392643), "", LocationType.AREA, Icons.Default.People, Color(0xFF9C27B0)),
-    CampusLocation("North Field", LatLng(34.167561045970785, -119.04526582938406), "", LocationType.AREA, Icons.Default.Park, Color(0xFF9C27B0)),
-    CampusLocation("Central Mall", LatLng(34.16182005886744, -119.04344776363348), "", LocationType.AREA, Icons.Default.People, Color(0xFF9C27B0)),
-    CampusLocation("Potrero Fields", LatLng(34.159887809784415, -119.04743204832411), "", LocationType.AREA, Icons.Default.Park, Color(0xFF9C27B0)),
-    CampusLocation("South Quad", LatLng(34.160229605621325, -119.04270063156984), "", LocationType.AREA, Icons.Default.People, Color(0xFF9C27B0)),
+    CampusLocation(id = "area_north_quad", name = "North Quad", position = LatLng(34.163869256675795, -119.04439875392643), description = "", type = LocationType.AREA, icon = Icons.Default.People, color = Color(0xFF9C27B0)),
+    CampusLocation(id = "area_north_field", name = "North Field", position = LatLng(34.167561045970785, -119.04526582938406), description = "", type = LocationType.AREA, icon = Icons.Default.Park, color = Color(0xFF9C27B0)),
+    CampusLocation(id = "area_central_mall", name = "Central Mall", position = LatLng(34.16182005886744, -119.04344776363348), description = "", type = LocationType.AREA, icon = Icons.Default.People, color = Color(0xFF9C27B0)),
+    CampusLocation(id = "area_potrero", name = "Potrero Fields", position = LatLng(34.159887809784415, -119.04743204832411), description = "", type = LocationType.AREA, icon = Icons.Default.Park, color = Color(0xFF9C27B0)),
+    CampusLocation(id = "area_south_quad", name = "South Quad", position = LatLng(34.160229605621325, -119.04270063156984), description = "", type = LocationType.AREA, icon = Icons.Default.People, color = Color(0xFF9C27B0)),
 
     // Housing category
-    CampusLocation("Santa Cruz Village", LatLng(34.15909088586997, -119.04255249590989), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
-    CampusLocation("Santa Cruz Village D", LatLng(34.16012344365498, -119.04398722341813), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
-    CampusLocation("Santa Cruz Village E", LatLng(34.15991620770629, -119.04397330984331), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
-    CampusLocation("Santa Cruz Village F", LatLng(34.1597406324177, -119.04394896107382), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
-    CampusLocation("Santa Cruz Village G", LatLng(34.15951036919081, -119.04383417401763), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
-    CampusLocation("Santa Cruz Village H", LatLng(34.1592628355215, -119.04385504439146), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
-    CampusLocation("Anacapa Village A", LatLng(34.15935494115949, -119.04437332533838), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
-    CampusLocation("Anacapa Village B", LatLng(34.1597665369933, -119.04473507848517), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
-    CampusLocation("Anacapa Village C", LatLng(34.15958520481026, -119.04532292734869), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
-    CampusLocation("Anacapa Village Commons Building", LatLng(34.159208147754384, -119.04492291184982), "", LocationType.HOUSING, Icons.Default.Home, Color(0xFF800000)),
+    CampusLocation(id = "house_sc_v", name = "Santa Cruz Village", position = LatLng(34.15909088586997, -119.04255249590989), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
+    CampusLocation(id = "house_sc_d", name = "Santa Cruz Village D", position = LatLng(34.16012344365498, -119.04398722341813), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
+    CampusLocation(id = "house_sc_e", name = "Santa Cruz Village E", position = LatLng(34.15991620770629, -119.04397330984331), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
+    CampusLocation(id = "house_sc_f", name = "Santa Cruz Village F", position = LatLng(34.1597406324177, -119.04394896107382), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
+    CampusLocation(id = "house_sc_g", name = "Santa Cruz Village G", position = LatLng(34.15951036919081, -119.04383417401763), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
+    CampusLocation(id = "house_sc_h", name = "Santa Cruz Village H", position = LatLng(34.1592628355215, -119.04385504439146), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
+    CampusLocation(id = "house_anacapa_a", name = "Anacapa Village A", position = LatLng(34.15935494115949, -119.04437332533838), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
+    CampusLocation(id = "house_anacapa_b", name = "Anacapa Village B", position = LatLng(34.1597665369933, -119.04473507848517), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
+    CampusLocation(id = "house_anacapa_c", name = "Anacapa Village C", position = LatLng(34.15958520481026, -119.04532292734869), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
+    CampusLocation(id = "house_anacapa_com", name = "Anacapa Village Commons Building", position = LatLng(34.159208147754384, -119.04492291184982), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
 
     // Parking Lots
-    CampusLocation("Parking Lot A3", LatLng(34.166606172710715, -119.04703678095836), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
-    CampusLocation("Parking Lot A4", LatLng(34.164244290933254, -119.04646170905023), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
-    CampusLocation("Parking Lot A11", LatLng(34.164126287402695, -119.04786350249398), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
-    CampusLocation("Parking Lot A2", LatLng(34.16410868093253, -119.04164009131796), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
-    CampusLocation("Parking Lot A6", LatLng(34.16325952040607, -119.04202460036679), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
-    CampusLocation("Parking Lot A1", LatLng(34.163586436668446, -119.04267748158364), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
-    CampusLocation("Parking Lot A8", LatLng(34.16309446392495, -119.04030380989158), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
-    CampusLocation("Parking Lot A/E", LatLng(34.16186741815617, -119.04156570455609), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
-    CampusLocation("Parking Lot A7", LatLng(34.160649977624885, -119.04118719083276), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
-    CampusLocation("Parking Lot A10", LatLng(34.15940842843663, -119.04062564402817), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2)),
-    CampusLocation("Parking Lot SH1", LatLng(34.15912561853075, -119.04537811915849), SH_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF00BCD4)),
-    CampusLocation("Parking Lot R1", LatLng(34.1630169076814, -119.04316226033373), RESTRICTED_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF673AB7)),
-    CampusLocation("Parking Lot A5", LatLng(34.16050864644475, -119.04463491964691), GENERAL_PARKING_DESC, LocationType.PARKING, Icons.Default.LocalParking, Color(0xFF1976D2))
+    CampusLocation(id = "park_a3", name = "Parking Lot A3", position = LatLng(34.166606172710715, -119.04703678095836), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
+    CampusLocation(id = "park_a4", name = "Parking Lot A4", position = LatLng(34.164244290933254, -119.04646170905023), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
+    CampusLocation(id = "park_a11", name = "Parking Lot A11", position = LatLng(34.164126287402695, -119.04786350249398), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
+    CampusLocation(id = "park_a2", name = "Parking Lot A2", position = LatLng(34.16410868093253, -119.04164009131796), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
+    CampusLocation(id = "park_a6", name = "Parking Lot A6", position = LatLng(34.16325952040607, -119.04202460036679), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
+    CampusLocation(id = "park_a1", name = "Parking Lot A1", position = LatLng(34.163586436668446, -119.04267748158364), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
+    CampusLocation(id = "park_a8", name = "Parking Lot A8", position = LatLng(34.16309446392495, -119.04030380989158), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
+    CampusLocation(id = "park_ae", name = "Parking Lot A/E", position = LatLng(34.16186741815617, -119.04156570455609), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
+    CampusLocation(id = "park_a7", name = "Parking Lot A7", position = LatLng(34.160649977624885, -119.04118719083276), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
+    CampusLocation(id = "park_a10", name = "Parking Lot A10", position = LatLng(34.15940842843663, -119.04062564402817), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
+    CampusLocation(id = "park_sh1", name = "Parking Lot SH1", position = LatLng(34.15912561853075, -119.04537811915849), description = SH_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF00BCD4)),
+    CampusLocation(id = "park_r1", name = "Parking Lot R1", position = LatLng(34.1630169076814, -119.04316226033373), description = RESTRICTED_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF673AB7)),
+    CampusLocation(id = "park_a5", name = "Parking Lot A5", position = LatLng(34.16050864644475, -119.04463491964691), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2))
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MapScreen(navController: NavHostController, calendarViewModel: CalendarViewModel) {
+fun MapScreen(
+    navController: NavHostController, 
+    calendarViewModel: CalendarViewModel,
+    mapViewModel: MapViewModel = viewModel()
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
@@ -172,6 +166,7 @@ fun MapScreen(navController: NavHostController, calendarViewModel: CalendarViewM
     var isLoadingLocation by remember { mutableStateOf(false) }
     var hasLocationPermission by remember { mutableStateOf(false) }
     var showDetailsSheet by remember { mutableStateOf(false) }
+    var showPinCreationDialog by remember { mutableStateOf(false) }
 
     // search and filtering state
     var searchQuery by remember { mutableStateOf("") }
@@ -182,11 +177,18 @@ fun MapScreen(navController: NavHostController, calendarViewModel: CalendarViewM
         position = CameraPosition.fromLatLngZoom(CSUCI_CENTER, 17f)
     }
 
-    val filteredLocations = remember(searchQuery, filterType) {
-        val trimmedQuery = searchQuery.trim()
-        campusLocations.filter {
-            (trimmedQuery.isEmpty() || it.name.contains(trimmedQuery, ignoreCase = true)) &&
-                    (filterType == null || it.type == filterType)
+    val combinedLocations = remember(mapViewModel.customPins) {
+        campusLocations + mapViewModel.customPins.map { it.toCampusLocation() }
+    }
+
+    val filteredLocations = remember(searchQuery, filterType, combinedLocations, mapViewModel.isPinMode) {
+        if (mapViewModel.isPinMode) emptyList() 
+        else {
+            val trimmedQuery = searchQuery.trim()
+            combinedLocations.filter {
+                (trimmedQuery.isEmpty() || it.name.contains(trimmedQuery, ignoreCase = true)) &&
+                        (filterType == null || it.type == filterType)
+            }
         }
     }
 
@@ -239,26 +241,28 @@ fun MapScreen(navController: NavHostController, calendarViewModel: CalendarViewM
 
     Scaffold(
         topBar = {
-            MapTopControls(
-                searchQuery = searchQuery,
-                onSearchChange = {
-                    searchQuery = it
-                    showSearchResults = it.isNotEmpty()
-                },
-                showSearchResults = showSearchResults,
-                onClearSearch = {
-                    searchQuery = ""
-                    showSearchResults = false
-                },
-                filteredLocations = filteredLocations,
-                onResultClick = { location ->
-                    searchQuery = location.name
-                    showSearchResults = false
-                    selectedLocation = location
-                },
-                filterType = filterType,
-                onFilterClick = { filterType = it }
-            )
+            if (!mapViewModel.isPinMode) {
+                MapTopControls(
+                    searchQuery = searchQuery,
+                    onSearchChange = {
+                        searchQuery = it
+                        showSearchResults = it.isNotEmpty()
+                    },
+                    showSearchResults = showSearchResults,
+                    onClearSearch = {
+                        searchQuery = ""
+                        showSearchResults = false
+                    },
+                    filteredLocations = filteredLocations,
+                    onResultClick = { location ->
+                        searchQuery = location.name
+                        showSearchResults = false
+                        selectedLocation = location
+                    },
+                    filterType = filterType,
+                    onFilterClick = { filterType = it }
+                )
+            }
         }
     ) { paddingValues ->
         Box(
@@ -272,18 +276,27 @@ fun MapScreen(navController: NavHostController, calendarViewModel: CalendarViewM
                 hasLocationPermission = hasLocationPermission,
                 userLocation = userLocation,
                 selectedLocation = selectedLocation,
-                onLocationClick = { location -> selectedLocation = location },
-                onMapClick = {
-                    selectedLocation = null
-                    showSearchResults = false
+                onLocationClick = { location -> 
+                    if (!mapViewModel.isPinMode) selectedLocation = location 
+                },
+                onMapClick = { latLng ->
+                    if (mapViewModel.isPinMode) {
+                        mapViewModel.setTempPin(latLng)
+                    } else {
+                        selectedLocation = null
+                        showSearchResults = false
+                    }
                 },
                 displayLocations = filteredLocations,
-                events = calendarViewModel.events
+                events = calendarViewModel.events,
+                isPinMode = mapViewModel.isPinMode,
+                tempPinLocation = mapViewModel.tempPinLocation
             )
 
             MapOverlays(
                 hasLocationPermission = hasLocationPermission,
                 isLoadingLocation = isLoadingLocation,
+                isPinMode = mapViewModel.isPinMode,
                 onLocationRequest = {
                     scope.launch {
                         isLoadingLocation = true
@@ -292,12 +305,15 @@ fun MapScreen(navController: NavHostController, calendarViewModel: CalendarViewM
                             isLoadingLocation = false
                         }
                     }
-                }
+                },
+                onTogglePinMode = { mapViewModel.togglePinMode() },
+                onConfirmPin = { showPinCreationDialog = true },
+                tempPinSet = mapViewModel.tempPinLocation != null
             )
 
             // Info card for selected location
             AnimatedVisibility(
-                visible = selectedLocation != null,
+                visible = selectedLocation != null && !mapViewModel.isPinMode,
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
                 exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
                 modifier = Modifier.align(Alignment.BottomCenter)
@@ -315,7 +331,7 @@ fun MapScreen(navController: NavHostController, calendarViewModel: CalendarViewM
                 val location = selectedLocation!!
                 val locationEvents = calendarViewModel.events.filter { 
                     (it.calendarId == "custom" || it.isPinned) &&
-                    it.location?.contains(location.name, ignoreCase = true) == true 
+                    (it.location?.contains(location.name, ignoreCase = true) == true || it.id == location.associatedEventId)
                 }
                 
                 ModalBottomSheet(
@@ -330,19 +346,93 @@ fun MapScreen(navController: NavHostController, calendarViewModel: CalendarViewM
                             calendarViewModel.onDateSelected(event.start.toLocalDate())
                             resetMapState()
                             navController.navigate(Routes.CALENDAR)
+                        },
+                        onDeletePin = {
+                            mapViewModel.deletePin(location.id)
+                            showDetailsSheet = false
+                            selectedLocation = null
+                        },
+                        onToggleFavorite = {
+                            val pin = mapViewModel.customPins.find { it.id == location.id }
+                            if (pin != null) {
+                                mapViewModel.toggleFavorite(pin)
+                                selectedLocation = selectedLocation?.copy(isFavorited = !pin.isFavorited)
+                            }
+                        },
+                        onSendMessage = {
+                            navController.navigate("${Routes.SOCIAL}?shareLocation=${location.name}")
+                        },
+                        onAssociateEvent = {
+                            navController.navigate(Routes.CALENDAR)
                         }
                     )
                 }
+            }
+
+            if (showPinCreationDialog) {
+                PinCreationDialog(
+                    onDismiss = { showPinCreationDialog = false },
+                    onConfirm = { name, desc, color ->
+                        mapViewModel.savePin(name, desc, color)
+                        showPinCreationDialog = false
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
+fun PinCreationDialog(onDismiss: () -> Unit, onConfirm: (String, String, Color) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var selectedColor by remember { mutableStateOf(Color(0xFFE91E63)) }
+
+    val colors = listOf(Color(0xFFE91E63), Color(0xFF9C27B0), Color(0xFF2196F3), Color(0xFF4CAF50), Color(0xFFFF9800))
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Create Custom Pin", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(16.dp))
+                Text("Pick a Color", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                    colors.forEach { color ->
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(color, CircleShape)
+                                .border(if (selectedColor == color) 2.dp else 0.dp, Color.Black, CircleShape)
+                                .clickable { selectedColor = color }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(name, description, selectedColor) }, enabled = name.isNotBlank()) {
+                Text("Confirm")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
 fun LocationDetailsContent(
     location: CampusLocation, 
     events: List<CalendarEvent>,
-    onGoToEvent: (CalendarEvent) -> Unit
+    onGoToEvent: (CalendarEvent) -> Unit,
+    onDeletePin: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onSendMessage: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onAssociateEvent: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -360,7 +450,7 @@ fun LocationDetailsContent(
                 Icon(location.icon, contentDescription = null, tint = location.color, modifier = Modifier.size(32.dp))
             }
             Spacer(Modifier.width(16.dp))
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = location.name,
                     style = MaterialTheme.typography.headlineSmall,
@@ -372,6 +462,15 @@ fun LocationDetailsContent(
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.Gray
                 )
+            }
+            if (location.isCustom) {
+                IconButton(onClick = onToggleFavorite) {
+                    Icon(
+                        imageVector = if (location.isFavorited) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = "Favorite",
+                        tint = if (location.isFavorited) Color.Red else Color.Gray
+                    )
+                }
             }
         }
 
@@ -394,6 +493,36 @@ fun LocationDetailsContent(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (location.isCustom) {
+                Button(
+                    onClick = onDeletePin,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.1f), contentColor = Color.Red),
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Delete")
+                }
+            }
+            Button(
+                onClick = onSendMessage,
+                colors = ButtonDefaults.buttonColors(containerColor = BrandRedDark.copy(alpha = 0.1f), contentColor = BrandRedDark),
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Share")
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+
         if (events.isNotEmpty()) {
             Text(
                 text = "Events at this Location",
@@ -411,7 +540,7 @@ fun LocationDetailsContent(
             }
         } else {
             Text(
-                text = "No upcoming custom or pinned events here.",
+                text = "No upcoming events here.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray,
                 modifier = Modifier.padding(vertical = 8.dp)
@@ -579,6 +708,7 @@ fun CategoryFilterRow(selectedType: LocationType?, onFilterClick: (LocationType?
                     LocationType.AREA -> Icons.Default.People
                     LocationType.HOUSING -> Icons.Default.Home
                     LocationType.PARKING -> Icons.Default.LocalParking
+                    LocationType.CUSTOM -> Icons.Default.PushPin
                 }
                 CustomFilterChip(
                     selected = selectedType == type,
@@ -638,18 +768,20 @@ fun MapContent(
     onLocationClick: (CampusLocation) -> Unit,
     onMapClick: (LatLng) -> Unit,
     displayLocations: List<CampusLocation>,
-    events: List<CalendarEvent>
+    events: List<CalendarEvent>,
+    isPinMode: Boolean = false,
+    tempPinLocation: LatLng? = null
 ) {
-    val uiSettings = remember {
+    val uiSettings = remember(isPinMode) {
         MapUiSettings(
             myLocationButtonEnabled = false,
-            zoomControlsEnabled = true,
+            zoomControlsEnabled = !isPinMode,
             compassEnabled = true,
             mapToolbarEnabled = false
         )
     }
 
-    val mapProperties = remember(hasLocationPermission) {
+    val mapProperties = remember(hasLocationPermission, isPinMode) {
         MapProperties(
             isMyLocationEnabled = false,
             latLngBoundsForCameraTarget = CSUCI_BOUNDS,
@@ -667,30 +799,46 @@ fun MapContent(
     ) {
         if (userLocation != null) UserLocationMarker(userLocation)
 
-        displayLocations.forEach { location ->
-            val isSelected = selectedLocation?.name == location.name
-            // Only include custom and pinned events on the map to reduce clutter
-            val locationEvents = events.filter { 
-                (it.calendarId == "custom" || it.isPinned) &&
-                it.location?.contains(location.name, ignoreCase = true) == true 
+        if (isPinMode) {
+            tempPinLocation?.let {
+                Marker(
+                    state = rememberMarkerState(position = it),
+                    title = "New Custom Pin",
+                    icon = com.google.android.gms.maps.model.BitmapDescriptorFactory.defaultMarker(com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_AZURE)
+                )
             }
-            val eventCount = locationEvents.size
-            val hasPinnedEvent = locationEvents.any { it.isPinned }
+        } else {
+            displayLocations.forEach { location ->
+                val isSelected = selectedLocation?.id == location.id
+                val locationEvents = events.filter { 
+                    (it.calendarId == "custom" || it.isPinned) &&
+                    (it.location?.contains(location.name, ignoreCase = true) == true || it.id == location.associatedEventId)
+                }
+                val eventCount = locationEvents.size
+                val hasPinnedEvent = locationEvents.any { it.isPinned }
 
-            key(location.name, isSelected, eventCount, hasPinnedEvent) {
-                MarkerComposable(
-                    state = rememberMarkerState(position = location.position),
-                    zIndex = if (isSelected) 100f else 1f,
-                    anchor = Offset(0.5f, if (isSelected) 1.0f else 0.5f),
-                    onClick = {
-                        onLocationClick(location)
-                        true 
-                    }
-                ) {
-                    if (isSelected) {
-                        SelectedPointerIcon(location, eventCount, hasPinnedEvent)
-                    } else {
-                        LandmarkIcon(icon = location.icon, color = location.color, eventCount = eventCount, hasPinnedEvent = hasPinnedEvent)
+                key(location.id, location.name, isSelected, eventCount, hasPinnedEvent, location.isCustom, location.isFavorited) {
+                    MarkerComposable(
+                        state = rememberMarkerState(position = location.position),
+                        zIndex = if (isSelected) 100f else 1f,
+                        anchor = Offset(0.5f, if (isSelected) 1.0f else 0.5f),
+                        onClick = {
+                            onLocationClick(location)
+                            true 
+                        }
+                    ) {
+                        if (isSelected) {
+                            SelectedPointerIcon(location, eventCount, hasPinnedEvent)
+                        } else {
+                            LandmarkIcon(
+                                icon = location.icon, 
+                                color = location.color, 
+                                eventCount = eventCount, 
+                                hasPinnedEvent = hasPinnedEvent,
+                                isCustom = location.isCustom,
+                                isFavorited = location.isFavorited
+                            )
+                        }
                     }
                 }
             }
@@ -717,20 +865,18 @@ fun SelectedPointerIcon(location: CampusLocation, eventCount: Int = 0, hasPinned
             .size(75.dp) 
             .graphicsLayer(translationY = bounce)
     ) {
-        // Pointer Pin color based on location color
         Icon(
             imageVector = Icons.Default.LocationOn,
             contentDescription = null,
             tint = location.color,
             modifier = Modifier.fillMaxSize()
         )
-        // Icon on top in white circle with dynamic border if events exist
         Surface(
             shape = CircleShape,
             color = Color.White,
             modifier = Modifier.padding(top = 10.dp).size(30.dp),
-            // Orange/Purple border depending on event type
             border = BorderStroke(2.5.dp, when {
+                location.isFavorited -> Color(0xFFFFD700) // Gold for favorited custom pins
                 hasPinnedEvent -> Color(0xFF9C27B0) // Purple for pinned
                 eventCount > 0 -> BrandOrange // Orange for regular events
                 else -> location.color
@@ -739,7 +885,7 @@ fun SelectedPointerIcon(location: CampusLocation, eventCount: Int = 0, hasPinned
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    imageVector = location.icon,
+                    imageVector = if (location.isCustom) Icons.Default.PushPin else location.icon,
                     contentDescription = null,
                     tint = location.color,
                     modifier = Modifier.size(20.dp)
@@ -747,7 +893,6 @@ fun SelectedPointerIcon(location: CampusLocation, eventCount: Int = 0, hasPinned
             }
         }
 
-        //  dot for events
         if (eventCount > 0) {
             Box(
                 modifier = Modifier
@@ -761,14 +906,21 @@ fun SelectedPointerIcon(location: CampusLocation, eventCount: Int = 0, hasPinned
 }
 
 @Composable
-fun LandmarkIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, eventCount: Int = 0, hasPinnedEvent: Boolean = false) {
+fun LandmarkIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector, 
+    color: Color, 
+    eventCount: Int = 0, 
+    hasPinnedEvent: Boolean = false,
+    isCustom: Boolean = false,
+    isFavorited: Boolean = false
+) {
     Box(contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier
                 .size(34.dp)
                 .background(color, CircleShape)
-                // Border highlight for events
                 .border(2.5.dp, when {
+                    isFavorited -> Color(0xFFFFD700) // Gold border for favorited
                     hasPinnedEvent -> Color(0xFF9C27B0) // Purple for pinned
                     eventCount > 0 -> BrandOrange // Orange for regular events
                     else -> Color.White
@@ -777,10 +929,14 @@ fun LandmarkIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, color: C
                 .padding(7.dp),
             contentAlignment = Alignment.Center
         ) {
-            Icon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Icon(
+                imageVector = if (isCustom) Icons.Default.PushPin else icon, 
+                contentDescription = null, 
+                tint = Color.White, 
+                modifier = Modifier.size(20.dp)
+            )
         }
 
-        //  dot for events
         if (eventCount > 0) {
             Box(
                 modifier = Modifier
@@ -810,7 +966,12 @@ fun LocationInfoCard(location: CampusLocation, onClose: () -> Unit, onDetailsCli
                     modifier = Modifier.size(44.dp).background(location.color.copy(alpha = 0.1f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(location.icon, contentDescription = null, tint = location.color, modifier = Modifier.size(24.dp))
+                    Icon(
+                        imageVector = if (location.isCustom) Icons.Default.PushPin else location.icon, 
+                        contentDescription = null, 
+                        tint = location.color, 
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -852,21 +1013,74 @@ fun UserLocationMarker(position: LatLng) {
 }
 
 @Composable
-fun MapOverlays(hasLocationPermission: Boolean, isLoadingLocation: Boolean, onLocationRequest: () -> Unit) {
+fun MapOverlays(
+    hasLocationPermission: Boolean, 
+    @Suppress("UNUSED_PARAMETER") isLoadingLocation: Boolean, 
+    isPinMode: Boolean,
+    onLocationRequest: () -> Unit,
+    onTogglePinMode: () -> Unit,
+    onConfirmPin: () -> Unit,
+    tempPinSet: Boolean
+) {
     Box(modifier = Modifier.fillMaxSize()) {
-        if (hasLocationPermission) {
+        Column(
+            modifier = Modifier.align(Alignment.BottomStart).padding(20.dp).padding(bottom = 90.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (hasLocationPermission && !isPinMode) {
+                FloatingActionButton(
+                    onClick = onLocationRequest,
+                    shape = CircleShape,
+                    containerColor = Color.White,
+                    contentColor = BrandRedDark,
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
+                ) {
+                    Icon(painter = painterResource(id = android.R.drawable.ic_menu_mylocation), contentDescription = "My Location", modifier = Modifier.size(24.dp))
+                }
+            }
+
             FloatingActionButton(
-                onClick = onLocationRequest,
-                modifier = Modifier.align(Alignment.BottomStart).padding(20.dp).padding(bottom = 90.dp),
+                onClick = onTogglePinMode,
                 shape = CircleShape,
-                containerColor = Color.White,
-                contentColor = BrandRedDark,
+                containerColor = if (isPinMode) BrandRedDark else Color.White,
+                contentColor = if (isPinMode) Color.White else BrandRedDark,
                 elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
             ) {
-                Icon(painter = painterResource(id = android.R.drawable.ic_menu_mylocation), contentDescription = "My Location", modifier = Modifier.size(24.dp))
+                Icon(
+                    imageVector = if (isPinMode) Icons.Default.Close else Icons.Default.AddLocationAlt, 
+                    contentDescription = "Custom Pin", 
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
-        if (isLoadingLocation) CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = BrandRedDark, strokeWidth = 4.dp)
+
+        if (isPinMode) {
+            Surface(
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+                shape = RoundedCornerShape(20.dp),
+                color = BrandRedDark,
+                shadowElevation = 8.dp
+            ) {
+                Text(
+                    text = if (tempPinSet) "Tap 'Confirm' to save pin" else "Tap anywhere on map to place pin",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            if (tempPinSet) {
+                Button(
+                    onClick = onConfirmPin,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandRedDark),
+                    shape = RoundedCornerShape(50)
+                ) {
+                    Text("Confirm Pin Location", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
         if (!hasLocationPermission) PermissionCard(modifier = Modifier.align(Alignment.Center))
     }
 }
@@ -882,6 +1096,7 @@ fun PermissionCard(modifier: Modifier) {
     }
 }
 
+@SuppressLint("MissingPermission")
 suspend fun fetchLocation(fusedLocationProviderClient: FusedLocationProviderClient, cameraState: CameraPositionState, shouldAnimate: Boolean = true, onResult: (LatLng) -> Unit) {
     try {
         var location = fusedLocationProviderClient.lastLocation.await()
@@ -893,5 +1108,5 @@ suspend fun fetchLocation(fusedLocationProviderClient: FusedLocationProviderClie
             onResult(latLng)
             if (shouldAnimate) cameraState.animate(CameraUpdateFactory.newLatLngZoom(latLng, 17f))
         }
-    } catch (e: Exception) {}
+    } catch (_: Exception) {}
 }

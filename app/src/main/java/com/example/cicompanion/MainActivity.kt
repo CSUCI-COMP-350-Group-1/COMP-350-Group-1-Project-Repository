@@ -1,5 +1,7 @@
 package com.example.cicompanion
 
+import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -15,15 +17,22 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.cicompanion.appNavigation.DrawerProfileContent
 import com.example.cicompanion.appNavigation.TopBar
 import com.example.cicompanion.appNavigation.screenTitleForRoute
@@ -32,40 +41,26 @@ import com.example.cicompanion.calendar.CalendarApp
 import com.example.cicompanion.home.HomeScreen
 import com.example.cicompanion.home.HomeViewModel
 import com.example.cicompanion.maps.MapScreen
-import com.example.cicompanion.social.FriendsAndRequestsScreen
-import com.example.cicompanion.social.ProfileScreen
+import com.example.cicompanion.maps.MapViewModel
 import com.example.cicompanion.social.*
 import com.example.cicompanion.studyRoom.RoomListScreen
 import com.example.cicompanion.ui.NavBar
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.CICompanionTheme
-import kotlinx.coroutines.launch
-import android.Manifest
-import android.content.Intent
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.NavType
-import androidx.navigation.navArgument
 import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.example.cicompanion.notifications.PushNotificationService
 import com.example.cicompanion.sidebar.SearchScreen
 import com.google.firebase.auth.FirebaseAuth
-import com.example.cicompanion.social.MessagesScreen
-import com.example.cicompanion.social.MessageThreadScreen
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.messaging.FirebaseMessaging
-
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-    // FOR PUSH NOTIFICATIONS runtime permission launcher for Android 13+
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
 
     private var pendingNotificationRoute by mutableStateOf<String?>(null)
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -80,10 +75,6 @@ class MainActivity : ComponentActivity() {
             FriendRequestNotificationSender.syncCurrentUserFcmToken()
         }
 
-        //PRINTS FCM TOKEN
-        /*FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-            android.util.Log.d("FCM_TOKEN", "Token: $token")
-        }*/
         enableEdgeToEdge()
         setContent {
             CICompanionTheme {
@@ -105,7 +96,7 @@ class MainActivity : ComponentActivity() {
             PushNotificationService.EXTRA_DESTINATION_ROUTE
         )
     }
-    // PUSH NOTIFICATIONS helper for Android 13+ notification permission
+
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
 
@@ -129,9 +120,10 @@ fun AppNavigation(notificationRoute: String? = null,
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // Create shared ViewModels here to sync across screens and persist during navigation
+    // Shared ViewModels to sync state across the app
     val calendarViewModel: CalendarViewModel = viewModel()
     val homeViewModel: HomeViewModel = viewModel()
+    val mapViewModel: MapViewModel = viewModel()
 
     LaunchedEffect(notificationRoute) {
         if (!notificationRoute.isNullOrBlank()) {
@@ -168,12 +160,11 @@ fun AppNavigation(notificationRoute: String? = null,
                     title = currentScreenTitle,
                     showBackButton =
                         currentRoute == Routes.FRIENDS_AND_REQUESTS ||
-                                currentRoute?.startsWith(Routes.MESSAGE_THREAD_BASE) == true, // MESSAGING
+                                currentRoute?.startsWith(Routes.MESSAGE_THREAD_BASE) == true,
                     onHamburgerClick = {
                         scope.launch { drawerState.open() }
                     },
                     onBackClick = {
-                        // MESSAGING  prefer normal back-stack behavior for thread screens
                         val popped = navController.popBackStack()
                         if (!popped) {
                             navController.navigate(Routes.PROFILE) {
@@ -182,9 +173,7 @@ fun AppNavigation(notificationRoute: String? = null,
                             }
                         }
                     },
-                    onNotificationClick = {
-                        // navController.navigate(Routes.NOTIFICATIONS)
-                    },
+                    onNotificationClick = { },
                     navController = navController
                 )
             },
@@ -193,10 +182,10 @@ fun AppNavigation(notificationRoute: String? = null,
             Box(modifier = Modifier.padding(paddingValues)) {
                 NavHost(navController = navController, startDestination = Routes.HOME) {
                     composable(Routes.HOME) {
-                        HomeScreen(navController, calendarViewModel)
+                        HomeScreen(navController, calendarViewModel, homeViewModel, mapViewModel)
                     }
                     composable(Routes.MAP) {
-                        MapScreen(navController, calendarViewModel)
+                        MapScreen(navController, calendarViewModel, mapViewModel)
                     }
                     composable(Routes.CALENDAR) {
                         CalendarApp(viewModel = calendarViewModel)
@@ -208,12 +197,10 @@ fun AppNavigation(notificationRoute: String? = null,
                         SearchScreen(navController)
                     }
 
-                    // Base profile route
                     composable(Routes.PROFILE) {
                         ProfileScreen(navController)
                     }
 
-                    // Profile route with userId path parameter
                     composable(
                         route = "${Routes.PROFILE}/{userId}",
                         arguments = listOf(navArgument("userId") { type = NavType.StringType })
@@ -222,34 +209,37 @@ fun AppNavigation(notificationRoute: String? = null,
                         ProfileScreen(navController, userId)
                     }
 
-                    composable(Routes.SOCIAL) {
-                        // MESSAGING
-                        MessagesScreen(navController)
+                    composable(Routes.SOCIAL) { backStackEntry ->
+                        val sharedLocation = backStackEntry.arguments?.getString("shareLocation")
+                        MessagesScreen(navController, sharedLocation)
                     }
-                    composable(Routes.MESSAGE_THREAD) { backStackEntry ->
-                        // MESSAGING CHANGE
+
+                    composable(
+                        route = Routes.MESSAGE_THREAD,
+                        arguments = listOf(
+                            navArgument("conversationId") { type = NavType.StringType },
+                            navArgument("friendUserId") { type = NavType.StringType },
+                            navArgument("initialMessage") { type = NavType.StringType; nullable = true }
+                        )
+                    ) { backStackEntry ->
                         val conversationId = backStackEntry.arguments?.getString("conversationId").orEmpty()
                         val friendUserId = backStackEntry.arguments?.getString("friendUserId").orEmpty()
+                        val initialMessage = backStackEntry.arguments?.getString("initialMessage")
 
                         MessageThreadScreen(
                             navController = navController,
                             conversationId = conversationId,
-                            friendUserId = friendUserId
+                            friendUserId = friendUserId,
+                            initialMessage = initialMessage
                         )
                     }
+
                     composable(Routes.FRIENDS_AND_REQUESTS) {
-                        FriendsAndRequestsScreen(
-                            navController = navController,
-                            initialTab = 1
-                        )
+                        FriendsAndRequestsScreen(navController, initialTab = 1)
                     }
-                    // PUSH NOTIFICATIONS CHANGE:
-                    // Notification alias route: opens the same screen, but directly on the Requests tab.
+
                     composable(Routes.FRIEND_REQUESTS) {
-                        FriendsAndRequestsScreen(
-                            navController = navController,
-                            initialTab = 2
-                        )
+                        FriendsAndRequestsScreen(navController, initialTab = 2)
                     }
                 }
             }

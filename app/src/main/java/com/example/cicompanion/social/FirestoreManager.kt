@@ -4,6 +4,7 @@ import android.util.Log
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.maps.CampusLocation
 import com.example.cicompanion.maps.LocationType
+import com.example.cicompanion.maps.CustomPin
 import com.google.android.gms.maps.model.LatLng
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
@@ -88,7 +89,10 @@ object FirestoreManager {
             "end" to event.endExclusive.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
             "isAllDay" to event.isAllDay,
             "calendarId" to "custom",
-            "isPinned" to event.isPinned
+            "isPinned" to event.isPinned,
+            "ownerId" to (event.ownerId ?: user.uid),
+            "maxMembers" to event.maxMembers,
+            "isPinnedByLeader" to event.isPinnedByLeader
         )
 
         return try {
@@ -152,6 +156,9 @@ object FirestoreManager {
                 val endStr = doc.getString("end") ?: return@mapNotNull null
                 val isAllDay = doc.getBoolean("isAllDay") ?: false
                 val isPinned = doc.getBoolean("isPinned") ?: false
+                val ownerId = doc.getString("ownerId")
+                val maxMembers = doc.getLong("maxMembers")?.toInt()
+                val isPinnedByLeader = doc.getBoolean("isPinnedByLeader") ?: false
 
                 CalendarEvent(
                     id = id,
@@ -163,12 +170,92 @@ object FirestoreManager {
                     start = ZonedDateTime.parse(startStr),
                     endExclusive = ZonedDateTime.parse(endStr),
                     isAllDay = isAllDay,
-                    isPinned = isPinned
+                    isPinned = isPinned,
+                    ownerId = ownerId,
+                    maxMembers = maxMembers,
+                    isPinnedByLeader = isPinnedByLeader
                 )
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching custom events", e)
             emptyList()
+        }
+    }
+
+    // CUSTOM PINS
+    suspend fun saveCustomPin(pin: CustomPin): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        val db = FirebaseFirestore.getInstance()
+        val pinData = hashMapOf(
+            "id" to pin.id,
+            "userId" to user.uid,
+            "name" to pin.name,
+            "latitude" to pin.latitude,
+            "longitude" to pin.longitude,
+            "description" to pin.description,
+            "colorArgb" to pin.colorArgb,
+            "isFavorited" to pin.isFavorited,
+            "associatedEventId" to pin.associatedEventId
+        )
+
+        return try {
+            db.collection("users").document(user.uid)
+                .collection("customPins").document(pin.id)
+                .set(pinData)
+                .await()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving custom pin", e)
+            false
+        }
+    }
+
+    suspend fun fetchCustomPins(): List<CustomPin> {
+        val user = FirebaseAuth.getInstance().currentUser ?: return emptyList()
+        val db = FirebaseFirestore.getInstance()
+
+        return try {
+            val snapshot = db.collection("users").document(user.uid)
+                .collection("customPins")
+                .get()
+                .await()
+
+            snapshot.documents.mapNotNull { doc ->
+                doc.toObject(CustomPin::class.java)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching custom pins", e)
+            emptyList()
+        }
+    }
+
+    suspend fun deleteCustomPin(pinId: String): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        val db = FirebaseFirestore.getInstance()
+        return try {
+            db.collection("users").document(user.uid)
+                .collection("customPins").document(pinId)
+                .delete()
+                .await()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting custom pin", e)
+            false
+        }
+    }
+
+    suspend fun updateCustomPin(pin: CustomPin): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        val db = FirebaseFirestore.getInstance()
+        return try {
+            db.collection("users").document(user.uid)
+                .collection("customPins").document(pin.id)
+                .set(pin, SetOptions.merge())
+                .await()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating custom pin", e)
+            false
         }
     }
 
@@ -179,6 +266,7 @@ object FirestoreManager {
             if (snapshot.isEmpty) return emptyList()
 
             snapshot.documents.mapNotNull { doc ->
+                val id = doc.id
                 val name = doc.getString("name") ?: ""
                 val lat = doc.getDouble("latitude") ?: 0.0
                 val lng = doc.getDouble("longitude") ?: 0.0
@@ -194,9 +282,18 @@ object FirestoreManager {
                     LocationType.AREA -> Icons.Default.People
                     LocationType.HOUSING -> Icons.Default.Home
                     LocationType.PARKING -> Icons.Default.LocalParking
+                    LocationType.CUSTOM -> Icons.Default.PushPin
                 }
 
-                CampusLocation(name, LatLng(lat, lng), description, type, icon, color)
+                CampusLocation(
+                    id = id,
+                    name = name,
+                    position = LatLng(lat, lng),
+                    description = description,
+                    type = type,
+                    icon = icon,
+                    color = color
+                )
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching campus locations", e)

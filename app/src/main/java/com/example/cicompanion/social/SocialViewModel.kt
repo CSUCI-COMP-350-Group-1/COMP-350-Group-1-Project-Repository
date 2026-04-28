@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.cicompanion.calendar.model.CalendarEvent
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 
@@ -19,6 +20,9 @@ class SocialViewModel : ViewModel() {
         private set
 
     var outgoingRequests by mutableStateOf<List<FriendRequest>>(emptyList())
+        private set
+
+    var incomingEventInvites by mutableStateOf<List<EventInvite>>(emptyList())
         private set
 
     var isLoading by mutableStateOf(false)
@@ -57,6 +61,7 @@ class SocialViewModel : ViewModel() {
             )
 
             refreshRequests()
+            refreshEventInvites()
             isLoading = false
         }
     }
@@ -75,13 +80,22 @@ class SocialViewModel : ViewModel() {
         )
     }
 
+    fun refreshEventInvites() {
+        val user = FirebaseAuth.getInstance().currentUser ?: return
+        SocialRepository.fetchIncomingEventInvites(
+            currentUserId = user.uid,
+            onSuccess = { incomingEventInvites = it },
+            onError = { errorMessage = it }
+        )
+    }
+
     fun sendRequest(targetUser: UserProfile, onSuccess: () -> Unit = {}) {
         val currentUser = FirebaseAuth.getInstance().currentUser ?: return
         SocialRepository.sendFriendRequest(
             currentUser = currentUser,
             targetUser = targetUser,
             onSuccess = {
-                requestStatuses[targetUser.uid] = "pending"
+                requestStatuses[targetUser.uid] = "pending_sent"
                 refreshRequests()
                 onSuccess()
             },
@@ -122,6 +136,39 @@ class SocialViewModel : ViewModel() {
             onSuccess = {
                 requestStatuses.remove(friend.uid)
                 refreshAll()
+                onSuccess()
+            },
+            onError = { errorMessage = it }
+        )
+    }
+
+    fun inviteToEvent(targetUserId: String, event: CalendarEvent, onSuccess: () -> Unit = {}) {
+        val currentUser = FirebaseAuth.getInstance().currentUser ?: return
+        SocialRepository.sendEventInvite(
+            currentUser = currentUser,
+            targetUserId = targetUserId,
+            event = event,
+            onSuccess = onSuccess,
+            onError = { errorMessage = it }
+        )
+    }
+
+    fun acceptInvite(invite: EventInvite, onSuccess: () -> Unit = {}) {
+        SocialRepository.acceptEventInvite(
+            invite = invite,
+            onSuccess = {
+                refreshEventInvites()
+                onSuccess()
+            },
+            onError = { errorMessage = it }
+        )
+    }
+
+    fun declineInvite(invite: EventInvite, onSuccess: () -> Unit = {}) {
+        SocialRepository.declineEventInvite(
+            invite = invite,
+            onSuccess = {
+                refreshEventInvites()
                 onSuccess()
             },
             onError = { errorMessage = it }

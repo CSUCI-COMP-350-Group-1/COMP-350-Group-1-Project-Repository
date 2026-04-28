@@ -20,12 +20,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.cicompanion.appNavigation.FeatureCard
 import com.example.cicompanion.appNavigation.allAvailableFeatures
 import com.example.cicompanion.calendar.CalendarViewModel
 import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.maps.MapViewModel
+import com.example.cicompanion.maps.CustomPin
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.BrandRedDark
@@ -38,7 +41,8 @@ import java.time.format.DateTimeFormatter
 fun HomeScreen(
     navController: NavHostController,
     calendarViewModel: CalendarViewModel = viewModel(),
-    homeViewModel: HomeViewModel = viewModel()
+    homeViewModel: HomeViewModel = viewModel(),
+    mapViewModel: MapViewModel = viewModel()
 ) {
     // Observe auth state to ensure customization is loaded when user signs in/out
     var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
@@ -61,11 +65,16 @@ fun HomeScreen(
         calendarViewModel.events.filter { it.isPinned }
     }
 
+    val favoritePins = remember(mapViewModel.customPins) {
+        mapViewModel.customPins.filter { it.isFavorited }
+    }
+
     var showCustomizer by remember { mutableStateOf(false) }
 
     // Trigger load customization whenever the user ID changes (login, logout, or swap)
     LaunchedEffect(currentUser?.uid) {
         homeViewModel.loadCustomization()
+        mapViewModel.loadCustomPins()
     }
 
     LazyColumn(
@@ -81,16 +90,18 @@ fun HomeScreen(
             )
         }
 
-        if (pinnedEvents.isNotEmpty()) {
+        if (pinnedEvents.isNotEmpty() || favoritePins.isNotEmpty()) {
             item {
                 Text(
-                    text = "Pinned Reminders",
+                    text = "Pinned & Favorites",
                     modifier = Modifier.padding(start = 16.dp, top = 24.dp),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
                 )
             }
+            
+            // Pinned Events
             items(pinnedEvents) { event ->
                 PinnedEventItem(
                     event = event,
@@ -99,6 +110,16 @@ fun HomeScreen(
                         calendarViewModel.onDateSelected(event.start.toLocalDate())
                         calendarViewModel.setHighlightedEvent(event.id)
                         navController.navigate(Routes.CALENDAR)
+                    }
+                )
+            }
+
+            // Favorite Pins
+            items(favoritePins) { pin ->
+                FavoritePinItem(
+                    pin = pin,
+                    onNavigateToMap = {
+                        navController.navigate(Routes.MAP)
                     }
                 )
             }
@@ -179,6 +200,65 @@ fun HomeScreen(
                 showCustomizer = false
             }
         )
+    }
+}
+
+@Composable
+fun FavoritePinItem(pin: CustomPin, onNavigateToMap: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(12.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.Favorite,
+                contentDescription = null,
+                tint = Color(0xFFFFD700), // Gold
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = pin.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "Custom Pin • ${pin.description}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(BrandRedDark.copy(alpha = 0.1f))
+                    .clickable(onClick = onNavigateToMap),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Map,
+                    contentDescription = "View on Map",
+                    tint = BrandRedDark,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
     }
 }
 
