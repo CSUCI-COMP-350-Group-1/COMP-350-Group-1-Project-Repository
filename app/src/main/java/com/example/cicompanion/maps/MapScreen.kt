@@ -33,6 +33,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -330,7 +331,7 @@ fun MapScreen(
             if (showDetailsSheet && selectedLocation != null) {
                 val location = selectedLocation!!
                 val locationEvents = calendarViewModel.events.filter { 
-                    (it.calendarId == "custom" || it.isPinned) &&
+                    (it.calendarId == "custom" || it.isPinned || it.isBookmarked) &&
                     (it.location?.contains(location.name, ignoreCase = true) == true || it.id == location.associatedEventId)
                 }
                 
@@ -567,16 +568,27 @@ fun MapEventItem(event: CalendarEvent, onMoreClick: () -> Unit) {
                 modifier = Modifier
                     .size(40.dp)
                     .background(
-                        if (event.isPinned) Color(0xFF9C27B0).copy(alpha = 0.1f) 
-                        else BrandOrange.copy(alpha = 0.1f), 
+                        when {
+                            event.isPinned -> Color(0xFF9C27B0).copy(alpha = 0.1f)
+                            event.isBookmarked -> Color(0xFFFFC107).copy(alpha = 0.1f)
+                            else -> BrandOrange.copy(alpha = 0.1f)
+                        }, 
                         CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = if (event.isPinned) Icons.Default.PushPin else Icons.Default.Event,
+                    imageVector = when {
+                        event.isPinned -> Icons.Default.PushPin
+                        event.isBookmarked -> Icons.Default.Bookmark
+                        else -> Icons.Default.Event
+                    },
                     contentDescription = null,
-                    tint = if (event.isPinned) Color(0xFF9C27B0) else BrandOrange,
+                    tint = when {
+                        event.isPinned -> Color(0xFF9C27B0)
+                        event.isBookmarked -> Color(0xFFFFC107)
+                        else -> BrandOrange
+                    },
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -811,13 +823,14 @@ fun MapContent(
             displayLocations.forEach { location ->
                 val isSelected = selectedLocation?.id == location.id
                 val locationEvents = events.filter { 
-                    (it.calendarId == "custom" || it.isPinned) &&
+                    (it.calendarId == "custom" || it.isPinned || it.isBookmarked) &&
                     (it.location?.contains(location.name, ignoreCase = true) == true || it.id == location.associatedEventId)
                 }
                 val eventCount = locationEvents.size
                 val hasPinnedEvent = locationEvents.any { it.isPinned }
+                val hasBookmarkedEvent = locationEvents.any { it.isBookmarked }
 
-                key(location.id, location.name, isSelected, eventCount, hasPinnedEvent, location.isCustom, location.isFavorited) {
+                key(location.id, location.name, isSelected, eventCount, hasPinnedEvent, hasBookmarkedEvent, location.isCustom, location.isFavorited) {
                     MarkerComposable(
                         state = rememberMarkerState(position = location.position),
                         zIndex = if (isSelected) 100f else 1f,
@@ -828,13 +841,14 @@ fun MapContent(
                         }
                     ) {
                         if (isSelected) {
-                            SelectedPointerIcon(location, eventCount, hasPinnedEvent)
+                            SelectedPointerIcon(location, eventCount, hasPinnedEvent, hasBookmarkedEvent)
                         } else {
                             LandmarkIcon(
                                 icon = location.icon, 
                                 color = location.color, 
                                 eventCount = eventCount, 
                                 hasPinnedEvent = hasPinnedEvent,
+                                hasBookmarkedEvent = hasBookmarkedEvent,
                                 isCustom = location.isCustom,
                                 isFavorited = location.isFavorited
                             )
@@ -847,7 +861,12 @@ fun MapContent(
 }
 
 @Composable
-fun SelectedPointerIcon(location: CampusLocation, eventCount: Int = 0, hasPinnedEvent: Boolean = false) {
+fun SelectedPointerIcon(
+    location: CampusLocation, 
+    eventCount: Int = 0, 
+    hasPinnedEvent: Boolean = false,
+    hasBookmarkedEvent: Boolean = false
+) {
     val infiniteTransition = rememberInfiniteTransition(label = "markerBounce")
     val bounce by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -876,6 +895,7 @@ fun SelectedPointerIcon(location: CampusLocation, eventCount: Int = 0, hasPinned
             color = Color.White,
             modifier = Modifier.padding(top = 10.dp).size(30.dp),
             border = BorderStroke(2.5.dp, when {
+                hasBookmarkedEvent -> Color.Red // Red for bookmarked CSUCI
                 location.isFavorited -> Color(0xFFFFD700) // Gold for favorited custom pins
                 hasPinnedEvent -> Color(0xFF9C27B0) // Purple for pinned
                 eventCount > 0 -> BrandOrange // Orange for regular events
@@ -898,7 +918,7 @@ fun SelectedPointerIcon(location: CampusLocation, eventCount: Int = 0, hasPinned
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .size(14.dp)
-                    .background(Color.Red, CircleShape)
+                    .background(if (hasBookmarkedEvent) Color.Red else Color.Red, CircleShape)
                     .border(1.5.dp, Color.White, CircleShape)
             )
         }
@@ -911,6 +931,7 @@ fun LandmarkIcon(
     color: Color, 
     eventCount: Int = 0, 
     hasPinnedEvent: Boolean = false,
+    hasBookmarkedEvent: Boolean = false,
     isCustom: Boolean = false,
     isFavorited: Boolean = false
 ) {
@@ -920,6 +941,7 @@ fun LandmarkIcon(
                 .size(34.dp)
                 .background(color, CircleShape)
                 .border(2.5.dp, when {
+                    hasBookmarkedEvent -> Color.Red // Red border for bookmarked
                     isFavorited -> Color(0xFFFFD700) // Gold border for favorited
                     hasPinnedEvent -> Color(0xFF9C27B0) // Purple for pinned
                     eventCount > 0 -> BrandOrange // Orange for regular events

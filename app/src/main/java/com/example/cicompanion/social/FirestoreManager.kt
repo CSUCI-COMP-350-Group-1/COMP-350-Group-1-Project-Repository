@@ -88,11 +88,12 @@ object FirestoreManager {
             "start" to event.start.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
             "end" to event.endExclusive.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
             "isAllDay" to event.isAllDay,
-            "calendarId" to "custom",
+            "calendarId" to event.calendarId,
             "isPinned" to event.isPinned,
             "ownerId" to (event.ownerId ?: user.uid),
             "maxMembers" to event.maxMembers,
-            "isPinnedByLeader" to event.isPinnedByLeader
+            "isPinnedByLeader" to event.isPinnedByLeader,
+            "isBookmarked" to event.isBookmarked
         )
 
         return try {
@@ -118,6 +119,21 @@ object FirestoreManager {
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error updating pin status", e)
+            false
+        }
+    }
+
+    suspend fun updateEventBookmarkStatus(eventId: String, isBookmarked: Boolean): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        val db = FirebaseFirestore.getInstance()
+        return try {
+            db.collection("users").document(user.uid)
+                .collection("customEvents").document(eventId)
+                .update("isBookmarked", isBookmarked)
+                .await()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating bookmark status", e)
             false
         }
     }
@@ -159,10 +175,12 @@ object FirestoreManager {
                 val ownerId = doc.getString("ownerId")
                 val maxMembers = doc.getLong("maxMembers")?.toInt()
                 val isPinnedByLeader = doc.getBoolean("isPinnedByLeader") ?: false
+                val isBookmarked = doc.getBoolean("isBookmarked") ?: false
+                val calendarId = doc.getString("calendarId") ?: "custom"
 
                 CalendarEvent(
                     id = id,
-                    calendarId = "custom",
+                    calendarId = calendarId,
                     title = title,
                     description = description,
                     location = location,
@@ -173,7 +191,8 @@ object FirestoreManager {
                     isPinned = isPinned,
                     ownerId = ownerId,
                     maxMembers = maxMembers,
-                    isPinnedByLeader = isPinnedByLeader
+                    isPinnedByLeader = isPinnedByLeader,
+                    isBookmarked = isBookmarked
                 )
             }
         } catch (e: Exception) {

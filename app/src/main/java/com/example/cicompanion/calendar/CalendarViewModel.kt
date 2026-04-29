@@ -12,6 +12,7 @@ import com.example.cicompanion.social.FirestoreManager
 import com.example.cicompanion.social.SocialRepository
 import com.example.cicompanion.social.UserProfile
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -58,20 +59,40 @@ class CalendarViewModel(
     var errorMessage: String? by mutableStateOf(null)
         private set
 
+    private var customEventsListener: ListenerRegistration? = null
+    private var incomingInvitesListener: ListenerRegistration? = null
+
     init {
         loadOnlineCalendar()
         
         val auth = FirebaseAuth.getInstance()
         auth.addAuthStateListener { firebaseAuth ->
             val user = firebaseAuth.currentUser
+            customEventsListener?.remove()
+            incomingInvitesListener?.remove()
             if (user != null) {
-                loadCustomEvents()
-                loadIncomingInvites(user.uid)
+                // Real-time listener for custom events (includes shared ones)
+                customEventsListener = SocialRepository.listenToCustomEvents(user.uid,
+                    onEventsChanged = { customEvents = it },
+                    onError = { errorMessage = it }
+                )
+                
+                // Real-time listener for incoming invites
+                incomingInvitesListener = SocialRepository.listenToIncomingEventInvites(user.uid,
+                    onInvitesChanged = { incomingInvites = it },
+                    onError = { errorMessage = it }
+                )
             } else {
                 customEvents = emptyList()
                 incomingInvites = emptyList()
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        customEventsListener?.remove()
+        incomingInvitesListener?.remove()
     }
 
     val events: List<CalendarEvent>
@@ -143,24 +164,10 @@ class CalendarViewModel(
         }
     }
 
-    fun loadCustomEvents() {
-        viewModelScope.launch {
-            customEvents = FirestoreManager.fetchCustomEvents()
-        }
-    }
-
-    fun loadIncomingInvites(userId: String) {
-        SocialRepository.fetchIncomingEventInvites(
-            currentUserId = userId,
-            onSuccess = { incomingInvites = it },
-            onError = { errorMessage = it }
-        )
-    }
-
     fun addCustomEvent(event: CalendarEvent) {
         viewModelScope.launch {
             FirestoreManager.saveCustomEvent(event)
-            loadCustomEvents()
+            // No need to manually reload, listener handles it
         }
     }
 
@@ -168,15 +175,13 @@ class CalendarViewModel(
         val user = FirebaseAuth.getInstance().currentUser ?: return
         viewModelScope.launch {
             if (event.ownerId == user.uid) {
-                // Global delete if owner
                 SocialRepository.deleteEventForAll(user.uid, event.id, 
-                    onSuccess = { loadCustomEvents() },
+                    onSuccess = { },
                     onError = { errorMessage = it }
                 )
             } else {
-                // Just remove from my calendar if not owner
                 SocialRepository.leaveEvent(user.uid, event.id,
-                    onSuccess = { loadCustomEvents() },
+                    onSuccess = { },
                     onError = { errorMessage = it }
                 )
             }
@@ -187,18 +192,13 @@ class CalendarViewModel(
         viewModelScope.launch {
             val targetStatus = !event.isPinned
             FirestoreManager.updateEventPinStatus(event.id, targetStatus)
-            loadCustomEvents()
         }
     }
 
     fun acceptInvite(invite: EventInvite) {
         SocialRepository.acceptEventInvite(invite,
             onSuccess = {
-                val user = FirebaseAuth.getInstance().currentUser
-                if (user != null) {
-                    loadIncomingInvites(user.uid)
-                    loadCustomEvents()
-                }
+                // Listener will update incomingInvites automatically
             },
             onError = { errorMessage = it }
         )
@@ -207,8 +207,7 @@ class CalendarViewModel(
     fun declineInvite(invite: EventInvite) {
         SocialRepository.declineEventInvite(invite,
             onSuccess = {
-                val user = FirebaseAuth.getInstance().currentUser
-                if (user != null) loadIncomingInvites(user.uid)
+                // Listener will update incomingInvites automatically
             },
             onError = { errorMessage = it }
         )
@@ -217,7 +216,7 @@ class CalendarViewModel(
     fun kickUser(eventId: String, targetUserId: String) {
         val ownerId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         SocialRepository.kickFromEvent(ownerId, targetUserId, eventId,
-            onSuccess = { /* Refresh if needed, usually dialog will handle it */ },
+            onSuccess = { },
             onError = { errorMessage = it }
         )
     }

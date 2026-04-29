@@ -1,7 +1,6 @@
 package com.example.cicompanion.calendar
 
 import android.widget.Toast
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,8 +13,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -26,16 +25,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.social.EventInvite
 import com.example.cicompanion.social.SocialRepository
@@ -45,7 +38,6 @@ import com.example.cicompanion.ui.theme.BrandRedDark
 import com.example.cicompanion.ui.theme.BrandRedLighter
 import com.example.cicompanion.utils.HtmlUtils
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.ListenerRegistration
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
@@ -60,12 +52,14 @@ import java.util.UUID
 
 private val CoralRed = Color(0xFFEF3347)
 private val SharedEventBlue = Color(0xFF2196F3)
+private val SharedEventLightBlue = Color(0xFFE3F2FD)
 private val CustomEventOrange = Color(0xFFFF9800)
 private val PinnedEventPurple = Color(0xFF9C27B0)
 private val SoftText = Color(0xFF6E5555)
 private val CardOffWhite = Color(0xFFF6E6D8)
 private val DateCellWhite = Color(0xFFF7F4F8)
 private val DateCellBorder = Color(0xFFE2BFB7)
+private val EventCardGrey = Color(0xFFF2F2F2)
 
 data class DayEventInfo(
     val hasCsuci: Boolean = false, 
@@ -152,7 +146,6 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                 viewModel = viewModel,
                 selectedDateEvents = selectedDateEvents,
                 dayEventInfoMap = dayEventInfoMap,
-                currentUserId = currentUser?.uid,
                 onDismissError = viewModel::clearError,
                 onDateSelected = { 
                     viewModel.onDateSelected(it)
@@ -210,7 +203,7 @@ fun CalendarApp(viewModel: CalendarViewModel) {
             onDismiss = { eventToEdit = null },
             onConfirm = { title, description, location, startTime, endTime ->
                 val startZdt = ZonedDateTime.of(event.start.toLocalDate(), startTime, event.start.zone)
-                val endZdt = ZonedDateTime.of(event.start.toLocalDate(), endTime, event.endExclusive?.zone ?: event.start.zone)
+                val endZdt = ZonedDateTime.of(event.start.toLocalDate(), endTime, event.endExclusive.zone)
                 val updatedEvent = event.copy(
                     title = title,
                     description = description,
@@ -253,7 +246,6 @@ fun CalendarApp(viewModel: CalendarViewModel) {
 
     eventToInvite?.let { event ->
         FriendPickerDialog(
-            event = event,
             onDismiss = { eventToInvite = null },
             onInvite = { friend ->
                 currentUser?.let { user ->
@@ -307,7 +299,6 @@ private fun CalendarScreenBody(
     viewModel: CalendarViewModel,
     selectedDateEvents: List<CalendarEvent>,
     dayEventInfoMap: Map<LocalDate, DayEventInfo>,
-    currentUserId: String?,
     onDismissError: () -> Unit,
     onDateSelected: (LocalDate) -> Unit,
     onRequestDelete: (CalendarEvent) -> Unit,
@@ -875,7 +866,7 @@ private fun SectionCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = CardOffWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
             modifier = Modifier
@@ -1216,13 +1207,17 @@ private fun EventCard(
     val currentUser = FirebaseAuth.getInstance().currentUser
     val isOwner = event.ownerId == currentUser?.uid
     
-    val containerColor = CardOffWhite
-    val borderColor = Color.Transparent
+    val containerColor = when {
+        !isCustom -> EventCardGrey
+        isOwner -> CardOffWhite
+        else -> SharedEventLightBlue
+    }
+    val borderColor = if (isHighlighted) CoralRed else Color.Transparent
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(0.dp, borderColor, RoundedCornerShape(22.dp)),
+            .border(if (isHighlighted) 2.dp else 0.dp, borderColor, RoundedCornerShape(22.dp)),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isCustom) 5.dp else 3.dp)
@@ -1331,7 +1326,7 @@ private fun EventCard(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = if (isOwner) Icons.Default.Delete else Icons.Outlined.ExitToApp,
+                                    imageVector = if (isOwner) Icons.Default.Delete else Icons.AutoMirrored.Outlined.ExitToApp,
                                     contentDescription = if (isOwner) "Delete" else "Leave",
                                     tint = CoralRed,
                                     modifier = Modifier.size(14.dp)
@@ -1371,6 +1366,7 @@ fun EventMembersDialog(
 ) {
     var members by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var userToKick by remember { mutableStateOf<UserProfile?>(null) }
     val isOwner = event.ownerId == currentUserId
 
     DisposableEffect(event.id) {
@@ -1429,7 +1425,7 @@ fun EventMembersDialog(
                                     isOwner = false,
                                     canKick = isOwner,
                                     currentUserId = currentUserId,
-                                    onKick = { onKick(member.uid) }
+                                    onKick = { userToKick = member }
                                 )
                             }
                         }
@@ -1441,6 +1437,30 @@ fun EventMembersDialog(
             TextButton(onClick = onDismiss) { Text("Close", color = CoralRed, fontWeight = FontWeight.Bold) }
         }
     )
+
+    userToKick?.let { member ->
+        AlertDialog(
+            onDismissRequest = { userToKick = null },
+            title = { Text("Kick Member") },
+            text = { Text("Are you sure you want to kick ${SocialRepository.displayNameOrEmail(member)} from this event?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onKick(member.uid)
+                        userToKick = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CoralRed)
+                ) {
+                    Text("Kick")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { userToKick = null }) {
+                    Text("Cancel", color = Color.Gray)
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -1631,7 +1651,6 @@ private fun AddEventDialog(
 
     if (showFriendPicker) {
         FriendPickerDialog(
-            event = CalendarEvent("", "", "", null, null, null, ZonedDateTime.now(), ZonedDateTime.now(), false),
             onDismiss = { showFriendPicker = false },
             onInvite = { friend ->
                 if (!invitedFriends.any { it.uid == friend.uid }) {
@@ -1653,7 +1672,7 @@ private fun EditEventDialog(
     var description by remember { mutableStateOf(event.description ?: "") }
     var location by remember { mutableStateOf(event.location ?: "") }
     var startTime by remember { mutableStateOf(event.start.toLocalTime()) }
-    var endTime by remember { mutableStateOf(event.endExclusive?.toLocalTime() ?: event.start.toLocalTime().plusHours(1)) }
+    var endTime by remember { mutableStateOf(event.endExclusive.toLocalTime()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1739,16 +1758,15 @@ fun WheelTimePicker(
     initialTime: LocalTime,
     onTimeChange: (LocalTime) -> Unit
 ) {
-    var hour by remember { mutableStateOf(if (initialTime.hour == 0) 12 else if (initialTime.hour > 12) initialTime.hour - 12 else initialTime.hour) }
-    var minute by remember { mutableStateOf(initialTime.minute) }
+    var hour by remember { mutableIntStateOf(if (initialTime.hour == 0) 12 else if (initialTime.hour > 12) initialTime.hour - 12 else initialTime.hour) }
+    var minute by remember { mutableIntStateOf(initialTime.minute) }
     var amPm by remember { mutableStateOf(if (initialTime.hour < 12) "AM" else "PM") }
 
     LaunchedEffect(hour, minute, amPm) {
-        val h = when {
-            amPm == "AM" && hour == 12 -> 0
-            amPm == "AM" -> hour
-            amPm == "PM" && hour == 12 -> 12
-            else -> hour + 12
+        val h = when (amPm) {
+            "AM" -> if (hour == 12) 0 else hour
+            "PM" -> if (hour == 12) 12 else hour + 12
+            else -> hour
         }
         onTimeChange(LocalTime.of(h, minute))
     }
@@ -1774,7 +1792,7 @@ fun WheelTimePicker(
         )
         WheelPicker(
             items = listOf("AM", "PM"),
-            initialIndex = if (amPm == "AM") 0 else if (amPm == "PM") 1 else 0,
+            initialIndex = if (amPm == "AM") 0 else 1,
             onItemSelected = { amPm = it },
             modifier = Modifier.weight(1f)
         )
@@ -1792,7 +1810,6 @@ fun <T> WheelPicker(
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
     val itemHeight = 40.dp
-    val itemHeightPx = with(LocalDensity.current) { itemHeight.toPx() }
 
     LaunchedEffect(listState.isScrollInProgress) {
         if (!listState.isScrollInProgress) {
@@ -1839,7 +1856,6 @@ fun <T> WheelPicker(
 
 @Composable
 fun FriendPickerDialog(
-    event: CalendarEvent,
     onDismiss: () -> Unit,
     onInvite: (UserProfile) -> Unit
 ) {

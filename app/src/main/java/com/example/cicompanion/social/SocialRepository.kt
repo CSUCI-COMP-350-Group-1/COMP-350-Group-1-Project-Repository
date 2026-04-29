@@ -8,6 +8,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.QuerySnapshot
 import kotlinx.coroutines.tasks.await
 import java.time.format.DateTimeFormatter
+import java.time.ZonedDateTime
 
 object SocialRepository {
 
@@ -487,6 +488,27 @@ object SocialRepository {
                 onError(exception.message ?: "Could not fetch event invites.") }
     }
 
+    fun listenToIncomingEventInvites(
+        currentUserId: String,
+        onInvitesChanged: (List<EventInvite>) -> Unit,
+        onError: (String) -> Unit
+    ): ListenerRegistration {
+        return eventInvitesCollection()
+            .whereEqualTo("toUserId", currentUserId)
+            .whereEqualTo("status", "pending")
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    onError(e.message ?: "Error listening to event invites.")
+                    return@addSnapshotListener
+                }
+                if (snapshot == null) {
+                    onInvitesChanged(emptyList())
+                    return@addSnapshotListener
+                }
+                onInvitesChanged(snapshot.documents.mapNotNull { it.toObject(EventInvite::class.java) })
+            }
+    }
+
     fun acceptEventInvite(
         invite: EventInvite,
         onSuccess: () -> Unit,
@@ -531,7 +553,28 @@ object SocialRepository {
     }
 
     /**
-     * Real-time listener for event members
+     * Real-time listener for event member IDs.
+     */
+    fun listenToEventMemberIds(
+        eventId: String,
+        onIdsChanged: (List<String>) -> Unit,
+        onError: (String) -> Unit
+    ): ListenerRegistration {
+        return eventInvitesCollection()
+            .whereEqualTo("eventId", eventId)
+            .whereEqualTo("status", "accepted")
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    onError(e.message ?: "Error listening to members.")
+                    return@addSnapshotListener
+                }
+                val ids = snapshot?.documents?.mapNotNull { it.getString("toUserId") } ?: emptyList()
+                onIdsChanged(ids)
+            }
+    }
+
+    /**
+     * Real-time listener for event members (Full Profiles)
      */
     fun listenToEventMembers(
         eventId: String,
@@ -547,12 +590,7 @@ object SocialRepository {
                     return@addSnapshotListener
                 }
                 
-                if (snapshot == null || snapshot.isEmpty) {
-                    onMembersChanged(emptyList())
-                    return@addSnapshotListener
-                }
-                
-                val memberIds = snapshot.documents.mapNotNull { it.getString("toUserId") }.toSet()
+                val memberIds = snapshot?.documents?.mapNotNull { it.getString("toUserId") } ?: emptyList()
                 
                 if (memberIds.isEmpty()) {
                     onMembersChanged(emptyList())
@@ -572,6 +610,59 @@ object SocialRepository {
                         }
                     )
                 }
+            }
+    }
+
+    /**
+     * Real-time listener for custom events
+     */
+    fun listenToCustomEvents(
+        userId: String,
+        onEventsChanged: (List<CalendarEvent>) -> Unit,
+        onError: (String) -> Unit
+    ): ListenerRegistration {
+        return FirebaseFirestore.getInstance().collection("users").document(userId)
+            .collection("customEvents")
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    onError(e.message ?: "Error listening to custom events.")
+                    return@addSnapshotListener
+                }
+                if (snapshot == null) {
+                    onEventsChanged(emptyList())
+                    return@addSnapshotListener
+                }
+                
+                val events = snapshot.documents.mapNotNull { doc ->
+                    val id = doc.getString("id") ?: ""
+                    val title = doc.getString("title") ?: ""
+                    val description = doc.getString("description")
+                    val location = doc.getString("location")
+                    val startStr = doc.getString("start") ?: return@mapNotNull null
+                    val endStr = doc.getString("end") ?: return@mapNotNull null
+                    val isAllDay = doc.getBoolean("isAllDay") ?: false
+                    val isPinned = doc.getBoolean("isPinned") ?: false
+                    val ownerId = doc.getString("ownerId")
+                    val maxMembers = doc.getLong("maxMembers")?.toInt()
+                    val isPinnedByLeader = doc.getBoolean("isPinnedByLeader") ?: false
+
+                    CalendarEvent(
+                        id = id,
+                        calendarId = "custom",
+                        title = title,
+                        description = description,
+                        location = location,
+                        htmlLink = null,
+                        start = ZonedDateTime.parse(startStr),
+                        endExclusive = ZonedDateTime.parse(endStr),
+                        isAllDay = isAllDay,
+                        isPinned = isPinned,
+                        ownerId = ownerId,
+                        maxMembers = maxMembers,
+                        isPinnedByLeader = isPinnedByLeader
+                    )
+                }
+                onEventsChanged(events)
             }
     }
     

@@ -7,6 +7,8 @@ import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,6 +27,7 @@ import java.time.format.DateTimeFormatter
 
 private val CustomEventOrange = Color(0xFFFF9800)
 private val BrandRed = Color(0xFFEF3347)
+private val BookmarkYellow = Color(0xFFFFC107)
 
 @Composable
 fun CalendarWidget(events: List<CalendarEvent>,
@@ -118,7 +121,12 @@ fun CalendarWidget(events: List<CalendarEvent>,
 @Composable
 private fun EventWidgetCard(event: CalendarEvent) {
     val isCustom = event.calendarId == "custom"
-    val badgeColor = if (isCustom) CustomEventOrange else BrandRed
+    val isBookmarked = event.isBookmarked
+    val badgeColor = when {
+        isBookmarked -> BookmarkYellow
+        isCustom -> CustomEventOrange
+        else -> BrandRed
+    }
 
     val eventDateText = event.start.format(
         DateTimeFormatter.ofPattern("EEE, MMM d")
@@ -132,14 +140,23 @@ private fun EventWidgetCard(event: CalendarEvent) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = HtmlUtils.stripHtml(event.title),
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                if (isBookmarked) {
+                    Icon(
+                        imageVector = Icons.Default.Bookmark,
+                        contentDescription = null,
+                        tint = BookmarkYellow,
+                        modifier = Modifier.size(16.dp).padding(end = 4.dp)
+                    )
+                }
+                Text(
+                    text = HtmlUtils.stripHtml(event.title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             
             Surface(
                 color = badgeColor.copy(alpha = 0.1f),
@@ -147,7 +164,11 @@ private fun EventWidgetCard(event: CalendarEvent) {
                 border = androidx.compose.foundation.BorderStroke(0.5.dp, badgeColor.copy(alpha = 0.5f))
             ) {
                 Text(
-                    text = if (isCustom) "Custom" else "CSUCI",
+                    text = when {
+                        isBookmarked -> "BOOKMARKED"
+                        isCustom -> "Custom"
+                        else -> "CSUCI"
+                    },
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                     style = MaterialTheme.typography.labelSmall,
                     fontSize = 9.sp,
