@@ -181,7 +181,8 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                         onSignOut = {
                             FirebaseAuth.getInstance().signOut()
                             FirebaseAuthManager.getGoogleSignInClient(context).signOut()
-                        }
+                        },
+                        navController = navController
                     )
                 } else {
                     if (requestStatus == "accepted") {
@@ -391,132 +392,6 @@ fun ViewOnlyProfileActions(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun OldProfileScreen(navController: NavHostController) {
-    var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
-    var friendCount by remember { mutableIntStateOf(0) }
-    val context = LocalContext.current
-
-    DisposableEffect(Unit) {
-        val listener = FirebaseAuth.AuthStateListener { auth ->
-            currentUser = auth.currentUser
-        }
-        FirebaseAuth.getInstance().addAuthStateListener(listener)
-        onDispose {
-            FirebaseAuth.getInstance().removeAuthStateListener(listener)
-        }
-    }
-
-    LaunchedEffect(currentUser?.uid) {
-        currentUser?.let { signedInUser ->
-            FirestoreManager.saveUserToFirestore(signedInUser) {
-                FriendRequestNotificationSender.syncCurrentUserFcmToken()
-            }
-            SocialRepository.fetchFriendCount(
-                currentUserId = signedInUser.uid,
-                onSuccess = { count -> friendCount = count },
-                onError = { friendCount = 0 }
-            )
-        }
-    }
-
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        handleGoogleSignInResult(result)
-    }
-
-    Scaffold(
-        containerColor = AppBackground,
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate(Routes.USER_SEARCH) },
-                shape = CircleShape,
-                containerColor = Color.Red,
-                contentColor = Color.White
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Search Users"
-                )
-            }
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-                .background(AppBackground)
-        ) {
-            ProfileHeader(
-                userDisplayName = currentUser?.displayName ?: "Signed out",
-                userEmail = currentUser?.email ?: "user@example.com",
-                photoUrl = currentUser?.photoUrl?.toString(),
-                friendCount = friendCount,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp)
-                    .border(
-                        width = 1.dp,
-                        color = GrayIcon.copy(alpha = 0.3f),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                    .background(NavBackground)
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                if (currentUser == null) {
-                    Button(onClick = {
-                        val signInClient = FirebaseAuthManager.getGoogleSignInClient(context)
-                        launcher.launch(signInClient.signInIntent)
-                    },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Red,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text("Sign in with Google")
-                    }
-                } else {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { navController.navigate(Routes.FRIENDS_AND_REQUESTS) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.Red,
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Text("Friend Requests")
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = {
-                                FirebaseAuth.getInstance().signOut()
-                                FirebaseAuthManager.getGoogleSignInClient(context).signOut()
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.Red,
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Text("Sign Out")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 private fun handleGoogleSignInResult(result: ActivityResult) {
     if (result.resultCode != Activity.RESULT_OK) return
     val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
@@ -534,9 +409,10 @@ private fun ColumnScope.ProfileActionArea(
     onSignIn: () -> Unit,
     onFindFriends: () -> Unit,
     onViewFriendRequests: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    navController: NavHostController
 ) {
-    val showEditAndSettings = false // Toggle for edit profile and settings buttons
+    val showEditAndSettings = true // Toggle for edit profile and settings buttons
 
     if (currentUser == null) {
         Button(
@@ -571,7 +447,7 @@ private fun ColumnScope.ProfileActionArea(
             SectionLabel("Account Settings")
 
             OutlinedButton(
-                onClick = { /* Mockup Edit */ },
+                onClick = { navController.navigate(Routes.EDIT_PROFILE) },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(12.dp),
                 border = BorderStroke(1.dp, Color.LightGray),

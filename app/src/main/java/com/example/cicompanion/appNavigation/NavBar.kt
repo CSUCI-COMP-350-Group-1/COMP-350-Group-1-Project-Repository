@@ -42,6 +42,7 @@ object Routes {
     const val FRIEND_REQUESTS = "friendRequests"
     const val SEARCH = "search"
     const val FRIENDS_AND_REQUESTS = "friends_and_requests"
+    const val EDIT_PROFILE = "edit_profile"
 
     // MESSAGING: new thread route
     const val MESSAGE_THREAD_BASE = "message_thread"

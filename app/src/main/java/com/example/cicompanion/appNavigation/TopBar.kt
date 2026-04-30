@@ -41,6 +41,7 @@ fun screenTitleForRoute(route: String?): String {
         route == Routes.FRIEND_REQUESTS -> "Friend Requests"
         route == Routes.FRIENDS_AND_REQUESTS -> "Friends & Requests"
         route == Routes.SEARCH -> "Search"
+        route == Routes.EDIT_PROFILE -> "Edit Profile"
         route?.startsWith(Routes.MESSAGE_THREAD_BASE) == true -> "Chat" // MESSAGING
         else -> "CI Companion"
     }
