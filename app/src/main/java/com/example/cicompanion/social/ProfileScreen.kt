@@ -56,6 +56,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
     var displayName by remember { mutableStateOf("Loading...") }
     var email by remember { mutableStateOf("") }
     var photoUrl by remember { mutableStateOf<String?>(null) }
+    var bio by remember { mutableStateOf("") }
     var friendCount by remember { mutableIntStateOf(0) }
     var requestStatus by remember { mutableStateOf<String?>(null) }
     var targetUserProfile by remember { mutableStateOf<UserProfile?>(null) }
@@ -77,6 +78,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             displayName = "Guest User"
             email = "Sign in to sync your data"
             photoUrl = null
+            bio = ""
             friendCount = 0
             requestStatus = null
             targetUserProfile = null
@@ -92,12 +94,14 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                     displayName = profile.displayName.ifBlank { profile.email }
                     email = profile.email
                     photoUrl = profile.photoUrl
+                    bio = profile.bio
                 },
                 onError = {
                     if (isOwnProfile) {
                         displayName = currentUser?.displayName ?: "Guest User"
                         email = currentUser?.email ?: ""
                         photoUrl = currentUser?.photoUrl?.toString()
+                        bio = ""
                     }
                 }
             )
@@ -121,6 +125,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             displayName = "Guest User"
             email = "Sign in to sync your data"
             photoUrl = null
+            bio = ""
             friendCount = 0
             requestStatus = null
             targetUserProfile = null
@@ -155,8 +160,6 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                     .padding(20.dp)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
-
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -165,6 +168,19 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Top
             ) {
+                // Bio displayed between user info and actions
+                if (bio.isNotBlank()) {
+                    Text(
+                        text = bio,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        color = Color.DarkGray,
+                        fontSize = 15.sp,
+                        lineHeight = 20.sp
+                    )
+                }
+
                 if (isOwnProfile || currentUser == null) {
                     ProfileActionArea(
                         currentUser = currentUser,

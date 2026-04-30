@@ -83,6 +83,18 @@ object SocialRepository {
             .addOnFailureListener { e -> onError(e.message ?: "Failed to update display name") }
     }
 
+    fun updateBio(
+        userId: String,
+        newBio: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        usersCollection().document(userId)
+            .update("bio", newBio)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onError(e.message ?: "Failed to update bio") }
+    }
+
     private fun handleSearchableUsersSuccess(
         snapshot: QuerySnapshot,
         currentUserId: String,

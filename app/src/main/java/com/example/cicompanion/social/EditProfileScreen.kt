@@ -4,7 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
@@ -27,6 +28,7 @@ fun EditProfileScreen(navController: NavHostController) {
     val currentUser = FirebaseAuth.getInstance().currentUser
     var userProfile by remember { mutableStateOf<UserProfile?>(null) }
     var showNameDialog by remember { mutableStateOf(false) }
+    var showBioDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(currentUser?.uid) {
@@ -73,15 +75,15 @@ fun EditProfileScreen(navController: NavHostController) {
             Spacer(modifier = Modifier.height(8.dp))
 
             OutlinedButton(
-                onClick = { /* TODO: Implement */ },
+                onClick = { showBioDialog = true },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(12.dp),
                 border = BorderStroke(1.dp, Color.LightGray),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
             ) {
-                Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(12.dp))
-                Text("Edit Profile Picture", fontSize = 14.sp)
+                Text("Edit Bio", fontSize = 14.sp)
                 Spacer(Modifier.weight(1f))
                 Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
             }
@@ -95,9 +97,9 @@ fun EditProfileScreen(navController: NavHostController) {
                 border = BorderStroke(1.dp, Color.LightGray),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
             ) {
-                Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(12.dp))
-                Text("Edit Bio", fontSize = 14.sp)
+                Text("Edit Profile Picture", fontSize = 14.sp)
                 Spacer(Modifier.weight(1f))
                 Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
             }
@@ -133,6 +135,24 @@ fun EditProfileScreen(navController: NavHostController) {
                     onSuccess = {
                         showNameDialog = false
                         userProfile = userProfile?.copy(displayName = newName)
+                    },
+                    onError = { msg -> errorMessage = msg }
+                )
+            }
+        )
+    }
+
+    if (showBioDialog && userProfile != null) {
+        BioDialog(
+            currentBio = userProfile!!.bio,
+            onDismiss = { showBioDialog = false },
+            onUpdate = { newBio ->
+                SocialRepository.updateBio(
+                    userId = userProfile!!.uid,
+                    newBio = newBio,
+                    onSuccess = {
+                        showBioDialog = false
+                        userProfile = userProfile?.copy(bio = newBio)
                     },
                     onError = { msg -> errorMessage = msg }
                 )
@@ -181,29 +201,49 @@ fun DisplayNameDialog(
 }
 
 @Composable
-fun SettingsItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = Color.LightGray.copy(alpha = 0.15f)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(icon, contentDescription = null, tint = Color.DarkGray)
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(
-                text = label,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
-                color = Color.Black
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+fun BioDialog(
+    currentBio: String,
+    onDismiss: () -> Unit,
+    onUpdate: (String) -> Unit
+) {
+    var newBio by remember { mutableStateOf(currentBio) }
+    val charLimit = 150
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Bio") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = newBio,
+                    onValueChange = { if (it.length <= charLimit) newBio = it },
+                    label = { Text("Bio") },
+                    supportingText = {
+                        Text(
+                            text = "${newBio.length} / $charLimit",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.End,
+                            color = if (newBio.length >= charLimit) BrandRed else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().height(140.dp),
+                    maxLines = 5
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onUpdate(newBio) },
+                enabled = newBio != currentBio,
+                colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+            ) {
+                Text("Update")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = Color.Gray)
+            }
         }
-    }
+    )
 }

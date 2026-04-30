@@ -25,6 +25,7 @@ import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.BrandRedDark
 import com.example.cicompanion.ui.theme.BrandRedLighter
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -99,6 +100,8 @@ fun TopBar(
 @Composable
 fun DrawerProfileContent(navController: NavController, drawerState: DrawerState, scope: CoroutineScope) {
     var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
+    var firestoreDisplayName by remember { mutableStateOf<String?>(null) }
+    var firestorePhotoUrl by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
 
     // Observe auth state changes to update the UI immediately on sign in/out
@@ -111,6 +114,32 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
             FirebaseAuth.getInstance().removeAuthStateListener(listener)
         }
     }
+
+    // Sync profile data from Firestore to reflect changes immediately in the drawer
+    DisposableEffect(currentUser?.uid) {
+        val uid = currentUser?.uid
+        if (uid != null) {
+            val registration = FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(uid)
+                .addSnapshotListener { snapshot, _ ->
+                    if (snapshot != null && snapshot.exists()) {
+                        firestoreDisplayName = snapshot.getString("displayName")
+                        firestorePhotoUrl = snapshot.getString("photoUrl")
+                    }
+                }
+            onDispose {
+                registration.remove()
+            }
+        } else {
+            firestoreDisplayName = null
+            firestorePhotoUrl = null
+            onDispose {}
+        }
+    }
+
+    val displayName = firestoreDisplayName ?: currentUser?.displayName ?: "Signed Out"
+    val photoUrl = firestorePhotoUrl ?: currentUser?.photoUrl?.toString()
 
     ModalDrawerSheet {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -128,9 +157,9 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
                         .background(Color(0xFFE6E0F8)),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (currentUser?.photoUrl != null) {
+                    if (photoUrl != null) {
                         AsyncImage(
-                            model = currentUser!!.photoUrl.toString(),
+                            model = photoUrl,
                             contentDescription = "Profile Picture",
                             modifier = Modifier.fillMaxSize()
                         )
@@ -148,7 +177,7 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
 
                 Column {
                     Text(
-                        text = currentUser?.displayName ?: "Signed Out",
+                        text = displayName,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
