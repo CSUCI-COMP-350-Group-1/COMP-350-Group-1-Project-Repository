@@ -83,18 +83,6 @@ object SocialRepository {
             .addOnFailureListener { e -> onError(e.message ?: "Failed to update display name") }
     }
 
-    fun revertToOriginalDisplayName(
-        userId: String,
-        originalDisplayName: String,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        usersCollection().document(userId)
-            .update("displayName", originalDisplayName)
-            .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { e -> onError(e.message ?: "Failed to revert display name") }
-    }
-
     private fun handleSearchableUsersSuccess(
         snapshot: QuerySnapshot,
         currentUserId: String,

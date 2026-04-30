@@ -1,9 +1,12 @@
 package com.example.cicompanion.social
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
@@ -53,16 +56,51 @@ fun EditProfileScreen(navController: NavHostController) {
                 modifier = Modifier.padding(bottom = 24.dp)
             )
 
-            SettingsItem(
-                label = "Edit Display Name",
-                icon = Icons.Default.Person,
-                onClick = { showNameDialog = true }
-            )
-            SettingsItem(
-                label = "Edit Profile Picture",
-                icon = Icons.Default.Image,
-                onClick = { /* TODO: Implement */ }
-            )
+            OutlinedButton(
+                onClick = { showNameDialog = true },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color.LightGray),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(12.dp))
+                Text("Edit Display Name", fontSize = 14.sp)
+                Spacer(Modifier.weight(1f))
+                Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedButton(
+                onClick = { /* TODO: Implement */ },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color.LightGray),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
+            ) {
+                Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(12.dp))
+                Text("Edit Profile Picture", fontSize = 14.sp)
+                Spacer(Modifier.weight(1f))
+                Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedButton(
+                onClick = { /* TODO: Implement */ },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color.LightGray),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
+            ) {
+                Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(12.dp))
+                Text("Edit Bio", fontSize = 14.sp)
+                Spacer(Modifier.weight(1f))
+                Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
 
             errorMessage?.let {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -98,17 +136,6 @@ fun EditProfileScreen(navController: NavHostController) {
                     },
                     onError = { msg -> errorMessage = msg }
                 )
-            },
-            onRevert = {
-                SocialRepository.revertToOriginalDisplayName(
-                    userId = userProfile!!.uid,
-                    originalDisplayName = userProfile!!.originalDisplayName,
-                    onSuccess = {
-                        showNameDialog = false
-                        userProfile = userProfile?.copy(displayName = userProfile!!.originalDisplayName)
-                    },
-                    onError = { msg -> errorMessage = msg }
-                )
             }
         )
     }
@@ -118,8 +145,7 @@ fun EditProfileScreen(navController: NavHostController) {
 fun DisplayNameDialog(
     currentProfile: UserProfile,
     onDismiss: () -> Unit,
-    onUpdate: (String) -> Unit,
-    onRevert: () -> Unit
+    onUpdate: (String) -> Unit
 ) {
     var newName by remember { mutableStateOf(currentProfile.displayName) }
 
@@ -135,16 +161,6 @@ fun DisplayNameDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                if (currentProfile.originalDisplayName.isNotBlank() && 
-                    currentProfile.displayName != currentProfile.originalDisplayName) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextButton(
-                        onClick = onRevert,
-                        modifier = Modifier.align(Alignment.End)
-                    ) {
-                        Text("Revert to '${currentProfile.originalDisplayName}'", color = BrandRed)
-                    }
-                }
             }
         },
         confirmButton = {
