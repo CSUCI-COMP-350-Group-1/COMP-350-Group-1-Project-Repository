@@ -29,27 +29,34 @@ object FirestoreManager {
         val db = FirebaseFirestore.getInstance()
         val userRef = db.collection("users").document(user.uid)
 
-        val userProfile = hashMapOf(
-            "uid" to user.uid,
-            "displayName" to (user.displayName ?: ""),
-            "email" to (user.email ?: ""),
-            "photoUrl" to (user.photoUrl?.toString() ?: ""),
-            "bio" to "",
-            "lastSignInAt" to System.currentTimeMillis()
-        )
+        userRef.get().addOnSuccessListener { document ->
+            val data = hashMapOf<String, Any>(
+                "uid" to user.uid,
+                "email" to (user.email ?: ""),
+                "photoUrl" to (user.photoUrl?.toString() ?: ""),
+                "lastSignInAt" to System.currentTimeMillis()
+            )
 
-        userRef.set(userProfile, SetOptions.merge())
-            .addOnSuccessListener {
-                Log.d(TAG, "User profile saved to Firestore for uid=${user.uid}")
+            // Initialize display names if this is a new user or missing data
+            if (!document.exists() || document.getString("originalDisplayName").isNullOrBlank()) {
+                val initialName = user.displayName ?: ""
+                data["displayName"] = initialName
+                data["originalDisplayName"] = initialName
+            }
 
-                // PUSH NOTIFICATIONS
-                // store this device's FCM token on the user document
-                onSuccess?.invoke()
-            }
-            .addOnFailureListener { exception ->
-                Log.e(TAG, "Failed to save user profile to Firestore.", exception)
-            }
+            userRef.set(data, SetOptions.merge())
+                .addOnSuccessListener {
+                    Log.d(TAG, "User profile saved to Firestore for uid=${user.uid}")
+                    onSuccess?.invoke()
+                }
+                .addOnFailureListener { exception ->
+                    Log.e(TAG, "Failed to save user profile to Firestore.", exception)
+                }
+        }.addOnFailureListener { exception ->
+            Log.e(TAG, "Failed to fetch user document before saving.", exception)
+        }
     }
+
     // PUSH NOTIFICATIONS
     // store this device's FCM token on the user document
     fun saveFcmToken(userId: String, token: String) {
