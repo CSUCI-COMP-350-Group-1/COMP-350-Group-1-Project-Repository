@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,6 +27,8 @@ import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.firestore.DocumentSnapshot
+import kotlinx.coroutines.delay
 
 @Composable
 fun FriendsAndRequestsScreen(
@@ -88,6 +91,7 @@ fun FriendsAndRequestsScreen(
 
 @Composable
 fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
+    var searchQuery by remember { mutableStateOf("") }
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var nicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -109,8 +113,8 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
                         isLoading = false
                         errorMessage = null // Clear any stale error on success
                     },
-                    onError = { err ->
-                        errorMessage = err
+                    onError = {
+                        nicknames = emptyMap()
                         isLoading = false 
                     }
                 )
@@ -126,7 +130,36 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
         refreshFriends()
     }
 
+    val displayFriends = remember(friends, searchQuery, nicknames) {
+        if (searchQuery.isBlank()) {
+            friends
+        } else {
+            friends.filter { friend ->
+                val nickname = nicknames[friend.uid] ?: ""
+                friend.displayName.contains(searchQuery, ignoreCase = true) ||
+                        friend.email.contains(searchQuery, ignoreCase = true) ||
+                        nickname.contains(searchQuery, ignoreCase = true)
+            }
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Search friends by name or email") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFFEF3347),
+                unfocusedBorderColor = Color.LightGray
+            )
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         if (errorMessage != null) {
             Text(text = errorMessage!!, color = Color.Red, modifier = Modifier.padding(bottom = 8.dp))
         }
@@ -139,9 +172,13 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("You don't have any friends yet.", textAlign = TextAlign.Center, color = Color.Gray)
             }
+        } else if (displayFriends.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No friends found matching \"$searchQuery\"", textAlign = TextAlign.Center, color = Color.Gray)
+            }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(friends, key = { it.uid }) { friend ->
+                items(displayFriends, key = { it.uid }) { friend ->
                     FriendCard(
                         user = friend,
                         nickname = nicknames[friend.uid],
@@ -237,22 +274,47 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
 @Composable
 fun AddFriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
     var searchQuery by remember { mutableStateOf("") }
-    var users by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val users = remember { mutableStateListOf<UserProfile>() }
+    var lastDocument by remember { mutableStateOf<DocumentSnapshot?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    var canLoadMore by remember { mutableStateOf(true) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val requestStatuses = remember { mutableStateMapOf<String, String>() }
+    val listState = rememberLazyListState()
+
+    val fetchUsers = { isNextPage: Boolean ->
+        if (!isLoading && (isNextPage && canLoadMore || !isNextPage)) {
+            isLoading = true
+            if (!isNextPage) {
+                users.clear()
+                lastDocument = null
+            }
+            SocialRepository.fetchSearchableUsers(
+                currentUserId = currentUser.uid,
+                searchQuery = searchQuery,
+                lastDocument = lastDocument,
+                onSuccess = { newUsers, nextDoc ->
+                    users.addAll(newUsers)
+                    lastDocument = nextDoc
+                    canLoadMore = newUsers.size >= 20
+                    isLoading = false
+                    errorMessage = null
+                },
+                onError = {
+                    errorMessage = it
+                    isLoading = false
+                }
+            )
+        }
+    }
+
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotBlank()) delay(500)
+        fetchUsers(false)
+    }
 
     LaunchedEffect(Unit) {
-        SocialRepository.fetchSearchableUsers(
-            currentUserId = currentUser.uid,
-            onSuccess = { loadedUsers ->
-                users = loadedUsers
-                isLoading = false
-            },
-            onError = { errorMessage = it; isLoading = false }
-        )
-
         SocialRepository.fetchAllFriendRequestStatuses(
             currentUserId = currentUser.uid,
             onSuccess = { statuses ->
@@ -263,17 +325,7 @@ fun AddFriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
     }
 
     // Filter out users who are already friends to avoid the empty spaces
-    val displayUsers = remember(users, searchQuery, requestStatuses.toMap()) {
-        val filtered = if (searchQuery.isBlank()) {
-            users
-        } else {
-            users.filter { user ->
-                user.displayName.contains(searchQuery, ignoreCase = true) ||
-                        user.email.contains(searchQuery, ignoreCase = true)
-            }
-        }
-        filtered.filter { requestStatuses[it.uid] != "accepted" }
-    }
+    val displayUsers = users.filter { requestStatuses[it.uid] != "accepted" }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         OutlinedTextField(
@@ -297,11 +349,11 @@ fun AddFriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
             Text(text = errorMessage!!, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
         }
 
-        if (isLoading) {
+        if (isLoading && users.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Color(0xFFEF3347))
             }
-        } else if (displayUsers.isEmpty()) {
+        } else if (!isLoading && displayUsers.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
                     text = if (searchQuery.isBlank()) "No users left to add." else "No users found matching \"$searchQuery\"",
@@ -311,6 +363,7 @@ fun AddFriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize().padding(top = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -331,6 +384,23 @@ fun AddFriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
                             )
                         }
                     )
+                }
+
+                if (canLoadMore) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                            if (isLoading) {
+                                CircularProgressIndicator(color = Color(0xFFEF3347), modifier = Modifier.size(24.dp))
+                            } else {
+                                Button(
+                                    onClick = { fetchUsers(true) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray, contentColor = Color.Black)
+                                ) {
+                                    Text("Load More")
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

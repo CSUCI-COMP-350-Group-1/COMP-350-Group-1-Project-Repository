@@ -2,7 +2,9 @@ package com.example.cicompanion.social
 
 import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.QuerySnapshot
 
 object SocialRepository {
@@ -20,67 +22,70 @@ object SocialRepository {
                 if (friendIds.isEmpty()) {
                     onSuccess(emptyList())
                 } else {
-                    fetchUsersByIdsParallel(friendIds, onSuccess, onError)
+                    fetchUsersByIdsBatched(friendIds, onSuccess, onError)
                 }
             },
             onError = { onError("Friends Load Error: $it") }
         )
     }
 
-    private fun fetchUsersByIdsParallel(
+    private fun fetchUsersByIdsBatched(
         userIds: List<String>,
         onSuccess: (List<UserProfile>) -> Unit,
         onError: (String) -> Unit
     ) {
         val allUsers = mutableListOf<UserProfile>()
-        var completedCount = 0
-        var hasError = false
+        val chunks = userIds.chunked(30) // Firestore whereIn limit is 30
+        var processedChunks = 0
 
         if (userIds.isEmpty()) {
             onSuccess(emptyList())
             return
         }
 
-        userIds.forEach { userId ->
-            usersCollection().document(userId).get()
-                .addOnSuccessListener { document ->
-                    if (hasError) return@addOnSuccessListener
-                    
-                    val user = document.toObject(UserProfile::class.java)
-                    if (user != null) {
-                        allUsers.add(user)
-                    }
-                    
-                    completedCount++
-                    if (completedCount == userIds.size) {
+        chunks.forEach { chunk ->
+            usersCollection().whereIn("uid", chunk).get()
+                .addOnSuccessListener { snapshot ->
+                    allUsers.addAll(snapshot.toObjects(UserProfile::class.java))
+                    processedChunks++
+                    if (processedChunks == chunks.size) {
                         onSuccess(allUsers.sortedBy { displayNameOrEmail(it).lowercase() })
                     }
                 }
                 .addOnFailureListener { exception ->
-                    if (!hasError) {
-                        hasError = true
-                        onError("Profile Fetch Error: ${exception.message}")
-                    }
+                    onError("Profile Batch Fetch Error: ${exception.message}")
                 }
         }
     }
 
     fun fetchSearchableUsers(
         currentUserId: String,
-        onSuccess: (List<UserProfile>) -> Unit,
+        searchQuery: String = "",
+        lastDocument: DocumentSnapshot? = null,
+        onSuccess: (List<UserProfile>, DocumentSnapshot?) -> Unit,
         onError: (String) -> Unit
     ) {
-        // Warning: This lists the 'users' collection. 
-        // If rules forbid listing, this will return PERMISSION_DENIED.
-        usersCollection()
-            .limit(50)
-            .get()
+        var query = usersCollection()
+            .orderBy("displayName")
+            .limit(20)
+
+        if (searchQuery.isNotBlank()) {
+            query = query.whereGreaterThanOrEqualTo("displayName", searchQuery)
+                .whereLessThanOrEqualTo("displayName", searchQuery + "\uf8ff")
+        }
+
+        if (lastDocument != null) {
+            query = query.startAfter(lastDocument)
+        }
+
+        query.get()
             .addOnSuccessListener { snapshot ->
                 val users = snapshot.documents
                     .mapNotNull { it.toObject(UserProfile::class.java) }
                     .filter { it.uid.isNotBlank() && it.uid != currentUserId }
-                    .sortedBy { displayNameOrEmail(it).lowercase() }
-                onSuccess(users)
+                
+                val newLastDocument = if (snapshot.documents.isNotEmpty()) snapshot.documents.last() else null
+                onSuccess(users, newLastDocument)
             }
             .addOnFailureListener { exception ->
                 val msg = if (exception.message?.contains("PERMISSION_DENIED", ignoreCase = true) == true) {
@@ -347,7 +352,13 @@ object SocialRepository {
                 }
                 onSuccess(nicknamesMap)
             }
-            .addOnFailureListener { onError("Load Nicknames Error: ${it.message}") }
+            .addOnFailureListener { exception ->
+                if (exception.message?.contains("PERMISSION_DENIED", ignoreCase = true) == true) {
+                    onSuccess(emptyMap())
+                } else {
+                    onError("Load Nicknames Error: ${exception.message}")
+                }
+            }
     }
 
     fun displayNameOrEmail(user: UserProfile): String {
