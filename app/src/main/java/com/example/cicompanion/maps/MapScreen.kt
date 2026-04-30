@@ -33,12 +33,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -47,7 +48,7 @@ import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.BrandOrange
-import com.example.cicompanion.ui.theme.BrandRedDark
+import com.example.cicompanion.ui.theme.CoralRed
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -168,6 +169,7 @@ fun MapScreen(
     var hasLocationPermission by remember { mutableStateOf(false) }
     var showDetailsSheet by remember { mutableStateOf(false) }
     var showPinCreationDialog by remember { mutableStateOf(false) }
+    var showEventPickerForSelection by remember { mutableStateOf(false) }
 
     // search and filtering state
     var searchQuery by remember { mutableStateOf("") }
@@ -298,6 +300,7 @@ fun MapScreen(
                 hasLocationPermission = hasLocationPermission,
                 isLoadingLocation = isLoadingLocation,
                 isPinMode = mapViewModel.isPinMode,
+                isEditing = mapViewModel.editingPinId != null,
                 onLocationRequest = {
                     scope.launch {
                         isLoadingLocation = true
@@ -307,8 +310,12 @@ fun MapScreen(
                         }
                     }
                 },
-                onTogglePinMode = { mapViewModel.togglePinMode() },
+                onTogglePinMode = { 
+                    if (mapViewModel.isPinMode) mapViewModel.exitPinMode()
+                    else mapViewModel.togglePinMode() 
+                },
                 onConfirmPin = { showPinCreationDialog = true },
+                onClearPin = { mapViewModel.clearTempPin() },
                 tempPinSet = mapViewModel.tempPinLocation != null
             )
 
@@ -331,8 +338,12 @@ fun MapScreen(
             if (showDetailsSheet && selectedLocation != null) {
                 val location = selectedLocation!!
                 val locationEvents = calendarViewModel.events.filter { 
-                    (it.calendarId == "custom" || it.isPinned || it.isBookmarked) &&
-                    (it.location?.contains(location.name, ignoreCase = true) == true || it.id == location.associatedEventId)
+                    if (location.isCustom) {
+                        it.id == location.associatedEventId
+                    } else {
+                        (it.calendarId == "custom" || it.isPinned || it.isBookmarked) &&
+                        (it.location?.contains(location.name, ignoreCase = true) == true)
+                    }
                 }
                 
                 ModalBottomSheet(
@@ -364,7 +375,14 @@ fun MapScreen(
                             navController.navigate("${Routes.SOCIAL}?shareLocation=${location.name}")
                         },
                         onAssociateEvent = {
-                            navController.navigate(Routes.CALENDAR)
+                            showEventPickerForSelection = true
+                        },
+                        onEditPin = {
+                            val pin = mapViewModel.customPins.find { it.id == location.id }
+                            if (pin != null) {
+                                showDetailsSheet = false
+                                mapViewModel.startEditingLocation(pin.id)
+                            }
                         }
                     )
                 }
@@ -372,10 +390,27 @@ fun MapScreen(
 
             if (showPinCreationDialog) {
                 PinCreationDialog(
-                    onDismiss = { showPinCreationDialog = false },
-                    onConfirm = { name, desc, color ->
-                        mapViewModel.savePin(name, desc, color)
+                    customEvents = calendarViewModel.events.filter { it.calendarId == "custom" },
+                    editingPin = mapViewModel.editingPin,
+                    onDismiss = { 
                         showPinCreationDialog = false
+                    },
+                    onConfirm = { name, desc, color, eventId ->
+                        mapViewModel.savePin(name, desc, color, eventId)
+                        showPinCreationDialog = false
+                    }
+                )
+            }
+
+            if (showEventPickerForSelection && selectedLocation != null) {
+                EventSelectionDialog(
+                    customEvents = calendarViewModel.events.filter { it.calendarId == "custom" },
+                    currentEventId = selectedLocation?.associatedEventId,
+                    onDismiss = { showEventPickerForSelection = false },
+                    onConfirm = { eventId ->
+                        mapViewModel.associateEvent(selectedLocation!!.id, eventId)
+                        selectedLocation = selectedLocation?.copy(associatedEventId = eventId)
+                        showEventPickerForSelection = false
                     }
                 )
             }
@@ -384,22 +419,160 @@ fun MapScreen(
 }
 
 @Composable
-fun PinCreationDialog(onDismiss: () -> Unit, onConfirm: (String, String, Color) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var selectedColor by remember { mutableStateOf(Color(0xFFE91E63)) }
+fun EventSelectionDialog(
+    customEvents: List<CalendarEvent>,
+    currentEventId: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (String?) -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    
+    val filteredEvents = remember(searchQuery, customEvents) {
+        customEvents.filter { it.title.contains(searchQuery, ignoreCase = true) }
+    }
 
-    val colors = listOf(Color(0xFFE91E63), Color(0xFF9C27B0), Color(0xFF2196F3), Color(0xFF4CAF50), Color(0xFFFF9800))
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .fillMaxWidth()
+            ) {
+                Text(
+                    "Link an Event",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = CoralRed
+                )
+                Spacer(Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search your events...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = CoralRed,
+                        unfocusedBorderColor = Color.LightGray
+                    ),
+                    singleLine = true
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 300.dp)
+                ) {
+                    item {
+                        Surface(
+                            onClick = { onConfirm(null) },
+                            modifier = Modifier.fillMaxWidth(),
+                            color = if (currentEventId == null) CoralRed.copy(alpha = 0.1f) else Color.Transparent,
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.LinkOff, contentDescription = null, tint = Color.Gray)
+                                Spacer(Modifier.width(12.dp))
+                                Text("None (Unlink Event)", fontWeight = FontWeight.Medium)
+                            }
+                        }
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color.LightGray.copy(alpha = 0.3f))
+                    }
+
+                    if (filteredEvents.isEmpty()) {
+                        item {
+                            Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                                Text("No events found.", color = Color.Gray)
+                            }
+                        }
+                    } else {
+                        items(filteredEvents) { event ->
+                            val isSelected = event.id == currentEventId
+                            Surface(
+                                onClick = { onConfirm(event.id) },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = if (isSelected) CoralRed.copy(alpha = 0.1f) else Color.Transparent,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Event, contentDescription = null, tint = if (isSelected) CoralRed else Color.Gray)
+                                    Spacer(Modifier.width(12.dp))
+                                    Column {
+                                        Text(event.title, fontWeight = FontWeight.Bold, color = if (isSelected) CoralRed else Color.Black)
+                                        Text(event.timeLabel(), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(20.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = Color.Gray)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PinCreationDialog(
+    customEvents: List<CalendarEvent>,
+    editingPin: CustomPin? = null,
+    onDismiss: () -> Unit, 
+    onConfirm: (String, String, Color, String?) -> Unit
+) {
+    var name by remember { mutableStateOf(editingPin?.name ?: "") }
+    var description by remember { mutableStateOf(editingPin?.description ?: "") }
+    var selectedColor by remember { mutableStateOf(editingPin?.color ?: CoralRed) }
+    var selectedEventId by remember { mutableStateOf<String?>(editingPin?.associatedEventId) }
+    var showEventPicker by remember { mutableStateOf(false) }
+
+    val colors = listOf(CoralRed, Color(0xFF9C27B0), Color(0xFF2196F3), Color(0xFF4CAF50), Color(0xFFFF9800))
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create Custom Pin", fontWeight = FontWeight.Bold) },
+        title = { Text(if (editingPin != null) "Edit Custom Pin" else "Create Custom Pin", fontWeight = FontWeight.Bold, color = CoralRed) },
         text = {
-            Column {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(
+                    value = name, 
+                    onValueChange = { name = it }, 
+                    label = { Text("Name") }, 
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CoralRed, focusedLabelColor = CoralRed)
+                )
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(
+                    value = description, 
+                    onValueChange = { description = it }, 
+                    label = { Text("Description") }, 
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CoralRed, focusedLabelColor = CoralRed)
+                )
                 Spacer(Modifier.height(16.dp))
+                
                 Text("Pick a Color", style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                     colors.forEach { color ->
@@ -412,17 +585,65 @@ fun PinCreationDialog(onDismiss: () -> Unit, onConfirm: (String, String, Color) 
                         )
                     }
                 }
+                
+                Spacer(Modifier.height(24.dp))
+                Text("Linked Event", style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(8.dp))
+                
+                val selectedEvent = customEvents.find { it.id == selectedEventId }
+                Surface(
+                    onClick = { showEventPicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color.LightGray),
+                    color = Color(0xFFF8F8F8)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (selectedEvent != null) Icons.Default.Event else Icons.Default.LinkOff,
+                            contentDescription = null,
+                            tint = if (selectedEvent != null) CoralRed else Color.Gray
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = selectedEvent?.title ?: "No event linked (Tap to select)",
+                            color = if (selectedEvent != null) Color.Black else Color.Gray,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+                    }
+                }
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(name, description, selectedColor) }, enabled = name.isNotBlank()) {
-                Text("Confirm")
+            Button(
+                onClick = { onConfirm(name, description, selectedColor, selectedEventId) }, 
+                enabled = name.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(if (editingPin != null) "Save Changes" else "Confirm")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray) }
         }
     )
+
+    if (showEventPicker) {
+        EventSelectionDialog(
+            customEvents = customEvents,
+            currentEventId = selectedEventId,
+            onDismiss = { showEventPicker = false },
+            onConfirm = { 
+                selectedEventId = it
+                showEventPicker = false
+            }
+        )
+    }
 }
 
 @Composable
@@ -433,7 +654,8 @@ fun LocationDetailsContent(
     onDeletePin: () -> Unit,
     onToggleFavorite: () -> Unit,
     onSendMessage: () -> Unit,
-    @Suppress("UNUSED_PARAMETER") onAssociateEvent: () -> Unit
+    onAssociateEvent: () -> Unit,
+    onEditPin: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -465,12 +687,17 @@ fun LocationDetailsContent(
                 )
             }
             if (location.isCustom) {
-                IconButton(onClick = onToggleFavorite) {
-                    Icon(
-                        imageVector = if (location.isFavorited) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "Favorite",
-                        tint = if (location.isFavorited) Color.Red else Color.Gray
-                    )
+                Row {
+                    IconButton(onClick = onEditPin) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit Pin", tint = Color.Gray)
+                    }
+                    IconButton(onClick = onToggleFavorite) {
+                        Icon(
+                            imageVector = if (location.isFavorited) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "Favorite",
+                            tint = if (location.isFavorited) Color.Red else Color.Gray
+                        )
+                    }
                 }
             }
         }
@@ -512,7 +739,7 @@ fun LocationDetailsContent(
             }
             Button(
                 onClick = onSendMessage,
-                colors = ButtonDefaults.buttonColors(containerColor = BrandRedDark.copy(alpha = 0.1f), contentColor = BrandRedDark),
+                colors = ButtonDefaults.buttonColors(containerColor = CoralRed.copy(alpha = 0.1f), contentColor = CoralRed),
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -522,11 +749,25 @@ fun LocationDetailsContent(
             }
         }
         
+        if (location.isCustom) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onAssociateEvent,
+                colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(if (location.associatedEventId != null) "Change Linked Event" else "Link an Event")
+            }
+        }
+        
         Spacer(modifier = Modifier.height(16.dp))
 
         if (events.isNotEmpty()) {
             Text(
-                text = "Events at this Location",
+                text = if (location.isCustom && location.associatedEventId != null) "Linked Event" else "Events at this Location",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
@@ -613,14 +854,14 @@ fun MapEventItem(event: CalendarEvent, onMoreClick: () -> Unit) {
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(BrandRedDark.copy(alpha = 0.1f))
+                    .background(CoralRed.copy(alpha = 0.1f))
                     .clickable(onClick = onMoreClick),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.CalendarMonth,
                     contentDescription = "Go to Calendar",
-                    tint = BrandRedDark,
+                    tint = CoralRed,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -663,7 +904,7 @@ fun MapTopControls(
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     unfocusedBorderColor = Color.LightGray.copy(alpha = 0.3f),
-                    focusedBorderColor = BrandRedDark,
+                    focusedBorderColor = CoralRed,
                     focusedContainerColor = Color(0xFFF8F8F8),
                     unfocusedContainerColor = Color(0xFFF8F8F8)
                 )
@@ -742,7 +983,7 @@ fun CustomFilterChip(
 ) {
     Surface(
         onClick = onClick,
-        color = if (selected) BrandRedDark else Color.White,
+        color = if (selected) CoralRed else Color.White,
         shape = RoundedCornerShape(12.dp),
         border = if (selected) null else BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f)),
         modifier = Modifier.height(36.dp)
@@ -813,18 +1054,28 @@ fun MapContent(
 
         if (isPinMode) {
             tempPinLocation?.let {
-                Marker(
+                MarkerComposable(
                     state = rememberMarkerState(position = it),
-                    title = "New Custom Pin",
-                    icon = com.google.android.gms.maps.model.BitmapDescriptorFactory.defaultMarker(com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_AZURE)
-                )
+                    anchor = Offset(0.5f, 0.5f)
+                ) {
+                    CustomPinMarkerIcon(
+                        color = CoralRed, 
+                        isFavorited = false, 
+                        eventCount = 0,
+                        isEditing = true
+                    )
+                }
             }
         } else {
             displayLocations.forEach { location ->
                 val isSelected = selectedLocation?.id == location.id
                 val locationEvents = events.filter { 
-                    (it.calendarId == "custom" || it.isPinned || it.isBookmarked) &&
-                    (it.location?.contains(location.name, ignoreCase = true) == true || it.id == location.associatedEventId)
+                    if (location.isCustom) {
+                        it.id == location.associatedEventId
+                    } else {
+                        (it.calendarId == "custom" || it.isPinned || it.isBookmarked) &&
+                        (it.location?.contains(location.name, ignoreCase = true) == true)
+                    }
                 }
                 val eventCount = locationEvents.size
                 val hasPinnedEvent = locationEvents.any { it.isPinned }
@@ -843,19 +1094,89 @@ fun MapContent(
                         if (isSelected) {
                             SelectedPointerIcon(location, eventCount, hasPinnedEvent, hasBookmarkedEvent)
                         } else {
-                            LandmarkIcon(
-                                icon = location.icon, 
-                                color = location.color, 
-                                eventCount = eventCount, 
-                                hasPinnedEvent = hasPinnedEvent,
-                                hasBookmarkedEvent = hasBookmarkedEvent,
-                                isCustom = location.isCustom,
-                                isFavorited = location.isFavorited
-                            )
+                            if (location.isCustom) {
+                                CustomPinMarkerIcon(location.color, location.isFavorited, eventCount)
+                            } else {
+                                LandmarkIcon(
+                                    icon = location.icon, 
+                                    color = location.color, 
+                                    eventCount = eventCount, 
+                                    hasPinnedEvent = hasPinnedEvent,
+                                    hasBookmarkedEvent = hasBookmarkedEvent,
+                                    isCustom = location.isCustom,
+                                    isFavorited = location.isFavorited
+                                )
+                            }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun CustomPinMarkerIcon(color: Color, isFavorited: Boolean, eventCount: Int, isEditing: Boolean = false) {
+    val infiniteTransition = rememberInfiniteTransition(label = "markerPulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (isEditing) 1.5f else 1.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(if (isEditing) 800 else 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulse"
+    )
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(if (isEditing) 800 else 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulseAlpha"
+    )
+
+    Box(contentAlignment = Alignment.Center) {
+        // Pulsing background ring
+        Box(
+            modifier = Modifier
+                .size(if (isEditing) 44.dp else 38.dp)
+                .graphicsLayer(scaleX = pulseScale, scaleY = pulseScale)
+                .background(color.copy(alpha = pulseAlpha), CircleShape)
+        )
+        
+        // Pin body
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .background(color, RoundedCornerShape(topStart = 17.dp, topEnd = 17.dp, bottomStart = 17.dp, bottomEnd = 2.dp))
+                .graphicsLayer(rotationZ = 45f)
+                .border(2.dp, when {
+                    isFavorited -> Color(0xFFFFD700) // Gold for favorited
+                    eventCount > 0 -> BrandOrange // Orange for associated events
+                    else -> Color.White
+                }, RoundedCornerShape(topStart = 17.dp, topEnd = 17.dp, bottomStart = 17.dp, bottomEnd = 2.dp))
+                .shadow(4.dp)
+        )
+        
+        // Icon inside
+        Icon(
+            imageVector = Icons.Default.PushPin,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(18.dp).offset(y = (-2).dp)
+        )
+
+        if (eventCount > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 6.dp, y = (-6).dp)
+                    .size(12.dp)
+                    .background(Color.Red, CircleShape)
+                    .border(1.dp, Color.White, CircleShape)
+            )
         }
     }
 }
@@ -1011,10 +1332,10 @@ fun LocationInfoCard(location: CampusLocation, onClose: () -> Unit, onDetailsCli
                     color = AppBackground,
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.height(36.dp).fillMaxWidth(),
-                    border = BorderStroke(1.dp, BrandRedDark.copy(alpha = 0.2f))
+                    border = BorderStroke(1.dp, CoralRed.copy(alpha = 0.2f))
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text("Details", color = BrandRedDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Details", color = CoralRed, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }
@@ -1039,71 +1360,118 @@ fun MapOverlays(
     hasLocationPermission: Boolean, 
     @Suppress("UNUSED_PARAMETER") isLoadingLocation: Boolean, 
     isPinMode: Boolean,
+    isEditing: Boolean = false,
     onLocationRequest: () -> Unit,
     onTogglePinMode: () -> Unit,
     onConfirmPin: () -> Unit,
+    onClearPin: () -> Unit,
     tempPinSet: Boolean
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier.align(Alignment.BottomStart).padding(20.dp).padding(bottom = 90.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            if (hasLocationPermission && !isPinMode) {
+        if (!isPinMode) {
+            Column(
+                modifier = Modifier.align(Alignment.BottomStart).padding(20.dp).padding(bottom = 90.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (hasLocationPermission) {
+                    FloatingActionButton(
+                        onClick = onLocationRequest,
+                        shape = CircleShape,
+                        containerColor = Color.White,
+                        contentColor = CoralRed,
+                        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
+                    ) {
+                        Icon(painter = painterResource(id = android.R.drawable.ic_menu_mylocation), contentDescription = "My Location", modifier = Modifier.size(24.dp))
+                    }
+                }
+
                 FloatingActionButton(
-                    onClick = onLocationRequest,
+                    onClick = onTogglePinMode,
                     shape = CircleShape,
                     containerColor = Color.White,
-                    contentColor = BrandRedDark,
+                    contentColor = CoralRed,
                     elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
                 ) {
-                    Icon(painter = painterResource(id = android.R.drawable.ic_menu_mylocation), contentDescription = "My Location", modifier = Modifier.size(24.dp))
+                    Icon(
+                        imageVector = Icons.Default.AddLocationAlt, 
+                        contentDescription = "Custom Pin", 
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
-            }
-
-            FloatingActionButton(
-                onClick = onTogglePinMode,
-                shape = CircleShape,
-                containerColor = if (isPinMode) BrandRedDark else Color.White,
-                contentColor = if (isPinMode) Color.White else BrandRedDark,
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
-            ) {
-                Icon(
-                    imageVector = if (isPinMode) Icons.Default.Close else Icons.Default.AddLocationAlt, 
-                    contentDescription = "Custom Pin", 
-                    modifier = Modifier.size(24.dp)
-                )
             }
         }
 
         if (isPinMode) {
+            // Header for pin mode
             Surface(
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
                 shape = RoundedCornerShape(20.dp),
-                color = BrandRedDark,
+                color = CoralRed,
                 shadowElevation = 8.dp
             ) {
                 Text(
-                    text = if (tempPinSet) "Tap 'Confirm' to save pin" else "Tap anywhere on map to place pin",
+                    text = if (isEditing) "Move the pin or confirm location." 
+                           else if (tempPinSet) "Pin placed! Confirm to continue." 
+                           else "Tap on map to place your pin",
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
             }
 
-            if (tempPinSet) {
-                Button(
-                    onClick = onConfirmPin,
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandRedDark),
-                    shape = RoundedCornerShape(50)
+            // Bottom controls for pin mode
+            Column(
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (tempPinSet) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = onClearPin,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = CoralRed),
+                            shape = RoundedCornerShape(50),
+                            border = BorderStroke(1.dp, CoralRed)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Change Location")
+                        }
+                        Button(
+                            onClick = onConfirmPin,
+                            colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
+                            shape = RoundedCornerShape(50)
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Confirm Location")
+                        }
+                    }
+                }
+                
+                // Exit pin mode button
+                Surface(
+                    onClick = onTogglePinMode,
+                    color = Color.White.copy(alpha = 0.9f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color.LightGray),
+                    modifier = Modifier.height(40.dp)
                 ) {
-                    Text("Confirm Pin Location", fontWeight = FontWeight.Bold)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = null, tint = Color.DarkGray, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Cancel", color = Color.DarkGray, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
                 }
             }
         }
 
-        if (!hasLocationPermission) PermissionCard(modifier = Modifier.align(Alignment.Center))
+        if (!hasLocationPermission && !isPinMode) PermissionCard(modifier = Modifier.align(Alignment.Center))
     }
 }
 

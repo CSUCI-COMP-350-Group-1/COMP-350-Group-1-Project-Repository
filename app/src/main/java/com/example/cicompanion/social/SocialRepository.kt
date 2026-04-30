@@ -2,6 +2,7 @@ package com.example.cicompanion.social
 
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.firebase.FriendRequestNotificationSender
+import com.example.cicompanion.maps.CustomPin
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -574,6 +575,26 @@ object SocialRepository {
     }
 
     /**
+     * Fetches all user IDs who have an invite (accepted or pending) for a specific event.
+     */
+    fun fetchInvitedUserIds(
+        eventId: String,
+        onSuccess: (List<String>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        eventInvitesCollection()
+            .whereEqualTo("eventId", eventId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val ids = snapshot?.documents?.mapNotNull { it.getString("toUserId") } ?: emptyList()
+                onSuccess(ids)
+            }
+            .addOnFailureListener { e ->
+                onError(e.message ?: "Error fetching invited users.")
+            }
+    }
+
+    /**
      * Real-time listener for event members (Full Profiles)
      */
     fun listenToEventMembers(
@@ -663,6 +684,33 @@ object SocialRepository {
                     )
                 }
                 onEventsChanged(events)
+            }
+    }
+
+    /**
+     * Real-time listener for custom pins
+     */
+    fun listenToCustomPins(
+        userId: String,
+        onPinsChanged: (List<CustomPin>) -> Unit,
+        onError: (String) -> Unit
+    ): ListenerRegistration {
+        return FirebaseFirestore.getInstance().collection("users").document(userId)
+            .collection("customPins")
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    onError(e.message ?: "Error listening to custom pins.")
+                    return@addSnapshotListener
+                }
+                if (snapshot == null) {
+                    onPinsChanged(emptyList())
+                    return@addSnapshotListener
+                }
+                
+                val pins = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(CustomPin::class.java)
+                }
+                onPinsChanged(pins)
             }
     }
     

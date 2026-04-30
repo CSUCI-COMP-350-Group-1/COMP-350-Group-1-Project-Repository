@@ -246,6 +246,7 @@ fun CalendarApp(viewModel: CalendarViewModel) {
 
     eventToInvite?.let { event ->
         FriendPickerDialog(
+            eventId = event.id,
             onDismiss = { eventToInvite = null },
             onInvite = { friend ->
                 currentUser?.let { user ->
@@ -1856,6 +1857,7 @@ fun <T> WheelPicker(
 
 @Composable
 fun FriendPickerDialog(
+    eventId: String? = null,
     onDismiss: () -> Unit,
     onInvite: (UserProfile) -> Unit
 ) {
@@ -1864,11 +1866,27 @@ fun FriendPickerDialog(
     var searchQuery by remember { mutableStateOf("") }
     val currentUser = FirebaseAuth.getInstance().currentUser
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(eventId) {
         if (currentUser != null) {
             SocialRepository.fetchAcceptedFriends(
                 currentUserId = currentUser.uid,
-                onSuccess = { friends = it; isLoading = false },
+                onSuccess = { allFriends ->
+                    if (eventId != null) {
+                        SocialRepository.fetchInvitedUserIds(eventId,
+                            onSuccess = { invitedIds ->
+                                friends = allFriends.filter { friend -> !invitedIds.contains(friend.uid) }
+                                isLoading = false
+                            },
+                            onError = {
+                                friends = allFriends
+                                isLoading = false
+                            }
+                        )
+                    } else {
+                        friends = allFriends
+                        isLoading = false
+                    }
+                },
                 onError = { isLoading = false }
             )
         }
@@ -1902,7 +1920,8 @@ fun FriendPickerDialog(
                         CircularProgressIndicator(color = CoralRed)
                     }
                 } else if (friends.isEmpty()) {
-                    Text("You don't have any friends to invite.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    Text(if (eventId != null) "All eligible friends are already invited." else "You don't have any friends to invite.", 
+                        textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 } else if (filteredFriends.isEmpty()) {
                     Text("No friends match \"$searchQuery\"", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 } else {

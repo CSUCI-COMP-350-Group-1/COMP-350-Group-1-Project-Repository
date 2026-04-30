@@ -213,10 +213,10 @@ class CalendarViewModel(
         )
     }
 
-    fun kickUser(eventId: String, targetUserId: String) {
+    fun kickUser(eventId: String, targetUserId: String, onSuccess: () -> Unit = {}) {
         val ownerId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         SocialRepository.kickFromEvent(ownerId, targetUserId, eventId,
-            onSuccess = { },
+            onSuccess = onSuccess,
             onError = { errorMessage = it }
         )
     }
