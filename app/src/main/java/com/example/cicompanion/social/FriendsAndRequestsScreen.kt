@@ -89,25 +89,36 @@ fun FriendsAndRequestsScreen(
 @Composable
 fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
+    var nicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
     var friendToRemove by remember { mutableStateOf<UserProfile?>(null) }
+    var friendToNickname by remember { mutableStateOf<UserProfile?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val refreshFriends = {
         isLoading = true
-        SocialRepository.fetchSearchableUsers(
+        // PERMISSION_DENIED fix: use fetchAcceptedFriends which avoids listing the /users collection
+        SocialRepository.fetchAcceptedFriends(
             currentUserId = currentUser.uid,
-            onSuccess = { allUsers ->
-                SocialRepository.fetchAllFriendRequestStatuses(
+            onSuccess = { loadedFriends ->
+                friends = loadedFriends
+                SocialRepository.fetchNicknames(
                     currentUserId = currentUser.uid,
-                    onSuccess = { statuses ->
-                        friends = allUsers.filter { statuses[it.uid] == "accepted" }
+                    onSuccess = { map ->
+                        nicknames = map
                         isLoading = false
+                        errorMessage = null // Clear any stale error on success
                     },
-                    onError = { errorMessage = it; isLoading = false }
+                    onError = { err ->
+                        errorMessage = err
+                        isLoading = false 
+                    }
                 )
             },
-            onError = { errorMessage = it; isLoading = false }
+            onError = { err -> 
+                errorMessage = err
+                isLoading = false 
+            }
         )
     }
 
@@ -133,7 +144,9 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
                 items(friends, key = { it.uid }) { friend ->
                     FriendCard(
                         user = friend,
+                        nickname = nicknames[friend.uid],
                         onCardClick = { navController.navigate("${Routes.PROFILE}/${friend.uid}") },
+                        onNickname = { friendToNickname = friend },
                         onRemove = { friendToRemove = friend }
                     )
                 }
@@ -170,6 +183,51 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
                     colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
                 ) {
                     Text("Cancel", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
+    friendToNickname?.let { friend ->
+        var currentNickname by remember { mutableStateOf(nicknames[friend.uid] ?: "") }
+        
+        AlertDialog(
+            onDismissRequest = { friendToNickname = null },
+            title = { Text("Set Nickname") },
+            text = {
+                Column {
+                    Text("Nickname for ${SocialRepository.displayNameOrEmail(friend)}")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = currentNickname,
+                        onValueChange = { currentNickname = it },
+                        placeholder = { Text("Enter nickname") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        SocialRepository.setNickname(
+                            currentUserId = currentUser.uid,
+                            friendUid = friend.uid,
+                            nickname = currentNickname,
+                            onSuccess = {
+                                friendToNickname = null
+                                refreshFriends()
+                            },
+                            onError = { errorMessage = it; friendToNickname = null }
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF3347))
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { friendToNickname = null }) {
+                    Text("Cancel")
                 }
             }
         )
@@ -381,7 +439,13 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
 }
 
 @Composable
-fun FriendCard(user: UserProfile, onCardClick: () -> Unit, onRemove: () -> Unit) {
+fun FriendCard(
+    user: UserProfile, 
+    nickname: String?,
+    onCardClick: () -> Unit, 
+    onNickname: () -> Unit,
+    onRemove: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -397,11 +461,21 @@ fun FriendCard(user: UserProfile, onCardClick: () -> Unit, onRemove: () -> Unit)
             UserAvatar(photoUrl = user.photoUrl)
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = SocialRepository.displayNameOrEmail(user), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(text = user.email, fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (!nickname.isNullOrBlank()) {
+                    Text(text = nickname, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(text = "(${SocialRepository.displayNameOrEmail(user)})", fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                } else {
+                    Text(text = SocialRepository.displayNameOrEmail(user), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(text = user.email, fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Default.PersonRemove, contentDescription = "Unfriend", tint = Color.Red)
+            Row {
+                IconButton(onClick = onNickname) {
+                    Icon(Icons.Default.Edit, contentDescription = "Set Nickname", tint = Color.Gray)
+                }
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Default.PersonRemove, contentDescription = "Unfriend", tint = Color.Red)
+                }
             }
         }
     }

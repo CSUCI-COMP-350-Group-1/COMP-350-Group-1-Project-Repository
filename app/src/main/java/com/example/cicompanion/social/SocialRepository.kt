@@ -13,21 +13,56 @@ object SocialRepository {
         onSuccess: (List<UserProfile>) -> Unit,
         onError: (String) -> Unit
     ) {
-        fetchSearchableUsers(
+        fetchAllFriendRequestStatuses(
             currentUserId = currentUserId,
-            onSuccess = { allUsers ->
-                fetchAllFriendRequestStatuses(
-                    currentUserId = currentUserId,
-                    onSuccess = { statuses ->
-                        onSuccess(
-                            allUsers.filter { statuses[it.uid] == "accepted" }
-                        )
-                    },
-                    onError = onError
-                )
+            onSuccess = { statuses ->
+                val friendIds = statuses.filter { it.value == "accepted" }.keys.toList()
+                if (friendIds.isEmpty()) {
+                    onSuccess(emptyList())
+                } else {
+                    fetchUsersByIdsParallel(friendIds, onSuccess, onError)
+                }
             },
-            onError = onError
+            onError = { onError("Friends Load Error: $it") }
         )
+    }
+
+    private fun fetchUsersByIdsParallel(
+        userIds: List<String>,
+        onSuccess: (List<UserProfile>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val allUsers = mutableListOf<UserProfile>()
+        var completedCount = 0
+        var hasError = false
+
+        if (userIds.isEmpty()) {
+            onSuccess(emptyList())
+            return
+        }
+
+        userIds.forEach { userId ->
+            usersCollection().document(userId).get()
+                .addOnSuccessListener { document ->
+                    if (hasError) return@addOnSuccessListener
+                    
+                    val user = document.toObject(UserProfile::class.java)
+                    if (user != null) {
+                        allUsers.add(user)
+                    }
+                    
+                    completedCount++
+                    if (completedCount == userIds.size) {
+                        onSuccess(allUsers.sortedBy { displayNameOrEmail(it).lowercase() })
+                    }
+                }
+                .addOnFailureListener { exception ->
+                    if (!hasError) {
+                        hasError = true
+                        onError("Profile Fetch Error: ${exception.message}")
+                    }
+                }
+        }
     }
 
     fun fetchSearchableUsers(
@@ -35,23 +70,28 @@ object SocialRepository {
         onSuccess: (List<UserProfile>) -> Unit,
         onError: (String) -> Unit
     ) {
+        // Warning: This lists the 'users' collection. 
+        // If rules forbid listing, this will return PERMISSION_DENIED.
         usersCollection()
+            .limit(50)
             .get()
             .addOnSuccessListener { snapshot ->
-                handleSearchableUsersSuccess(
-                    snapshot = snapshot,
-                    currentUserId = currentUserId,
-                    onSuccess = onSuccess
-                )
+                val users = snapshot.documents
+                    .mapNotNull { it.toObject(UserProfile::class.java) }
+                    .filter { it.uid.isNotBlank() && it.uid != currentUserId }
+                    .sortedBy { displayNameOrEmail(it).lowercase() }
+                onSuccess(users)
             }
             .addOnFailureListener { exception ->
-                onError(searchableUsersErrorMessage(exception))
+                val msg = if (exception.message?.contains("PERMISSION_DENIED", ignoreCase = true) == true) {
+                    "User Search Denied: Global listing is disabled. Try searching by exact name/email."
+                } else {
+                    exception.message ?: "Could not load users."
+                }
+                onError(msg)
             }
     }
 
-    /**
-     * Fetches a specific user's profile data by their UID.
-     */
     fun fetchUserProfile(
         userId: String,
         onSuccess: (UserProfile) -> Unit,
@@ -67,31 +107,8 @@ object SocialRepository {
                 }
             }
             .addOnFailureListener { exception ->
-                onError(exception.message ?: "Could not load user profile.")
+                onError("Load Profile Error: ${exception.message}")
             }
-    }
-
-    private fun handleSearchableUsersSuccess(
-        snapshot: QuerySnapshot,
-        currentUserId: String,
-        onSuccess: (List<UserProfile>) -> Unit
-    ) {
-        val users = mapSearchableUsers(snapshot, currentUserId)
-        onSuccess(users)
-    }
-
-    private fun mapSearchableUsers(
-        snapshot: QuerySnapshot,
-        currentUserId: String
-    ): List<UserProfile> {
-        return snapshot.documents
-            .mapNotNull { it.toObject(UserProfile::class.java) }
-            .filter { it.uid.isNotBlank() && it.uid != currentUserId }
-            .sortedBy { displayNameOrEmail(it).lowercase() }
-    }
-
-    private fun searchableUsersErrorMessage(exception: Exception): String {
-        return exception.message ?: "Could not load users."
     }
 
     fun sendFriendRequest(
@@ -107,113 +124,36 @@ object SocialRepository {
 
         val requestId = createFriendRequestId(currentUser.uid, targetUser.uid)
 
-        checkIfRequestExists(
-            requestId = requestId,
-            onComplete = { exists ->
-                handleExistingRequestCheck(
-                    exists = exists,
-                    currentUser = currentUser,
-                    targetUser = targetUser,
-                    requestId = requestId,
-                    onSuccess = onSuccess,
-                    onError = onError
-                )
-            },
-            onError = onError
-        )
-    }
+        friendRequestsCollection().document(requestId).get()
+            .addOnSuccessListener { doc ->
+                if (doc.exists()) {
+                    onError("You already sent a friend request to this user.")
+                } else {
+                    val request = FriendRequest(
+                        id = requestId,
+                        fromUserId = currentUser.uid,
+                        toUserId = targetUser.uid,
+                        fromDisplayName = currentUser.displayName ?: "",
+                        fromEmail = currentUser.email ?: "",
+                        fromPhotoUrl = currentUser.photoUrl?.toString() ?: "",
+                        toDisplayName = targetUser.displayName,
+                        toEmail = targetUser.email,
+                        status = "pending",
+                        sentAt = System.currentTimeMillis()
+                    )
 
-    private fun handleExistingRequestCheck(
-        exists: Boolean,
-        currentUser: FirebaseUser,
-        targetUser: UserProfile,
-        requestId: String,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        if (exists) {
-            onError("You already sent a friend request to this user.")
-            return
-        }
-
-        val request = buildFriendRequest(currentUser, targetUser, requestId)
-        saveFriendRequest(
-            request = request,
-            currentUser = currentUser,
-            targetUser = targetUser,
-            onSuccess = onSuccess,
-            onError = onError
-        )
-    }
-
-
-    fun createFriendRequestId(fromUserId: String, toUserId: String): String {
-        return "${fromUserId}_$toUserId"
-    }
-
-    private fun buildFriendRequest(
-        currentUser: FirebaseUser,
-        targetUser: UserProfile,
-        requestId: String
-    ): FriendRequest {
-        return FriendRequest(
-            id = requestId,
-            fromUserId = currentUser.uid,
-            toUserId = targetUser.uid,
-            fromDisplayName = currentUser.displayName ?: "",
-            fromEmail = currentUser.email ?: "",
-            fromPhotoUrl = currentUser.photoUrl?.toString() ?: "",
-            toDisplayName = targetUser.displayName,
-            toEmail = targetUser.email,
-            status = "pending",
-            sentAt = System.currentTimeMillis()
-        )
-    }
-
-    private fun checkIfRequestExists(
-        requestId: String,
-        onComplete: (Boolean) -> Unit,
-        onError: (String) -> Unit
-    ) {
-        friendRequestsCollection()
-            .document(requestId)
-            .get()
-            .addOnSuccessListener { document ->
-                onComplete(document.exists())
+                    friendRequestsCollection().document(requestId).set(request)
+                        .addOnSuccessListener {
+                            FriendRequestNotificationSender.sendFriendRequestNotification(
+                                targetUserId = targetUser.uid,
+                                senderDisplayName = currentUser.displayName ?: currentUser.email ?: "Someone"
+                            )
+                            onSuccess()
+                        }
+                        .addOnFailureListener { onError("Send Request Error: ${it.message}") }
+                }
             }
-            .addOnFailureListener { exception ->
-                onError(existingRequestErrorMessage(exception))
-            }
-    }
-
-    private fun existingRequestErrorMessage(exception: Exception): String {
-        return exception.message ?: "Could not verify the existing friend request."
-    }
-
-    private fun saveFriendRequest(
-        request: FriendRequest,
-        currentUser: FirebaseUser,
-        targetUser: UserProfile,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        friendRequestsCollection()
-            .document(request.id)
-            .set(request)
-            .addOnSuccessListener {
-                FriendRequestNotificationSender.sendFriendRequestNotification(
-                    targetUserId = targetUser.uid,
-                    senderDisplayName = currentUser.displayName ?: currentUser.email ?: "Someone"
-                )
-                onSuccess()
-            }
-            .addOnFailureListener { exception ->
-                onError(sendFriendRequestErrorMessage(exception))
-            }
-    }
-
-    private fun sendFriendRequestErrorMessage(exception: Exception): String {
-        return exception.message ?: "Could not send the friend request."
+            .addOnFailureListener { onError("Check Request Error: ${it.message}") }
     }
 
     fun fetchIncomingFriendRequests(
@@ -229,7 +169,7 @@ object SocialRepository {
                 onSuccess(snapshot.documents.mapNotNull { it.toObject(FriendRequest::class.java) })
             }
             .addOnFailureListener { exception ->
-                onError(exception.message ?: "Could not load incoming friend requests.")
+                onError("Incoming Requests Error: ${exception.message}")
             }
     }
 
@@ -246,7 +186,7 @@ object SocialRepository {
                 onSuccess(snapshot.documents.mapNotNull { it.toObject(FriendRequest::class.java) })
             }
             .addOnFailureListener { exception ->
-                onError(exception.message ?: "Could not load outgoing friend requests.")
+                onError("Outgoing Requests Error: ${exception.message}")
             }
     }
 
@@ -255,25 +195,19 @@ object SocialRepository {
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        updateFriendRequestStatus(
-            requestId = request.id,
-            newStatus = "accepted",
-            onSuccess = onSuccess,
-            onError = onError
-        )
+        acceptFriendRequestById(request.id, onSuccess, onError)
     }
-    
+
     fun acceptFriendRequestById(
         requestId: String,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        updateFriendRequestStatus(
-            requestId = requestId,
-            newStatus = "accepted",
-            onSuccess = onSuccess,
-            onError = onError
-        )
+        friendRequestsCollection()
+            .document(requestId)
+            .update("status", "accepted")
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { onError("Accept Request Error: ${it.message}") }
     }
 
     fun declineFriendRequest(
@@ -284,12 +218,8 @@ object SocialRepository {
         friendRequestsCollection()
             .document(request.id)
             .delete()
-            .addOnSuccessListener {
-                onSuccess()
-            }
-            .addOnFailureListener { exception ->
-                onError(exception.message ?: "Could not decline (delete) the friend request.")
-            }
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { onError("Decline Request Error: ${it.message}") }
     }
 
     fun removeFriend(
@@ -300,7 +230,6 @@ object SocialRepository {
     ) {
         val collection = friendRequestsCollection()
 
-        // 1. Check requests sent BY me
         collection.whereEqualTo("fromUserId", currentUserId).get()
             .addOnSuccessListener { outgoingSnapshot ->
                 val outgoingDoc = outgoingSnapshot.documents.find { it.getString("toUserId") == targetUserId }
@@ -308,9 +237,8 @@ object SocialRepository {
                 if (outgoingDoc != null) {
                     outgoingDoc.reference.delete()
                         .addOnSuccessListener { onSuccess() }
-                        .addOnFailureListener { onError("Permission Denied: Only the receiver can remove this friend. Please check your Firestore Security Rules.") }
+                        .addOnFailureListener { onError("Remove Friend Error: ${it.message}") }
                 } else {
-                    // 2. Check requests sent TO me
                     collection.whereEqualTo("toUserId", currentUserId).get()
                         .addOnSuccessListener { incomingSnapshot ->
                             val incomingDoc = incomingSnapshot.documents.find { it.getString("fromUserId") == targetUserId }
@@ -318,36 +246,15 @@ object SocialRepository {
                             if (incomingDoc != null) {
                                 incomingDoc.reference.delete()
                                     .addOnSuccessListener { onSuccess() }
-                                    .addOnFailureListener { onError("Permission Denied: Could not delete incoming friendship. Check Firestore Rules.") }
+                                    .addOnFailureListener { onError("Remove Friend Error: ${it.message}") }
                             } else {
                                 onError("No friendship found to remove.")
                             }
                         }
-                        .addOnFailureListener { onError("Error searching incoming requests: ${it.message}") }
+                        .addOnFailureListener { onError("Find Incoming Error: ${it.message}") }
                 }
             }
-            .addOnFailureListener { onError("Error searching outgoing requests: ${it.message}") }
-    }
-
-    private fun updateFriendRequestStatus(
-        requestId: String,
-        newStatus: String,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        friendRequestsCollection()
-            .document(requestId)
-            .update("status", newStatus)
-            .addOnSuccessListener {
-                onSuccess()
-            }
-            .addOnFailureListener { exception ->
-                onError(updateFriendRequestStatusErrorMessage(exception))
-            }
-    }
-
-    private fun updateFriendRequestStatusErrorMessage(exception: Exception): String {
-        return exception.message ?: "Could not update the friend request."
+            .addOnFailureListener { onError("Find Outgoing Error: ${it.message}") }
     }
 
     fun fetchAllFriendRequestStatuses(
@@ -376,7 +283,6 @@ object SocialRepository {
                             val request = doc.toObject(FriendRequest::class.java)
                             if (request != null && request.fromUserId.isNotBlank()) {
                                 val existingStatus = allStatuses[request.fromUserId]
-                                // Accepted status takes priority
                                 if (existingStatus != "accepted") {
                                     allStatuses[request.fromUserId] = if (request.status == "pending") "pending_received" else request.status
                                 }
@@ -384,13 +290,9 @@ object SocialRepository {
                         }
                         onSuccess(allStatuses)
                     }
-                    .addOnFailureListener { exception ->
-                        onError(exception.message ?: "Could not load incoming friend request statuses.")
-                    }
+                    .addOnFailureListener { onError("Load Incoming Statuses Error: ${it.message}") }
             }
-            .addOnFailureListener { exception ->
-                onError(exception.message ?: "Could not load outgoing friend request statuses.")
-            }
+            .addOnFailureListener { onError("Load Outgoing Statuses Error: ${it.message}") }
     }
 
     fun fetchFriendCount(
@@ -398,33 +300,54 @@ object SocialRepository {
         onSuccess: (Int) -> Unit,
         onError: (String) -> Unit
     ) {
-        friendRequestsCollection()
-            .whereEqualTo("status", "accepted")
-            .get()
-            .addOnSuccessListener { snapshot ->
-                onSuccess(countAcceptedFriends(snapshot, currentUserId))
-            }
-            .addOnFailureListener { exception ->
-                onError(exception.message ?: "Could not load friend count.")
-            }
+        fetchAllFriendRequestStatuses(
+            currentUserId = currentUserId,
+            onSuccess = { statuses ->
+                val count = statuses.values.count { it == "accepted" }
+                onSuccess(count)
+            },
+            onError = { onError("Friend Count Error: $it") }
+        )
     }
 
-    private fun countAcceptedFriends(
-        snapshot: QuerySnapshot,
-        currentUserId: String
-    ): Int {
-        val friendIds = mutableSetOf<String>()
+    fun createFriendRequestId(fromUserId: String, toUserId: String): String {
+        return "${fromUserId}_${toUserId}"
+    }
 
-        snapshot.documents
-            .mapNotNull { it.toObject(FriendRequest::class.java) }
-            .forEach { request ->
-                when (currentUserId) {
-                    request.fromUserId -> friendIds.add(request.toUserId)
-                    request.toUserId -> friendIds.add(request.fromUserId)
+    fun setNickname(
+        currentUserId: String,
+        friendUid: String,
+        nickname: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val data = hashMapOf(
+            "friendUid" to friendUid,
+            "nickname" to nickname
+        )
+        nicknamesCollection(currentUserId)
+            .document(friendUid)
+            .set(data)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { onError("Save Nickname Error: ${it.message}") }
+    }
+
+    fun fetchNicknames(
+        currentUserId: String,
+        onSuccess: (Map<String, String>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        nicknamesCollection(currentUserId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val nicknamesMap = snapshot.documents.associate { doc ->
+                    val friendId = doc.getString("friendUid") ?: doc.id
+                    val nickname = doc.getString("nickname") ?: ""
+                    friendId to nickname
                 }
+                onSuccess(nicknamesMap)
             }
-
-        return friendIds.size
+            .addOnFailureListener { onError("Load Nicknames Error: ${it.message}") }
     }
 
     fun displayNameOrEmail(user: UserProfile): String {
@@ -435,4 +358,7 @@ object SocialRepository {
 
     private fun friendRequestsCollection() =
         FirebaseFirestore.getInstance().collection("friend_requests")
+
+    private fun nicknamesCollection(currentUserId: String) =
+        usersCollection().document(currentUserId).collection("nicknames")
 }

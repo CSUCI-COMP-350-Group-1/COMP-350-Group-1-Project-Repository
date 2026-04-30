@@ -1,46 +1,18 @@
 package com.example.cicompanion.social
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Mail
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -68,9 +40,7 @@ private fun rememberAuthUser(): FirebaseUser? {
         val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
             currentUser = firebaseAuth.currentUser
         }
-
         auth.addAuthStateListener(listener)
-
         onDispose {
             auth.removeAuthStateListener(listener)
         }
@@ -85,6 +55,7 @@ fun MessagesScreen(navController: NavHostController) {
     val currentUser = rememberAuthUser()
 
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
+    var nicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var rawConversations by remember { mutableStateOf<List<ConversationSummary>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoadingFriends by remember { mutableStateOf(currentUser != null) }
@@ -93,34 +64,36 @@ fun MessagesScreen(navController: NavHostController) {
     LaunchedEffect(currentUser?.uid) {
         if (currentUser == null) {
             friends = emptyList()
+            nicknames = emptyMap()
             rawConversations = emptyList()
             errorMessage = null
             isLoadingFriends = false
         } else {
             isLoadingFriends = true
+            SocialRepository.fetchAcceptedFriends(
+                currentUserId = currentUser.uid,
+                onSuccess = {
+                    friends = it
+                    SocialRepository.fetchNicknames(
+                        currentUserId = currentUser.uid,
+                        onSuccess = { map ->
+                            nicknames = map
+                            isLoadingFriends = false
+                        },
+                        onError = { err -> errorMessage = err; isLoadingFriends = false }
+                    )
+                },
+                onError = {
+                    errorMessage = it
+                    isLoadingFriends = false
+                }
+            )
         }
     }
 
-    if (currentUser == null) {
-        SignedOutMessagingMessage()
-        return
-    }
-
-    LaunchedEffect(currentUser.uid) {
-        SocialRepository.fetchAcceptedFriends(
-            currentUserId = currentUser.uid,
-            onSuccess = {
-                friends = it
-                isLoadingFriends = false
-            },
-            onError = {
-                errorMessage = it
-                isLoadingFriends = false
-            }
-        )
-    }
-
-    DisposableEffect(currentUser.uid) {
+    DisposableEffect(currentUser?.uid) {
+        if (currentUser == null) return@DisposableEffect onDispose {}
+        
         val registration = MessagingRepository.listenToConversations(
             currentUserId = currentUser.uid,
             onUpdate = { rawConversations = it },
@@ -137,7 +110,7 @@ fun MessagesScreen(navController: NavHostController) {
     // Only show conversations if the other participant is still a friend
     val activeConversations = remember(rawConversations, friendsById) {
         rawConversations.filter { conversation ->
-            val otherId = MessagingRepository.findOtherParticipantId(conversation, currentUser.uid)
+            val otherId = MessagingRepository.findOtherParticipantId(conversation, currentUser?.uid ?: "")
             otherId != null && friendsById.containsKey(otherId)
         }
     }
@@ -198,11 +171,12 @@ fun MessagesScreen(navController: NavHostController) {
                         items(friends, key = { it.uid }) { friend ->
                             FriendPickerCard(
                                 user = friend,
+                                nickname = nicknames[friend.uid],
                                 onClick = {
                                     navController.navigate(
                                         Routes.messageThread(
                                             MessagingRepository.createConversationId(
-                                                currentUser.uid,
+                                                currentUser?.uid ?: "",
                                                 friend.uid
                                             ),
                                             friend.uid
@@ -243,13 +217,13 @@ fun MessagesScreen(navController: NavHostController) {
                     items(activeConversations, key = { it.id }) { conversation ->
                         val friendUserId = MessagingRepository.findOtherParticipantId(
                             conversation = conversation,
-                            currentUserId = currentUser.uid
+                            currentUserId = currentUser?.uid ?: ""
                         ).orEmpty()
 
                         val friend = friendsById[friendUserId]
 
                         ConversationCard(
-                            friendName = friend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Friend",
+                            friendName = nicknames[friendUserId] ?: friend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Friend",
                             friendEmail = friend?.email ?: "",
                             preview = conversation.lastMessageText,
                             onClick = {
@@ -267,7 +241,7 @@ fun MessagesScreen(navController: NavHostController) {
 
 @Composable
 fun MessageThreadScreen(
-    navController: NavHostController,
+    navController: NavHostController, // warning about unused param is wrong
     conversationId: String,
     friendUserId: String
 ) {
@@ -276,6 +250,7 @@ fun MessageThreadScreen(
     val currentUser = rememberAuthUser()
 
     var friend by remember { mutableStateOf<UserProfile?>(null) }
+    var nickname by remember { mutableStateOf<String?>(null) }
     var messages by remember { mutableStateOf<List<DirectMessage>>(emptyList()) }
     var messageText by rememberSaveable { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -285,25 +260,18 @@ fun MessageThreadScreen(
 
     val listState = rememberLazyListState()
 
-    // Clear stale thread data when the user signs out.
-    LaunchedEffect(currentUser?.uid) {
+    LaunchedEffect(currentUser?.uid, friendUserId) {
         if (currentUser == null) {
             friend = null
+            nickname = null
             messages = emptyList()
             messageText = ""
             errorMessage = null
             isSending = false
             conversationExists = false
+            return@LaunchedEffect
         }
-    }
 
-    if (currentUser == null) {
-        SignedOutMessagingMessage()
-        return
-    }
-
-    LaunchedEffect(currentUser.uid, friendUserId) {
-        // Check if they are still friends
         SocialRepository.fetchAllFriendRequestStatuses(
             currentUserId = currentUser.uid,
             onSuccess = { statuses ->
@@ -321,8 +289,15 @@ fun MessageThreadScreen(
             },
             onError = { errorMessage = it }
         )
-    }
 
+        SocialRepository.fetchNicknames(
+            currentUserId = currentUser.uid,
+            onSuccess = { map ->
+                nickname = map[friendUserId]
+            },
+            onError = { /* ignore nickname load error */ }
+        )
+    }
 
     // For a brand-new chat, the conversation doc may not exist yet.
     LaunchedEffect(conversationId) {
@@ -355,7 +330,6 @@ fun MessageThreadScreen(
                 },
                 onError = { errorMessage = it }
             )
-
             onDispose {
                 registration.remove()
             }
@@ -366,6 +340,11 @@ fun MessageThreadScreen(
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.lastIndex)
         }
+    }
+
+    if (currentUser == null) {
+        SignedOutMessagingMessage()
+        return
     }
 
     Scaffold(
@@ -417,7 +396,7 @@ fun MessageThreadScreen(
                         enabled = messageText.isNotBlank() && !isSending && friend != null
                     ) {
                         Icon(
-                            Icons.Default.Send,
+                            Icons.AutoMirrored.Filled.Send,
                             contentDescription = "Send",
                             tint = Color(0xFFEF3347)
                         )
@@ -447,15 +426,23 @@ fun MessageThreadScreen(
                 .background(AppBackground)
                 .padding(16.dp)
         ) {
+            val currentFriend = friend
+            val displayName = nickname ?: currentFriend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Chat"
             Text(
-                text = friend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Chat",
+                text = displayName,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
 
-            if (!friend?.email.isNullOrBlank()) {
+            if (!nickname.isNullOrBlank() && currentFriend != null) {
                 Text(
-                    text = friend!!.email,
+                    text = "(${SocialRepository.displayNameOrEmail(currentFriend)})",
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            } else if (currentFriend != null && currentFriend.email.isNotBlank()) {
+                Text(
+                    text = currentFriend.email,
                     color = Color.Gray,
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -503,6 +490,7 @@ fun MessageThreadScreen(
 @Composable
 private fun FriendPickerCard(
     user: UserProfile,
+    nickname: String?,
     onClick: () -> Unit
 ) {
     ElevatedButton(
@@ -510,7 +498,7 @@ private fun FriendPickerCard(
         shape = RoundedCornerShape(12.dp)
     ) {
         Text(
-            text = SocialRepository.displayNameOrEmail(user),
+            text = nickname ?: SocialRepository.displayNameOrEmail(user),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -518,7 +506,7 @@ private fun FriendPickerCard(
 }
 
 @Composable
-private fun ConversationCard(
+fun ConversationCard(
     friendName: String,
     friendEmail: String,
     preview: String,

@@ -57,6 +57,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
     var email by remember { mutableStateOf("") }
     var photoUrl by remember { mutableStateOf<String?>(null) }
     var friendCount by remember { mutableIntStateOf(0) }
+    var nickname by remember { mutableStateOf<String?>(null) }
     var requestStatus by remember { mutableStateOf<String?>(null) }
     var targetUserProfile by remember { mutableStateOf<UserProfile?>(null) }
 
@@ -78,6 +79,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             email = "Sign in to sync your data"
             photoUrl = null
             friendCount = 0
+            nickname = null
             requestStatus = null
             targetUserProfile = null
             return@LaunchedEffect
@@ -116,12 +118,24 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                     },
                     onError = { /* Handle error */ }
                 )
+
+                SocialRepository.fetchNicknames(
+                    currentUserId = currentUser!!.uid,
+                    onSuccess = { map ->
+                        nickname = map[targetUid]
+                    },
+                    onError = { /* Ignore */ }
+                )
+            } else {
+                nickname = null
+                requestStatus = null
             }
         } else {
             displayName = "Guest User"
             email = "Sign in to sync your data"
             photoUrl = null
             friendCount = 0
+            nickname = null
             requestStatus = null
             targetUserProfile = null
         }
@@ -147,6 +161,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                 userEmail = email,
                 photoUrl = photoUrl,
                 friendCount = friendCount,
+                nickname = nickname,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
@@ -633,7 +648,8 @@ fun ProfileHeader(
     userEmail: String,
     photoUrl: String?,
     friendCount: Int,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    nickname: String? = null
 ) {
     Row(
         modifier = modifier,
@@ -662,11 +678,18 @@ fun ProfileHeader(
 
         Column {
             Text(
-                text = userDisplayName,
+                text = nickname ?: userDisplayName,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 22.sp,
                 color = Color.Black
             )
+            if (nickname != null) {
+                Text(
+                    text = "($userDisplayName)",
+                    color = Color.Gray,
+                    fontSize = 14.sp
+                )
+            }
             Text(
                 text = userEmail,
                 color = Color.DarkGray,
