@@ -489,6 +489,16 @@ object SocialRepository {
                 onError(exception.message ?: "Could not fetch event invites.") }
     }
 
+    fun fetchEventInvite(
+        inviteId: String,
+        onSuccess: (EventInvite?) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        eventInvitesCollection().document(inviteId).get()
+            .addOnSuccessListener { doc -> onSuccess(doc.toObject(EventInvite::class.java)) }
+            .addOnFailureListener { onError(it.message ?: "Could not fetch event invite.") }
+    }
+
     fun listenToIncomingEventInvites(
         currentUserId: String,
         onInvitesChanged: (List<EventInvite>) -> Unit,
@@ -666,10 +676,12 @@ object SocialRepository {
                     val ownerId = doc.getString("ownerId")
                     val maxMembers = doc.getLong("maxMembers")?.toInt()
                     val isPinnedByLeader = doc.getBoolean("isPinnedByLeader") ?: false
+                    val isBookmarked = doc.getBoolean("isBookmarked") ?: false
+                    val calendarId = doc.getString("calendarId") ?: "custom"
 
                     CalendarEvent(
                         id = id,
-                        calendarId = "custom",
+                        calendarId = calendarId,
                         title = title,
                         description = description,
                         location = location,
@@ -680,7 +692,8 @@ object SocialRepository {
                         isPinned = isPinned,
                         ownerId = ownerId,
                         maxMembers = maxMembers,
-                        isPinnedByLeader = isPinnedByLeader
+                        isPinnedByLeader = isPinnedByLeader,
+                        isBookmarked = isBookmarked
                     )
                 }
                 onEventsChanged(events)

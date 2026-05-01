@@ -1,6 +1,12 @@
 package com.example.cicompanion.social
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -9,22 +15,31 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Mail
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
+import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.maps.CustomPin
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -171,9 +186,8 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                                 user = friend,
                                 onClick = {
                                     val conversationId = MessagingRepository.createConversationId(currentUser.uid, friend.uid)
-                                    val baseRoute = Routes.messageThread(conversationId, friend.uid)
-                                    val finalRoute = if (sharedLocation != null) "$baseRoute&initialMessage=Check out this custom pin: $sharedLocation" else baseRoute
-                                    navController.navigate(finalRoute)
+                                    val initialMsg = if (sharedLocation != null) "Check out this custom pin: $sharedLocation" else null
+                                    navController.navigate(Routes.messageThread(conversationId, friend.uid, initialMsg))
                                 }
                             )
                         }
@@ -212,9 +226,8 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                             friendEmail = friend?.email ?: "",
                             preview = conversation.lastMessageText,
                             onClick = {
-                                val baseRoute = Routes.messageThread(conversation.id, friendUserId)
-                                val finalRoute = if (sharedLocation != null) "$baseRoute&initialMessage=Check out this custom pin: $sharedLocation" else baseRoute
-                                navController.navigate(finalRoute)
+                                val initialMsg = if (sharedLocation != null) "Check out this custom pin: $sharedLocation" else null
+                                navController.navigate(Routes.messageThread(conversation.id, friendUserId, initialMsg))
                             }
                         )
                     }
@@ -224,6 +237,7 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
     }
 }
 
+@SuppressLint("MissingPermission")
 @Composable
 fun MessageThreadScreen(
     navController: NavHostController,
@@ -232,6 +246,8 @@ fun MessageThreadScreen(
     initialMessage: String? = null
 ) {
     val currentUser = rememberAuthUser()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     var friend by remember { mutableStateOf<UserProfile?>(null) }
     var messages by remember { mutableStateOf<List<DirectMessage>>(emptyList()) }
@@ -241,7 +257,38 @@ fun MessageThreadScreen(
     var conversationExists by remember { mutableStateOf(false) }
     var isFriend by remember { mutableStateOf(true) }
 
+    var userPins by remember { mutableStateOf<List<CustomPin>>(emptyList()) }
+    var userEvents by remember { mutableStateOf<List<CalendarEvent>>(emptyList()) }
+    var showPinPicker by remember { mutableStateOf(false) }
+    var showEventPicker by remember { mutableStateOf(false) }
+    var showAttachmentMenu by remember { mutableStateOf(false) }
+
     val listState = rememberLazyListState()
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                .addOnSuccessListener { location ->
+                    if (location != null && friend != null && currentUser != null) {
+                        MessagingRepository.sendMessage(
+                            currentUser = currentUser,
+                            friend = friend!!,
+                            messageText = "My current location",
+                            type = "location",
+                            metadata = mapOf(
+                                "lat" to location.latitude.toString(),
+                                "lng" to location.longitude.toString()
+                            ),
+                            onSuccess = { conversationExists = true },
+                            onError = { errorMessage = it }
+                        )
+                    }
+                }
+        }
+    }
 
     LaunchedEffect(currentUser?.uid) {
         if (currentUser == null) {
@@ -307,10 +354,82 @@ fun MessageThreadScreen(
         }
     }
 
+    DisposableEffect(currentUser.uid) {
+        val pinsReg = SocialRepository.listenToCustomPins(currentUser.uid, { userPins = it }, {})
+        val eventsReg = SocialRepository.listenToCustomEvents(currentUser.uid, { userEvents = it }, {})
+        onDispose {
+            pinsReg.remove()
+            eventsReg.remove()
+        }
+    }
+
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.lastIndex)
         }
+    }
+
+    if (showPinPicker) {
+        ItemPickerDialog(
+            title = "Select a Pin",
+            items = userPins,
+            itemName = { it.name },
+            onItemSelected = { pin ->
+                val targetFriend = friend ?: return@ItemPickerDialog
+                MessagingRepository.sendMessage(
+                    currentUser = currentUser,
+                    friend = targetFriend,
+                    messageText = "Pin: ${pin.name}",
+                    type = "pin",
+                    metadata = mapOf(
+                        "pinId" to pin.id,
+                        "pinName" to pin.name,
+                        "lat" to pin.latitude.toString(),
+                        "lng" to pin.longitude.toString(),
+                        "description" to pin.description,
+                        "colorArgb" to pin.colorArgb.toString(),
+                        "associatedEventId" to (pin.associatedEventId ?: "")
+                    ),
+                    onSuccess = { conversationExists = true },
+                    onError = { errorMessage = it }
+                )
+                showPinPicker = false
+            },
+            onDismiss = { showPinPicker = false }
+        )
+    }
+
+    if (showEventPicker) {
+        ItemPickerDialog(
+            title = "Select an Event",
+            items = userEvents.filter { it.ownerId == currentUser.uid },
+            itemName = { it.title },
+            onItemSelected = { event ->
+                val targetFriend = friend ?: return@ItemPickerDialog
+                SocialRepository.sendEventInvite(
+                    currentUser = currentUser,
+                    targetUserId = friendUserId,
+                    event = event,
+                    onSuccess = {
+                        MessagingRepository.sendMessage(
+                            currentUser = currentUser,
+                            friend = targetFriend,
+                            messageText = "Sent you an invite for: ${event.title}",
+                            type = "event_invite",
+                            metadata = mapOf(
+                                "eventId" to event.id,
+                                "eventTitle" to event.title
+                            ),
+                            onSuccess = { conversationExists = true },
+                            onError = { errorMessage = it }
+                        )
+                    },
+                    onError = { errorMessage = it }
+                )
+                showEventPicker = false
+            },
+            onDismiss = { showEventPicker = false }
+        )
     }
 
     Scaffold(
@@ -321,6 +440,61 @@ fun MessageThreadScreen(
                     modifier = Modifier.fillMaxWidth().background(Color.White).padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Box {
+                        IconButton(onClick = { showAttachmentMenu = !showAttachmentMenu }) {
+                            Icon(Icons.Default.Add, contentDescription = "Add attachment", tint = Color(0xFFEF3347))
+                        }
+                        DropdownMenu(
+                            expanded = showAttachmentMenu,
+                            onDismissRequest = { showAttachmentMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Ping Current Location") },
+                                onClick = {
+                                    showAttachmentMenu = false
+                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                                        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                                            .addOnSuccessListener { location ->
+                                                if (location != null && friend != null) {
+                                                    MessagingRepository.sendMessage(
+                                                        currentUser = currentUser,
+                                                        friend = friend!!,
+                                                        messageText = "My current location",
+                                                        type = "location",
+                                                        metadata = mapOf(
+                                                            "lat" to location.latitude.toString(),
+                                                            "lng" to location.longitude.toString()
+                                                        ),
+                                                        onSuccess = { conversationExists = true },
+                                                        onError = { errorMessage = it }
+                                                    )
+                                                }
+                                            }
+                                    } else {
+                                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                                    }
+                                },
+                                leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Send Custom Pin") },
+                                onClick = {
+                                    showAttachmentMenu = false
+                                    showPinPicker = true
+                                },
+                                leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Share Event") },
+                                onClick = {
+                                    showAttachmentMenu = false
+                                    showEventPicker = true
+                                },
+                                leadingIcon = { Icon(Icons.Default.Event, contentDescription = null) }
+                            )
+                        }
+                    }
+
                     OutlinedTextField(
                         value = messageText,
                         onValueChange = { messageText = it },
@@ -379,8 +553,83 @@ fun MessageThreadScreen(
             } else {
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(messages, key = { it.id }) { message ->
-                        MessageBubble(text = message.text, sentAt = message.sentAt, isMine = message.senderId == currentUser.uid)
+                        MessageBubble(
+                            message = message,
+                            isMine = message.senderId == currentUser.uid,
+                            navController = navController,
+                            ownedPins = userPins,
+                            onPinSaved = { 
+                                // already handled by listener
+                            }
+                        )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun <T> ItemPickerDialog(
+    title: String,
+    items: List<T>,
+    itemName: (T) -> String,
+    onItemSelected: (T) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredItems = remember(searchQuery, items) {
+        if (searchQuery.isBlank()) items
+        else items.filter { itemName(it).contains(searchQuery, ignoreCase = true) }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color(0xFFEF3347))
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFFEF3347),
+                        unfocusedBorderColor = Color.LightGray
+                    ),
+                    singleLine = true
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                if (filteredItems.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+                        Text("No items found.", textAlign = TextAlign.Center, color = Color.Gray)
+                    }
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                        items(filteredItems) { item ->
+                            Text(
+                                text = itemName(item),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onItemSelected(item) }
+                                    .padding(vertical = 12.dp, horizontal = 8.dp)
+                            )
+                            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+                    Text("Cancel", color = Color.Gray)
                 }
             }
         }
@@ -409,14 +658,183 @@ private fun ConversationCard(friendName: String, friendEmail: String, preview: S
 }
 
 @Composable
-private fun MessageBubble(text: String, sentAt: Long, isMine: Boolean) {
-    val timeString = remember(sentAt) {
+private fun MessageBubble(
+    message: DirectMessage,
+    isMine: Boolean,
+    navController: NavHostController,
+    ownedPins: List<CustomPin> = emptyList(),
+    onPinSaved: () -> Unit = {}
+) {
+    val timeString = remember(message.sentAt) {
         val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
-        sdf.format(Date(sentAt))
+        sdf.format(Date(message.sentAt))
     }
+    val scope = rememberCoroutineScope()
+    
+    var invite by remember { mutableStateOf<EventInvite?>(null) }
+    var inviteError by remember { mutableStateOf<String?>(null) }
+    var isPinAlreadySaved by remember(message.id, ownedPins) { 
+        mutableStateOf(message.type == "pin" && ownedPins.any { it.latitude == message.metadata["lat"]?.toDoubleOrNull() && it.longitude == message.metadata["lng"]?.toDoubleOrNull() })
+    }
+
+    if (message.type == "event_invite" && !isMine) {
+        LaunchedEffect(message.id) {
+            val inviteId = "${message.senderId}_${message.receiverId}_${message.metadata["eventId"]}"
+            SocialRepository.fetchEventInvite(inviteId, { invite = it }, { inviteError = it })
+        }
+    }
+
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isMine) Alignment.End else Alignment.Start) {
-        Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = if (isMine) Color(0xFFEF3347) else Color.White)) {
-            Text(text = text, modifier = Modifier.padding(12.dp), color = if (isMine) Color.White else Color.Black)
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = if (isMine) Color(0xFFEF3347) else Color.White)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                when (message.type) {
+                    "location", "pin" -> {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                if (message.type == "pin") Icons.Default.PushPin else Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = if (isMine) Color.White else Color(0xFFEF3347)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = message.text,
+                                color = if (isMine) Color.White else Color.Black,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        
+                        if (message.type == "pin" && !isMine && !isPinAlreadySaved) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = {
+                                    val lat = message.metadata["lat"]?.toDoubleOrNull() ?: return@Button
+                                    val lng = message.metadata["lng"]?.toDoubleOrNull() ?: return@Button
+                                    val name = message.metadata["pinName"] ?: "Shared Pin"
+                                    val desc = message.metadata["description"] ?: ""
+                                    val color = message.metadata["colorArgb"]?.toIntOrNull() ?: Color(0xFFEF3347).toArgb()
+                                    val eventId = message.metadata["associatedEventId"]
+                                    
+                                    val newPin = CustomPin(
+                                        id = java.util.UUID.randomUUID().toString(),
+                                        userId = FirebaseAuth.getInstance().currentUser?.uid ?: "",
+                                        name = name,
+                                        latitude = lat,
+                                        longitude = lng,
+                                        description = desc,
+                                        colorArgb = color,
+                                        associatedEventId = if (eventId.isNullOrBlank()) null else eventId
+                                    )
+                                    
+                                    scope.launch {
+                                        FirestoreManager.saveCustomPin(newPin)
+                                        isPinAlreadySaved = true
+                                        onPinSaved()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                                modifier = Modifier.height(32.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Add to My Map", fontSize = 12.sp)
+                            }
+                        } else if (message.type == "pin" && !isMine && isPinAlreadySaved) {
+                            Text("Saved to Map", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = {
+                                val lat = message.metadata["lat"]
+                                val lng = message.metadata["lng"]
+                                if (lat != null && lng != null) {
+                                    navController.navigate(Routes.mapWithLocation(lat.toDouble(), lng.toDouble()))
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isMine) Color.White.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.5f),
+                                contentColor = if (isMine) Color.White else Color.Black
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("View on Map", fontSize = 12.sp)
+                        }
+                    }
+                    "event_invite" -> {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Event,
+                                contentDescription = null,
+                                tint = if (isMine) Color.White else Color(0xFFEF3347)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Event Invitation",
+                                color = if (isMine) Color.White else Color.Black,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            text = message.metadata["eventTitle"] ?: "Unknown Event",
+                            color = if (isMine) Color.White else Color.Black,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        if (!isMine && invite?.status == "pending") {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = {
+                                        invite?.let {
+                                            SocialRepository.acceptEventInvite(it, { invite = it.copy(status = "accepted") }, {})
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                                    modifier = Modifier.height(32.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                ) {
+                                    Text("Accept", fontSize = 12.sp, color = Color.White)
+                                }
+                                Button(
+                                    onClick = {
+                                        invite?.let {
+                                            SocialRepository.declineEventInvite(it, { invite = null }, {})
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray),
+                                    modifier = Modifier.height(32.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                ) {
+                                    Text("Decline", fontSize = 12.sp, color = Color.Black)
+                                }
+                            }
+                        } else if (!isMine && invite?.status == "accepted") {
+                            Text("Accepted", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                        
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Button(
+                            onClick = { navController.navigate(Routes.CALENDAR) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isMine) Color.White.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.5f),
+                                contentColor = if (isMine) Color.White else Color.Black
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("Go to Calendar", fontSize = 12.sp)
+                        }
+                    }
+                    else -> {
+                        Text(text = message.text, color = if (isMine) Color.White else Color.Black)
+                    }
+                }
+            }
         }
         Text(text = timeString, fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(top = 2.dp, start = 4.dp, end = 4.dp))
     }
@@ -438,4 +856,11 @@ private fun SignedOutMessagingMessage() {
     Box(modifier = Modifier.fillMaxSize().background(AppBackground), contentAlignment = Alignment.Center) {
         Text("Please sign in to view your messages.")
     }
+}
+
+fun Color.toArgb(): Int {
+    return (this.alpha * 255.0f + 0.5f).toInt() shl 24 or
+            ((this.red * 255.0f + 0.5f).toInt() shl 16) or
+            ((this.green * 255.0f + 0.5f).toInt() shl 8) or
+            (this.blue * 255.0f + 0.5f).toInt()
 }

@@ -57,9 +57,19 @@ fun HomeScreen(
         }
     }
 
-    val widgetEvents = remember(calendarViewModel.events) {
-        upcomingHomeWidgetEvents(calendarViewModel.events)
+    val bookmarkedEvents = remember(calendarViewModel.events) {
+        calendarViewModel.events.filter { it.isBookmarked }
     }
+
+    val widgetEvents = remember(calendarViewModel.events, bookmarkedEvents) {
+        if (bookmarkedEvents.isNotEmpty()) {
+            bookmarkedEvents.sortedBy { it.start }
+        } else {
+            upcomingHomeWidgetEvents(calendarViewModel.events)
+        }
+    }
+
+    val widgetTitle = if (bookmarkedEvents.isNotEmpty()) "Bookmarked CSUCI Events" else "Upcoming Events"
     
     val pinnedEvents = remember(calendarViewModel.events) {
         calendarViewModel.events.filter { it.isPinned }
@@ -86,6 +96,7 @@ fun HomeScreen(
         item {
             CalendarWidget(
                 events = widgetEvents,
+                title = widgetTitle,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
@@ -338,6 +349,7 @@ fun QuickAccessCustomizerDialog(
             }
         },
         dismissButton = {
+            @Suppress("DEPRECATION")
             TextButton(
                 onClick = onDismiss,
                 colors = ButtonDefaults.textButtonColors(contentColor = BrandRedDark)

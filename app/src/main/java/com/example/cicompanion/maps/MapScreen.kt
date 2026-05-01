@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +46,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.cicompanion.calendar.CalendarViewModel
 import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.social.FirestoreManager
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.BrandOrange
@@ -57,6 +59,7 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.maps.model.MapStyleOptions
+import com.google.firebase.auth.FirebaseAuth
 import com.google.maps.android.compose.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -157,7 +160,13 @@ val campusLocations = listOf(
 fun MapScreen(
     navController: NavHostController, 
     calendarViewModel: CalendarViewModel,
-    mapViewModel: MapViewModel = viewModel()
+    mapViewModel: MapViewModel = viewModel(),
+    initialLat: Double? = null,
+    initialLng: Double? = null,
+    tempName: String? = null,
+    tempDesc: String? = null,
+    tempColor: Int? = null,
+    tempEventId: String? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -177,7 +186,35 @@ fun MapScreen(
     var showSearchResults by remember { mutableStateOf(false) }
 
     val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(CSUCI_CENTER, 17f)
+        position = CameraPosition.fromLatLngZoom(
+            if (initialLat != null && initialLng != null) LatLng(initialLat, initialLng) else CSUCI_CENTER,
+            17f
+        )
+    }
+
+    // Handle shared temporary pin from chat
+    LaunchedEffect(initialLat, initialLng, tempName) {
+        if (initialLat != null && initialLng != null) {
+            cameraPositionState.animate(
+                update = CameraUpdateFactory.newLatLngZoom(LatLng(initialLat, initialLng), 18f),
+                durationMs = 1000
+            )
+            
+            if (tempName != null) {
+                selectedLocation = CampusLocation(
+                    id = "shared_temp",
+                    name = tempName,
+                    position = LatLng(initialLat, initialLng),
+                    description = tempDesc ?: "Shared with you",
+                    type = LocationType.CUSTOM,
+                    icon = Icons.Default.PushPin,
+                    color = if (tempColor != null) Color(tempColor) else CoralRed,
+                    isCustom = true,
+                    associatedEventId = tempEventId
+                )
+                showDetailsSheet = true
+            }
+        }
     }
 
     val combinedLocations = remember(mapViewModel.customPins) {
@@ -198,10 +235,12 @@ fun MapScreen(
     // Centering camera on the location (when selected)
     LaunchedEffect(selectedLocation) {
         selectedLocation?.let { location ->
-            cameraPositionState.animate(
-                update = CameraUpdateFactory.newLatLng(location.position),
-                durationMs = 800
-            )
+            if (location.id != "shared_temp") {
+                cameraPositionState.animate(
+                    update = CameraUpdateFactory.newLatLng(location.position),
+                    durationMs = 800
+                )
+            }
         }
     }
 
@@ -223,7 +262,15 @@ fun MapScreen(
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasLocationPermission) {
-            fetchLocation(fusedLocationProviderClient = fusedLocationClient, cameraState = cameraPositionState, shouldAnimate = false) { userLocation = it }
+            if (initialLat == null || initialLng == null) {
+                fetchLocation(fusedLocationProviderClient = fusedLocationClient, cameraState = cameraPositionState, shouldAnimate = false) { userLocation = it }
+            } else {
+                // Just fetch but don't move camera if we have an initial position
+                try {
+                    val location = fusedLocationClient.lastLocation.await()
+                    location?.let { userLocation = LatLng(it.latitude, it.longitude) }
+                } catch (_: Exception) {}
+            }
         } else {
             permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
@@ -382,6 +429,23 @@ fun MapScreen(
                             if (pin != null) {
                                 showDetailsSheet = false
                                 mapViewModel.startEditingLocation(pin.id)
+                            }
+                        },
+                        onSaveSharedPin = {
+                            scope.launch {
+                                val newPin = CustomPin(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    userId = FirebaseAuth.getInstance().currentUser?.uid ?: "",
+                                    name = location.name,
+                                    latitude = location.position.latitude,
+                                    longitude = location.position.longitude,
+                                    description = location.description,
+                                    colorArgb = location.color.toArgb(),
+                                    associatedEventId = location.associatedEventId
+                                )
+                                FirestoreManager.saveCustomPin(newPin)
+                                selectedLocation = null
+                                showDetailsSheet = false
                             }
                         }
                     )
@@ -655,8 +719,11 @@ fun LocationDetailsContent(
     onToggleFavorite: () -> Unit,
     onSendMessage: () -> Unit,
     onAssociateEvent: () -> Unit,
-    onEditPin: () -> Unit
+    onEditPin: () -> Unit,
+    onSaveSharedPin: () -> Unit = {}
 ) {
+    val isTemp = location.id == "shared_temp"
+    
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -681,12 +748,12 @@ fun LocationDetailsContent(
                     color = Color.Black
                 )
                 Text(
-                    text = location.type.name.lowercase().replaceFirstChar { it.uppercase() },
+                    text = if (isTemp) "Shared Temporary Pin" else location.type.name.lowercase().replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.Gray
                 )
             }
-            if (location.isCustom) {
+            if (location.isCustom && !isTemp) {
                 Row {
                     IconButton(onClick = onEditPin) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit Pin", tint = Color.Gray)
@@ -725,31 +792,44 @@ fun LocationDetailsContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (location.isCustom) {
+            if (isTemp) {
                 Button(
-                    onClick = onDeletePin,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.1f), contentColor = Color.Red),
+                    onClick = onSaveSharedPin,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Delete")
+                    Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Save to My Map")
                 }
-            }
-            Button(
-                onClick = onSendMessage,
-                colors = ButtonDefaults.buttonColors(containerColor = CoralRed.copy(alpha = 0.1f), contentColor = CoralRed),
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Share")
+            } else {
+                if (location.isCustom) {
+                    Button(
+                        onClick = onDeletePin,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.1f), contentColor = Color.Red),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Delete")
+                    }
+                }
+                Button(
+                    onClick = onSendMessage,
+                    colors = ButtonDefaults.buttonColors(containerColor = CoralRed.copy(alpha = 0.1f), contentColor = CoralRed),
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Share")
+                }
             }
         }
         
-        if (location.isCustom) {
+        if (location.isCustom && !isTemp) {
             Spacer(modifier = Modifier.height(8.dp))
             Button(
                 onClick = onAssociateEvent,
@@ -766,19 +846,28 @@ fun LocationDetailsContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         if (events.isNotEmpty()) {
-            Text(
-                text = if (location.isCustom && location.associatedEventId != null) "Linked Event" else "Events at this Location",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            events.forEach { event ->
-                MapEventItem(
-                    event = event,
-                    onMoreClick = { onGoToEvent(event) }
+            val visibleEvents = if (isTemp && location.associatedEventId != null) {
+                // If it's a shared pin with an associated event, only show if user is already a member
+                events.filter { it.calendarId == "custom" && it.ownerId != FirebaseAuth.getInstance().currentUser?.uid }
+            } else {
+                events
+            }
+
+            if (visibleEvents.isNotEmpty()) {
+                Text(
+                    text = if (location.isCustom && location.associatedEventId != null) "Linked Event" else "Events at this Location",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                visibleEvents.forEach { event ->
+                    MapEventItem(
+                        event = event,
+                        onMoreClick = { onGoToEvent(event) }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
             }
         } else {
             Text(
@@ -1067,6 +1156,23 @@ fun MapContent(
                 }
             }
         } else {
+            // Draw shared temporary pin if exists
+            selectedLocation?.let { location ->
+                if (location.id == "shared_temp") {
+                    MarkerComposable(
+                        state = rememberMarkerState(position = location.position),
+                        zIndex = 100f,
+                        anchor = Offset(0.5f, 1.0f),
+                        onClick = {
+                            onLocationClick(location)
+                            true
+                        }
+                    ) {
+                        SelectedPointerIcon(location, 0, false, false)
+                    }
+                }
+            }
+
             displayLocations.forEach { location ->
                 val isSelected = selectedLocation?.id == location.id
                 val locationEvents = events.filter { 

@@ -71,7 +71,7 @@ class CalendarViewModel(
             customEventsListener?.remove()
             incomingInvitesListener?.remove()
             if (user != null) {
-                // Real-time listener for custom events (includes shared ones)
+                // Real-time listener for custom events (includes shared ones and bookmarked CSUCI ones)
                 customEventsListener = SocialRepository.listenToCustomEvents(user.uid,
                     onEventsChanged = { customEvents = it },
                     onError = { errorMessage = it }
@@ -98,7 +98,22 @@ class CalendarViewModel(
     val events: List<CalendarEvent>
         get() {
             val user = FirebaseAuth.getInstance().currentUser
-            return (customEvents + csuciEvents).filter { event ->
+            
+            // Merge csuciEvents and customEvents, prioritizing the one from customEvents if it's the same event ID
+            // (this handles bookmarked/pinned CSUCI events that are saved to Firestore)
+            val merged = (customEvents + csuciEvents)
+            val distinctEvents = merged.groupBy { it.id }.map { (_, events) ->
+                if (events.size > 1) {
+                    // Prefer the one from customEvents (which would have bookmark/pin status)
+                    events.find { it.calendarId != "custom" && (it.isBookmarked || it.isPinned) } 
+                        ?: events.find { it.calendarId == "custom" }
+                        ?: events.first()
+                } else {
+                    events.first()
+                }
+            }
+
+            return distinctEvents.filter { event ->
                 if (event.isPinned) {
                     filterPinned
                 } else if (event.calendarId == "custom") {
@@ -167,7 +182,6 @@ class CalendarViewModel(
     fun addCustomEvent(event: CalendarEvent) {
         viewModelScope.launch {
             FirestoreManager.saveCustomEvent(event)
-            // No need to manually reload, listener handles it
         }
     }
 
@@ -191,7 +205,24 @@ class CalendarViewModel(
     fun togglePinEvent(event: CalendarEvent) {
         viewModelScope.launch {
             val targetStatus = !event.isPinned
-            FirestoreManager.updateEventPinStatus(event.id, targetStatus)
+            if (event.calendarId != "custom") {
+                // If it's a CSUCI event, save a copy to Firestore with the pin status
+                FirestoreManager.saveCustomEvent(event.copy(isPinned = targetStatus))
+            } else {
+                FirestoreManager.updateEventPinStatus(event.id, targetStatus)
+            }
+        }
+    }
+
+    fun toggleBookmarkEvent(event: CalendarEvent) {
+        viewModelScope.launch {
+            val targetStatus = !event.isBookmarked
+            if (event.calendarId != "custom") {
+                // If it's a CSUCI event, save a copy to Firestore with the bookmark status
+                FirestoreManager.saveCustomEvent(event.copy(isBookmarked = targetStatus))
+            } else {
+                FirestoreManager.updateEventBookmarkStatus(event.id, targetStatus)
+            }
         }
     }
 

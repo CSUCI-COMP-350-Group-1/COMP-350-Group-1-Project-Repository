@@ -184,8 +184,35 @@ fun AppNavigation(notificationRoute: String? = null,
                     composable(Routes.HOME) {
                         HomeScreen(navController, calendarViewModel, homeViewModel, mapViewModel)
                     }
-                    composable(Routes.MAP) {
-                        MapScreen(navController, calendarViewModel, mapViewModel)
+                    composable(
+                        route = "${Routes.MAP}?lat={lat}&lng={lng}&tempName={tempName}&tempDesc={tempDesc}&tempColor={tempColor}&tempEventId={tempEventId}",
+                        arguments = listOf(
+                            navArgument("lat") { type = NavType.StringType; nullable = true },
+                            navArgument("lng") { type = NavType.StringType; nullable = true },
+                            navArgument("tempName") { type = NavType.StringType; nullable = true },
+                            navArgument("tempDesc") { type = NavType.StringType; nullable = true },
+                            navArgument("tempColor") { type = NavType.StringType; nullable = true },
+                            navArgument("tempEventId") { type = NavType.StringType; nullable = true }
+                        )
+                    ) { backStackEntry ->
+                        val lat = backStackEntry.arguments?.getString("lat")?.toDoubleOrNull()
+                        val lng = backStackEntry.arguments?.getString("lng")?.toDoubleOrNull()
+                        val tempName = backStackEntry.arguments?.getString("tempName")
+                        val tempDesc = backStackEntry.arguments?.getString("tempDesc")
+                        val tempColor = backStackEntry.arguments?.getString("tempColor")?.toIntOrNull()
+                        val tempEventId = backStackEntry.arguments?.getString("tempEventId")
+
+                        MapScreen(
+                            navController = navController,
+                            calendarViewModel = calendarViewModel,
+                            mapViewModel = mapViewModel,
+                            initialLat = lat,
+                            initialLng = lng,
+                            tempName = tempName,
+                            tempDesc = tempDesc,
+                            tempColor = tempColor,
+                            tempEventId = tempEventId
+                        )
                     }
                     composable(Routes.CALENDAR) {
                         CalendarApp(viewModel = calendarViewModel)

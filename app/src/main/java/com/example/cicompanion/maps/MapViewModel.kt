@@ -3,12 +3,13 @@ package com.example.cicompanion.maps
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.cicompanion.social.FirestoreManager
 import com.example.cicompanion.social.SocialRepository
-import com.example.cicompanion.ui.theme.CoralRed
+import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.launch
@@ -24,7 +25,7 @@ class MapViewModel : ViewModel() {
     var editingPinId by mutableStateOf<String?>(null)
         private set
 
-    var tempPinLocation by mutableStateOf<com.google.android.gms.maps.model.LatLng?>(null)
+    var tempPinLocation by mutableStateOf<LatLng?>(null)
         private set
 
     var isLoading by mutableStateOf(false)
@@ -36,34 +37,46 @@ class MapViewModel : ViewModel() {
     val editingPin: CustomPin? get() = editingPinId?.let { id -> customPins.find { it.id == id } }
 
     private var customPinsListener: ListenerRegistration? = null
+    private var authStateListener: FirebaseAuth.AuthStateListener? = null
 
     init {
         // Setup listener for auth changes to ensure pins are loaded when user signs in
         val auth = FirebaseAuth.getInstance()
-        auth.addAuthStateListener { firebaseAuth ->
+        authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
             val user = firebaseAuth.currentUser
+            // Clear existing listener on auth change
             customPinsListener?.remove()
+            customPinsListener = null
+            
             if (user != null) {
-                // Real-time listener for custom pins
-                isLoading = true
-                customPinsListener = SocialRepository.listenToCustomPins(user.uid,
-                    onPinsChanged = { 
-                        customPins = it
-                        isLoading = false
-                    },
-                    onError = { 
-                        errorMessage = it
-                        isLoading = false
-                    }
-                )
+                loadCustomPins()
             } else {
                 customPins = emptyList()
             }
         }
+        auth.addAuthStateListener(authStateListener!!)
+    }
+
+    fun loadCustomPins() {
+        val user = FirebaseAuth.getInstance().currentUser ?: return
+        if (customPinsListener != null) return // Already listening
+
+        isLoading = true
+        customPinsListener = SocialRepository.listenToCustomPins(user.uid,
+            onPinsChanged = { 
+                customPins = it
+                isLoading = false
+            },
+            onError = { 
+                errorMessage = it
+                isLoading = false
+            }
+        )
     }
 
     override fun onCleared() {
         super.onCleared()
+        authStateListener?.let { FirebaseAuth.getInstance().removeAuthStateListener(it) }
         customPinsListener?.remove()
     }
 
@@ -88,7 +101,7 @@ class MapViewModel : ViewModel() {
         tempPinLocation = pin.position
     }
 
-    fun setTempPin(latLng: com.google.android.gms.maps.model.LatLng) {
+    fun setTempPin(latLng: LatLng) {
         if (isPinMode) {
             tempPinLocation = latLng
         }
@@ -98,7 +111,7 @@ class MapViewModel : ViewModel() {
         tempPinLocation = null
     }
 
-    fun savePin(name: String, description: String, color: androidx.compose.ui.graphics.Color, associatedEventId: String? = null) {
+    fun savePin(name: String, description: String, color: Color, associatedEventId: String? = null) {
         val location = tempPinLocation ?: return
         val user = FirebaseAuth.getInstance().currentUser ?: return
         

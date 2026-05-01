@@ -55,6 +55,7 @@ private val SharedEventBlue = Color(0xFF2196F3)
 private val SharedEventLightBlue = Color(0xFFE3F2FD)
 private val CustomEventOrange = Color(0xFFFF9800)
 private val PinnedEventPurple = Color(0xFF9C27B0)
+private val BookmarkYellow = Color(0xFFFFC107)
 private val SoftText = Color(0xFF6E5555)
 private val CardOffWhite = Color(0xFFF6E6D8)
 private val DateCellWhite = Color(0xFFF7F4F8)
@@ -154,6 +155,7 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                 onRequestDelete = { eventToDelete = it },
                 onRequestEdit = { eventToEdit = it },
                 onTogglePin = viewModel::togglePinEvent,
+                onToggleBookmark = viewModel::toggleBookmarkEvent,
                 onRequestInvite = { eventToInvite = it },
                 onShowMembers = { eventMembersToShow = it },
                 onInviteClick = { inviteToShowDetails = it }
@@ -305,6 +307,7 @@ private fun CalendarScreenBody(
     onRequestDelete: (CalendarEvent) -> Unit,
     onRequestEdit: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
+    onToggleBookmark: (CalendarEvent) -> Unit,
     onRequestInvite: (CalendarEvent) -> Unit,
     onShowMembers: (CalendarEvent) -> Unit,
     onInviteClick: (EventInvite) -> Unit
@@ -370,6 +373,7 @@ private fun CalendarScreenBody(
                 onDeleteEvent = onRequestDelete,
                 onEditEvent = onRequestEdit,
                 onTogglePin = onTogglePin,
+                onToggleBookmark = onToggleBookmark,
                 onRequestInvite = onRequestInvite,
                 onShowMembers = onShowMembers,
                 highlightedEventId = viewModel.highlightedEventId
@@ -667,6 +671,7 @@ private fun CalendarContent(
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
+    onToggleBookmark: (CalendarEvent) -> Unit,
     onRequestInvite: (CalendarEvent) -> Unit,
     onShowMembers: (CalendarEvent) -> Unit,
     highlightedEventId: String? = null
@@ -683,6 +688,7 @@ private fun CalendarContent(
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
+            onToggleBookmark = onToggleBookmark,
             onRequestInvite = onRequestInvite,
             onShowMembers = onShowMembers,
             highlightedEventId = highlightedEventId
@@ -695,6 +701,7 @@ private fun CalendarContent(
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
+            onToggleBookmark = onToggleBookmark,
             onRequestInvite = onRequestInvite,
             onShowMembers = onShowMembers,
             highlightedEventId = highlightedEventId
@@ -709,6 +716,7 @@ private fun CalendarContent(
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
+            onToggleBookmark = onToggleBookmark,
             onRequestInvite = onRequestInvite,
             onShowMembers = onShowMembers,
             highlightedEventId = highlightedEventId
@@ -725,6 +733,7 @@ private fun DayView(
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
+    onToggleBookmark: (CalendarEvent) -> Unit,
     onRequestInvite: (CalendarEvent) -> Unit,
     onShowMembers: (CalendarEvent) -> Unit,
     highlightedEventId: String? = null
@@ -746,6 +755,7 @@ private fun DayView(
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
+            onToggleBookmark = onToggleBookmark,
             onRequestInvite = onRequestInvite,
             onShowMembers = onShowMembers,
             highlightedEventId = highlightedEventId
@@ -764,6 +774,7 @@ private fun WeekView(
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
+    onToggleBookmark: (CalendarEvent) -> Unit,
     onRequestInvite: (CalendarEvent) -> Unit,
     onShowMembers: (CalendarEvent) -> Unit,
     highlightedEventId: String? = null
@@ -798,6 +809,7 @@ private fun WeekView(
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
+            onToggleBookmark = onToggleBookmark,
             onRequestInvite = onRequestInvite,
             onShowMembers = onShowMembers,
             highlightedEventId = highlightedEventId
@@ -817,6 +829,7 @@ private fun MonthView(
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
+    onToggleBookmark: (CalendarEvent) -> Unit,
     onRequestInvite: (CalendarEvent) -> Unit,
     onShowMembers: (CalendarEvent) -> Unit,
     highlightedEventId: String? = null
@@ -851,6 +864,7 @@ private fun MonthView(
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
+            onToggleBookmark = onToggleBookmark,
             onRequestInvite = onRequestInvite,
             onShowMembers = onShowMembers,
             highlightedEventId = highlightedEventId
@@ -880,6 +894,7 @@ private fun SectionCard(
 
 @Composable
 private fun SectionHeading(text: String) {
+    @Suppress("DEPRECATION")
     Text(
         text = text,
         style = MaterialTheme.typography.titleMedium,
@@ -1133,6 +1148,7 @@ private fun EventsSection(
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
+    onToggleBookmark: (CalendarEvent) -> Unit,
     onRequestInvite: (CalendarEvent) -> Unit,
     onShowMembers: (CalendarEvent) -> Unit,
     highlightedEventId: String? = null
@@ -1144,6 +1160,7 @@ private fun EventsSection(
             onDeleteEvent = onDeleteEvent, 
             onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
+            onToggleBookmark = onToggleBookmark,
             onRequestInvite = onRequestInvite,
             onShowMembers = onShowMembers,
             highlightedEventId = highlightedEventId
@@ -1157,6 +1174,7 @@ private fun EventsList(
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
+    onToggleBookmark: (CalendarEvent) -> Unit,
     onRequestInvite: (CalendarEvent) -> Unit,
     onShowMembers: (CalendarEvent) -> Unit,
     highlightedEventId: String? = null
@@ -1175,6 +1193,7 @@ private fun EventsList(
                 onDelete = { onDeleteEvent(event) },
                 onEdit = { onEditEvent(event) },
                 onTogglePin = { onTogglePin(event) },
+                onToggleBookmark = { onToggleBookmark(event) },
                 onInvite = { onRequestInvite(event) },
                 onShowMembers = { onShowMembers(event) },
                 isHighlighted = event.id == highlightedEventId
@@ -1200,6 +1219,7 @@ private fun EventCard(
     onDelete: () -> Unit, 
     onEdit: () -> Unit,
     onTogglePin: () -> Unit,
+    onToggleBookmark: () -> Unit,
     onInvite: () -> Unit,
     onShowMembers: () -> Unit,
     isHighlighted: Boolean = false
@@ -1243,6 +1263,18 @@ private fun EventCard(
                             imageVector = if (event.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
                             contentDescription = "Pin",
                             tint = if (event.isPinned) PinnedEventPurple else Color.Gray,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                } else {
+                    IconButton(
+                        onClick = onToggleBookmark,
+                        modifier = Modifier.size(24.dp).offset(y = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (event.isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                            contentDescription = "Bookmark",
+                            tint = if (event.isBookmarked) BookmarkYellow else Color.Gray,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -1336,8 +1368,8 @@ private fun EventCard(
                         }
                     }
                     EventBadge(
-                        text = if (event.isPinned) "Pinned" else if (isCustom) (if (isOwner) "Custom" else "Shared") else "CSUCI",
-                        color = if (event.isPinned) PinnedEventPurple else if (isCustom) (if (isOwner) CustomEventOrange else SharedEventBlue) else CoralRed
+                        text = if (event.isPinned) "Pinned" else if (event.isBookmarked) "Bookmarked" else if (isCustom) (if (isOwner) "Custom" else "Shared") else "CSUCI",
+                        color = if (event.isPinned) PinnedEventPurple else if (event.isBookmarked) BookmarkYellow else if (isCustom) (if (isOwner) CustomEventOrange else SharedEventBlue) else CoralRed
                     )
                 }
             }
@@ -1349,6 +1381,7 @@ private fun EventCard(
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
                     Icon(Icons.Outlined.Info, contentDescription = null, modifier = Modifier.size(14.dp), tint = PinnedEventPurple)
                     Spacer(Modifier.width(6.dp))
+                    @Suppress("DEPRECATION")
                     Text("The leader has this event pinned", style = MaterialTheme.typography.labelSmall, color = PinnedEventPurple)
                 }
             }
@@ -1435,6 +1468,7 @@ fun EventMembersDialog(
             }
         },
         confirmButton = {
+            @Suppress("DEPRECATION")
             TextButton(onClick = onDismiss) { Text("Close", color = CoralRed, fontWeight = FontWeight.Bold) }
         }
     )
@@ -1452,10 +1486,12 @@ fun EventMembersDialog(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = CoralRed)
                 ) {
+                    @Suppress("DEPRECATION")
                     Text("Kick")
                 }
             },
             dismissButton = {
+                @Suppress("DEPRECATION")
                 TextButton(onClick = { userToKick = null }) {
                     Text("Cancel", color = Color.Gray)
                 }
@@ -1491,6 +1527,7 @@ fun MemberRow(
     ) {
         UserAvatar(photoUrl = photo)
         Spacer(modifier = Modifier.width(12.dp))
+        @Suppress("DEPRECATION")
         Text(
             text = if (userId == currentUserId) "$name (You)" else name, 
             modifier = Modifier.weight(1f), 
@@ -1541,6 +1578,7 @@ private fun AddEventDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                @Suppress("DEPRECATION")
                 Text(
                     text = "Date: ${selectedDate.format(DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy"))}",
                     style = MaterialTheme.typography.bodyMedium,
@@ -1609,7 +1647,7 @@ private fun AddEventDialog(
                             invitedFriends.forEach { friend ->
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
                                     UserAvatar(photoUrl = friend.photoUrl)
-                                    Spacer(Modifier.width(8.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(SocialRepository.displayNameOrEmail(friend), style = MaterialTheme.typography.bodySmall)
                                     Spacer(Modifier.weight(1f))
                                     IconButton(onClick = { invitedFriends = invitedFriends.filter { it.uid != friend.uid } }, modifier = Modifier.size(24.dp)) {
@@ -1627,6 +1665,7 @@ private fun AddEventDialog(
                     Text("Time Range", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = startTime, onTimeChange = { startTime = it }) }
+                        @Suppress("DEPRECATION")
                         Text("to", Modifier.padding(horizontal = 8.dp))
                         Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = endTime, onTimeChange = { endTime = it }) }
                     }
@@ -1634,6 +1673,7 @@ private fun AddEventDialog(
             }
         },
         confirmButton = {
+            @Suppress("DEPRECATION")
             Button(
                 onClick = { onConfirm(title, description, location, startTime, endTime, memberCap, invitedFriends) },
                 colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
@@ -1644,6 +1684,7 @@ private fun AddEventDialog(
             }
         },
         dismissButton = {
+            @Suppress("DEPRECATION")
             TextButton(onClick = onDismiss) {
                 Text("Back", color = CoralRed, fontWeight = FontWeight.Bold)
             }
@@ -1695,6 +1736,7 @@ private fun EditEventDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                @Suppress("DEPRECATION")
                 Text(
                     text = "Date: ${event.start.toLocalDate().format(DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy"))}",
                     style = MaterialTheme.typography.bodyMedium,
@@ -1737,6 +1779,7 @@ private fun EditEventDialog(
             }
         },
         confirmButton = {
+            @Suppress("DEPRECATION")
             Button(
                 onClick = { onConfirm(title, description, location, startTime, endTime) },
                 colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
@@ -1747,6 +1790,7 @@ private fun EditEventDialog(
             }
         },
         dismissButton = {
+            @Suppress("DEPRECATION")
             TextButton(onClick = onDismiss) {
                 Text("Back", color = CoralRed, fontWeight = FontWeight.Bold)
             }
@@ -1920,9 +1964,11 @@ fun FriendPickerDialog(
                         CircularProgressIndicator(color = CoralRed)
                     }
                 } else if (friends.isEmpty()) {
+                    @Suppress("DEPRECATION")
                     Text(if (eventId != null) "All eligible friends are already invited." else "You don't have any friends to invite.", 
                         textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 } else if (filteredFriends.isEmpty()) {
+                    @Suppress("DEPRECATION")
                     Text("No friends match \"$searchQuery\"", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
@@ -1938,11 +1984,13 @@ fun FriendPickerDialog(
                                 UserAvatar(photoUrl = friend.photoUrl)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
+                                    @Suppress("DEPRECATION")
                                     Text(
                                         text = SocialRepository.displayNameOrEmail(friend),
                                         style = MaterialTheme.typography.bodyLarge,
                                         fontWeight = FontWeight.Bold
                                     )
+                                    @Suppress("DEPRECATION")
                                     Text(
                                         text = friend.email,
                                         style = MaterialTheme.typography.bodySmall,
@@ -1957,7 +2005,9 @@ fun FriendPickerDialog(
         },
         confirmButton = {},
         dismissButton = {
+            @Suppress("DEPRECATION")
             TextButton(onClick = onDismiss) {
+                @Suppress("DEPRECATION")
                 Text("Cancel", color = CoralRed, fontWeight = FontWeight.Bold)
             }
         }
@@ -1970,6 +2020,7 @@ private fun buildSelectedDateEvents(
 ): List<CalendarEvent> {
     return events.filter { it.occursOn(selectedDate) }.sortedWith(
         compareByDescending<CalendarEvent> { it.isPinned }
+            .thenByDescending { it.isBookmarked }
             .thenByDescending { it.calendarId == "custom" }
             .thenBy { it.start }
     )
@@ -2068,6 +2119,7 @@ private fun EventBadge(text: String, color: Color) {
             .padding(horizontal = 10.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
+        @Suppress("DEPRECATION")
         Text(
             text = text,
             color = color,
@@ -2079,6 +2131,7 @@ private fun EventBadge(text: String, color: Color) {
 
 @Composable
 private fun EventMetaLine(text: String) {
+    @Suppress("DEPRECATION")
     Text(
         text = text,
         style = MaterialTheme.typography.bodyMedium,
@@ -2088,6 +2141,7 @@ private fun EventMetaLine(text: String) {
 
 @Composable
 private fun EventDescription(text: String) {
+    @Suppress("DEPRECATION")
     Text(
         text = text,
         style = MaterialTheme.typography.bodyMedium,
@@ -2115,7 +2169,9 @@ fun InviteDetailDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    @Suppress("DEPRECATION")
                     Text("From: ", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    @Suppress("DEPRECATION")
                     Text(invite.fromDisplayName, style = MaterialTheme.typography.bodyMedium, color = SharedEventBlue)
                 }
                 
@@ -2127,12 +2183,14 @@ fun InviteDetailDialog(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
                     Spacer(Modifier.width(8.dp))
+                    @Suppress("DEPRECATION")
                     Text(start.format(dayFormatter), style = MaterialTheme.typography.bodySmall)
                 }
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
                     Spacer(Modifier.width(8.dp))
+                    @Suppress("DEPRECATION")
                     Text("${start.format(timeFormatter)} - ${end.format(timeFormatter)}", style = MaterialTheme.typography.bodySmall)
                 }
                 
@@ -2140,12 +2198,14 @@ fun InviteDetailDialog(
                     Row(verticalAlignment = Alignment.Top) {
                         Icon(Icons.Outlined.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
                         Spacer(Modifier.width(8.dp))
+                        @Suppress("DEPRECATION")
                         Text(invite.eventLocation, style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 
                 if (!invite.eventDescription.isNullOrBlank()) {
                     HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                    @Suppress("DEPRECATION")
                     Text(invite.eventDescription, style = MaterialTheme.typography.bodyMedium)
                 }
                 
@@ -2162,6 +2222,7 @@ fun InviteDetailDialog(
                         ) {
                             Icon(Icons.Outlined.PushPin, contentDescription = null, tint = PinnedEventPurple, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(8.dp))
+                            @Suppress("DEPRECATION")
                             Text("The leader has this event pinned", style = MaterialTheme.typography.labelSmall, color = PinnedEventPurple, fontWeight = FontWeight.Medium)
                         }
                     }
@@ -2169,11 +2230,13 @@ fun InviteDetailDialog(
             }
         },
         confirmButton = {
+            @Suppress("DEPRECATION")
             Button(onClick = onAccept, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)), shape = RoundedCornerShape(12.dp)) {
                 Text("Accept", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
+            @Suppress("DEPRECATION")
             TextButton(onClick = onDecline) {
                 Text("Decline", color = CoralRed, fontWeight = FontWeight.Bold)
             }

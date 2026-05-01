@@ -30,11 +30,51 @@ private val BrandRed = Color(0xFFEF3347)
 private val BookmarkYellow = Color(0xFFFFC107)
 
 @Composable
-fun CalendarWidget(events: List<CalendarEvent>,
-                   modifier: Modifier = Modifier) {
-    if (events.isEmpty()) {
+fun CalendarWidget(
+    events: List<CalendarEvent>,
+    modifier: Modifier = Modifier,
+    title: String = "Upcoming Events"
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color.Black,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        if (events.isEmpty()) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp)
+                    .border(
+                        width = 1.dp,
+                        color = GrayIcon.copy(alpha = 0.3f),
+                        shape = RoundedCornerShape(8.dp)
+                    ),
+                color = NavBackground,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No events to show",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = GrayIcon
+                    )
+                }
+            }
+            return@Column
+        }
+
+        val pagerState = rememberPagerState(pageCount = { events.size })
+
         Surface(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .height(140.dp)
                 .border(
@@ -45,73 +85,47 @@ fun CalendarWidget(events: List<CalendarEvent>,
             color = NavBackground,
             shape = RoundedCornerShape(8.dp)
         ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No upcoming events",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = GrayIcon
-                )
-            }
-        }
-        return
-    }
-    val pagerState = rememberPagerState(pageCount = { events.size })
-
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(140.dp)
-            .border(
-                width = 1.dp,
-                color = GrayIcon.copy(alpha = 0.3f),
-                shape = RoundedCornerShape(8.dp)
-            ),
-        color = NavBackground,
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        //Inner widget
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 10.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            VerticalPager(
-                state = pagerState,
+            //Inner widget
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 10.dp, end = 14.dp),
-                userScrollEnabled = true,
-                horizontalAlignment = Alignment.Start
-            ) { page ->
-                val event = events[page]
-                EventWidgetCard(event)
-            }
-
-            //Three dot column
-            Column(
-                modifier = Modifier
-                    .padding(end = 16.dp)
-                    .wrapContentWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                    .fillMaxSize()
+                    .padding(horizontal = 10.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                events.forEachIndexed { index, _ ->
-                    // Dot turns red (or stays gray) based on current event page
-                    val dotColor = if (pagerState.currentPage == index) BrandRedLight else GrayIcon
-                    val dotBorder =
-                        if (pagerState.currentPage == index) GrayIcon else Color.Transparent
+                VerticalPager(
+                    state = pagerState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 10.dp, end = 14.dp),
+                    userScrollEnabled = true,
+                    horizontalAlignment = Alignment.Start
+                ) { page ->
+                    val event = events[page]
+                    EventWidgetCard(event)
+                }
 
-                    Box(
-                        modifier = Modifier
-                            .padding(vertical = 3.dp)
-                            .size(8.dp)
-                            .background(dotColor, CircleShape)
-                            .border(0.5.dp, dotBorder, CircleShape)
-                    )
+                //Three dot column
+                Column(
+                    modifier = Modifier
+                        .padding(end = 16.dp)
+                        .wrapContentWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    events.forEachIndexed { index, _ ->
+                        // Dot turns red (or stays gray) based on current event page
+                        val dotColor = if (pagerState.currentPage == index) BrandRedLight else GrayIcon
+                        val dotBorder =
+                            if (pagerState.currentPage == index) GrayIcon else Color.Transparent
+
+                        Box(
+                            modifier = Modifier
+                                .padding(vertical = 3.dp)
+                                .size(8.dp)
+                                .background(dotColor, CircleShape)
+                                .border(0.5.dp, dotBorder, CircleShape)
+                        )
+                    }
                 }
             }
         }
