@@ -47,6 +47,8 @@ class CalendarViewModel(
         private set
     var filterPinned by mutableStateOf(true)
         private set
+    var filterBookmarked by mutableStateOf(true)
+        private set
     var filterShared by mutableStateOf(true)
         private set
 
@@ -104,8 +106,8 @@ class CalendarViewModel(
             val merged = (customEvents + csuciEvents)
             val distinctEvents = merged.groupBy { it.id }.map { (_, events) ->
                 if (events.size > 1) {
-                    // Prefer the one from customEvents (which would have bookmark/pin status)
-                    events.find { it.calendarId != "custom" && (it.isBookmarked || it.isPinned) } 
+                    // Prefer the version from Firestore which has isBookmarked/isPinned status
+                    events.find { it.isBookmarked || it.isPinned } 
                         ?: events.find { it.calendarId == "custom" }
                         ?: events.first()
                 } else {
@@ -116,6 +118,8 @@ class CalendarViewModel(
             return distinctEvents.filter { event ->
                 if (event.isPinned) {
                     filterPinned
+                } else if (event.isBookmarked) {
+                    filterBookmarked
                 } else if (event.calendarId == "custom") {
                     val isShared = event.ownerId != null && event.ownerId != user?.uid
                     if (isShared) filterShared else filterCustom
@@ -141,6 +145,10 @@ class CalendarViewModel(
         filterPinned = !filterPinned
     }
 
+    fun toggleFilterBookmarked() {
+        filterBookmarked = !filterBookmarked
+    }
+
     fun toggleFilterShared() {
         filterShared = !filterShared
     }
@@ -149,6 +157,7 @@ class CalendarViewModel(
         filterCsuci = true
         filterCustom = true
         filterPinned = true
+        filterBookmarked = true
         filterShared = true
     }
 

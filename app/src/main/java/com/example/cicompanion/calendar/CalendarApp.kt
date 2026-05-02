@@ -1267,6 +1267,7 @@ private fun EventCard(
                         )
                     }
                 } else {
+                    /* COMMENTED OUT BOOKMARK ICON
                     IconButton(
                         onClick = onToggleBookmark,
                         modifier = Modifier.size(24.dp).offset(y = 2.dp)
@@ -1278,6 +1279,7 @@ private fun EventCard(
                             modifier = Modifier.size(18.dp)
                         )
                     }
+                    */
                 }
                 
                 Column(modifier = Modifier.weight(1f)) {
@@ -1368,8 +1370,8 @@ private fun EventCard(
                         }
                     }
                     EventBadge(
-                        text = if (event.isPinned) "Pinned" else if (event.isBookmarked) "Bookmarked" else if (isCustom) (if (isOwner) "Custom" else "Shared") else "CSUCI",
-                        color = if (event.isPinned) PinnedEventPurple else if (event.isBookmarked) BookmarkYellow else if (isCustom) (if (isOwner) CustomEventOrange else SharedEventBlue) else CoralRed
+                        text = if (event.isPinned) "Pinned" /* else if (event.isBookmarked) "Bookmarked" */ else if (isCustom) (if (isOwner) "Custom" else "Shared") else "CSUCI",
+                        color = if (event.isPinned) PinnedEventPurple /* else if (event.isBookmarked) BookmarkYellow */ else if (isCustom) (if (isOwner) CustomEventOrange else SharedEventBlue) else CoralRed
                     )
                 }
             }
@@ -2020,7 +2022,7 @@ private fun buildSelectedDateEvents(
 ): List<CalendarEvent> {
     return events.filter { it.occursOn(selectedDate) }.sortedWith(
         compareByDescending<CalendarEvent> { it.isPinned }
-            .thenByDescending { it.isBookmarked }
+            // .thenByDescending { it.isBookmarked }
             .thenByDescending { it.calendarId == "custom" }
             .thenBy { it.start }
     )

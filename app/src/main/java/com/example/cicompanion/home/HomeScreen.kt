@@ -57,22 +57,24 @@ fun HomeScreen(
         }
     }
 
-    val bookmarkedEvents = remember(calendarViewModel.events) {
-        calendarViewModel.events.filter { it.isBookmarked }
+    val allEvents = calendarViewModel.events
+    val now = ZonedDateTime.now()
+
+    val upcomingEvents = remember(allEvents) {
+        allEvents
+            .filter { it.endExclusive.isAfter(now) }
+            .sortedBy { it.start }
+            .take(5)
     }
 
-    val widgetEvents = remember(calendarViewModel.events, bookmarkedEvents) {
-        if (bookmarkedEvents.isNotEmpty()) {
-            bookmarkedEvents.sortedBy { it.start }
-        } else {
-            upcomingHomeWidgetEvents(calendarViewModel.events)
-        }
+    val bookmarkedEvents = remember(allEvents) {
+        allEvents
+            .filter { it.isBookmarked }
+            .sortedBy { it.start }
     }
-
-    val widgetTitle = if (bookmarkedEvents.isNotEmpty()) "Bookmarked CSUCI Events" else "Upcoming Events"
     
-    val pinnedEvents = remember(calendarViewModel.events) {
-        calendarViewModel.events.filter { it.isPinned }
+    val pinnedEvents = remember(allEvents) {
+        allEvents.filter { it.isPinned }
     }
 
     val favoritePins = remember(mapViewModel.customPins) {
@@ -95,9 +97,15 @@ fun HomeScreen(
     ) {
         item {
             CalendarWidget(
-                events = widgetEvents,
-                title = widgetTitle,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                upcomingEvents = upcomingEvents,
+                bookmarkedEvents = bookmarkedEvents,
+                modifier = Modifier.padding(horizontal = 16.dp),
+                onInfoClick = { event ->
+                    calendarViewModel.resetFilters()
+                    calendarViewModel.onDateSelected(event.start.toLocalDate())
+                    calendarViewModel.setHighlightedEvent(event.id)
+                    navController.navigate(Routes.CALENDAR)
+                }
             )
         }
 
@@ -417,13 +425,4 @@ fun PinnedEventItem(event: CalendarEvent, onNavigateToEvent: () -> Unit) {
             }
         }
     }
-}
-
-private fun upcomingHomeWidgetEvents(events: List<CalendarEvent>): List<CalendarEvent> {
-    val now = ZonedDateTime.now()
-
-    return events
-        .filter { event -> event.endExclusive.isAfter(now) }
-        .sortedBy { event -> event.start }
-        .take(3)
 }

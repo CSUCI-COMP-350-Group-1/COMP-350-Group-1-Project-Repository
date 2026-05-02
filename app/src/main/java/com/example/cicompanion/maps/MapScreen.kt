@@ -143,7 +143,7 @@ val campusLocations = listOf(
     CampusLocation(id = "park_a3", name = "Parking Lot A3", position = LatLng(34.166606172710715, -119.04703678095836), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
     CampusLocation(id = "park_a4", name = "Parking Lot A4", position = LatLng(34.164244290933254, -119.04646170905023), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
     CampusLocation(id = "park_a11", name = "Parking Lot A11", position = LatLng(34.164126287402695, -119.04786350249398), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
-    CampusLocation(id = "park_a2", name = "Parking Lot A2", position = LatLng(34.16410868093253, -119.04164009131796), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
+    CampusLocation(id = "park_a2", name = "Parking Lot A2", position = LatLng(34.164108680933254, -119.04164009131796), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
     CampusLocation(id = "park_a6", name = "Parking Lot A6", position = LatLng(34.16325952040607, -119.04202460036679), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
     CampusLocation(id = "park_a1", name = "Parking Lot A1", position = LatLng(34.163586436668446, -119.04267748158364), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
     CampusLocation(id = "park_a8", name = "Parking Lot A8", position = LatLng(34.16309446392495, -119.04030380989158), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2)),
@@ -388,7 +388,7 @@ fun MapScreen(
                     if (location.isCustom) {
                         it.id == location.associatedEventId
                     } else {
-                        (it.calendarId == "custom" || it.isPinned || it.isBookmarked) &&
+                        (it.calendarId == "custom" || it.isPinned /* || it.isBookmarked */) &&
                         (it.location?.contains(location.name, ignoreCase = true) == true)
                     }
                 }
@@ -503,6 +503,7 @@ fun EventSelectionDialog(
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White)
         ) {
+            @Suppress("DEPRECATION")
             Column(
                 modifier = Modifier
                     .padding(20.dp)
@@ -689,10 +690,12 @@ fun PinCreationDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
                 shape = RoundedCornerShape(12.dp)
             ) {
+                @Suppress("DEPRECATION")
                 Text(if (editingPin != null) "Save Changes" else "Confirm")
             }
         },
         dismissButton = {
+            @Suppress("DEPRECATION")
             TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray) }
         }
     )
@@ -724,6 +727,7 @@ fun LocationDetailsContent(
 ) {
     val isTemp = location.id == "shared_temp"
     
+    @Suppress("DEPRECATION")
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -900,23 +904,24 @@ fun MapEventItem(event: CalendarEvent, onMoreClick: () -> Unit) {
                     .background(
                         when {
                             event.isPinned -> Color(0xFF9C27B0).copy(alpha = 0.1f)
-                            event.isBookmarked -> Color(0xFFFFC107).copy(alpha = 0.1f)
+                            /* event.isBookmarked -> Color(0xFFFFC107).copy(alpha = 0.1f) */
                             else -> BrandOrange.copy(alpha = 0.1f)
                         }, 
                         CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
+                @Suppress("DEPRECATION")
                 Icon(
                     imageVector = when {
                         event.isPinned -> Icons.Default.PushPin
-                        event.isBookmarked -> Icons.Default.Bookmark
+                        /* event.isBookmarked -> Icons.Default.Bookmark */
                         else -> Icons.Default.Event
                     },
                     contentDescription = null,
                     tint = when {
                         event.isPinned -> Color(0xFF9C27B0)
-                        event.isBookmarked -> Color(0xFFFFC107)
+                        /* event.isBookmarked -> Color(0xFFFFC107) */
                         else -> BrandOrange
                     },
                     modifier = Modifier.size(20.dp)
@@ -1179,13 +1184,13 @@ fun MapContent(
                     if (location.isCustom) {
                         it.id == location.associatedEventId
                     } else {
-                        (it.calendarId == "custom" || it.isPinned || it.isBookmarked) &&
+                        (it.calendarId == "custom" || it.isPinned /* || it.isBookmarked */) &&
                         (it.location?.contains(location.name, ignoreCase = true) == true)
                     }
                 }
                 val eventCount = locationEvents.size
                 val hasPinnedEvent = locationEvents.any { it.isPinned }
-                val hasBookmarkedEvent = locationEvents.any { it.isBookmarked }
+                val hasBookmarkedEvent = false // locationEvents.any { it.isBookmarked }
 
                 key(location.id, location.name, isSelected, eventCount, hasPinnedEvent, hasBookmarkedEvent, location.isCustom, location.isFavorited) {
                     MarkerComposable(
@@ -1322,7 +1327,7 @@ fun SelectedPointerIcon(
             color = Color.White,
             modifier = Modifier.padding(top = 10.dp).size(30.dp),
             border = BorderStroke(2.5.dp, when {
-                hasBookmarkedEvent -> Color.Red // Red for bookmarked CSUCI
+                /* hasBookmarkedEvent -> Color.Red // Red for bookmarked CSUCI */
                 location.isFavorited -> Color(0xFFFFD700) // Gold for favorited custom pins
                 hasPinnedEvent -> Color(0xFF9C27B0) // Purple for pinned
                 eventCount > 0 -> BrandOrange // Orange for regular events
@@ -1345,7 +1350,7 @@ fun SelectedPointerIcon(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .size(14.dp)
-                    .background(if (hasBookmarkedEvent) Color.Red else Color.Red, CircleShape)
+                    .background(Color.Red, CircleShape)
                     .border(1.5.dp, Color.White, CircleShape)
             )
         }
@@ -1368,7 +1373,7 @@ fun LandmarkIcon(
                 .size(34.dp)
                 .background(color, CircleShape)
                 .border(2.5.dp, when {
-                    hasBookmarkedEvent -> Color.Red // Red border for bookmarked
+                    /* hasBookmarkedEvent -> Color.Red // Red border for bookmarked */
                     isFavorited -> Color(0xFFFFD700) // Gold border for favorited
                     hasPinnedEvent -> Color(0xFF9C27B0) // Purple for pinned
                     eventCount > 0 -> BrandOrange // Orange for regular events
