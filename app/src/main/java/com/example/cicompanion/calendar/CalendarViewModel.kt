@@ -8,16 +8,14 @@ import androidx.lifecycle.viewModelScope
 import com.example.cicompanion.calendar.data.repository.CalendarRepository
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.social.EventInvite
+import com.example.cicompanion.calendar.model.SelectedClass
 import com.example.cicompanion.social.FirestoreManager
 import com.example.cicompanion.social.SocialRepository
-import com.example.cicompanion.social.UserProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ListenerRegistration
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
-import java.util.UUID
 
 class CalendarViewModel(
     private val repository: CalendarRepository = CalendarRepository()
@@ -37,7 +35,10 @@ class CalendarViewModel(
 
     private var csuciEvents: List<CalendarEvent> by mutableStateOf(emptyList())
     private var customEvents: List<CalendarEvent> by mutableStateOf(emptyList())
-    
+
+    var selectedClasses: List<SelectedClass> by mutableStateOf(emptyList())
+        private set
+
     var incomingInvites by mutableStateOf<List<EventInvite>>(emptyList())
         private set
 
@@ -69,33 +70,34 @@ class CalendarViewModel(
 
     init {
         loadOnlineCalendar()
-        
+
         val auth = FirebaseAuth.getInstance()
         auth.addAuthStateListener { firebaseAuth ->
             val user = firebaseAuth.currentUser
             customEventsListener?.remove()
             incomingInvitesListener?.remove()
             acceptedInvitesListener?.remove()
+
             if (user != null) {
-                // Real-time listener for custom events (includes shared ones and bookmarked CSUCI ones)
                 customEventsListener = SocialRepository.listenToCustomEvents(user.uid,
                     onEventsChanged = { customEvents = it },
                     onError = { errorMessage = it }
                 )
-                
-                // Real-time listener for incoming invites
+
                 incomingInvitesListener = SocialRepository.listenToIncomingEventInvites(user.uid,
                     onInvitesChanged = { incomingInvites = it },
                     onError = { errorMessage = it }
                 )
 
-                // Real-time listener for accepted invites (to filter out deleted/kicked events)
                 acceptedInvitesListener = SocialRepository.listenToAcceptedEventInvites(user.uid,
                     onInvitesChanged = { acceptedInvites = it },
                     onError = { errorMessage = it }
                 )
+                loadCustomEvents()
+                loadSelectedClasses()
             } else {
                 customEvents = emptyList()
+                selectedClasses = emptyList()
                 incomingInvites = emptyList()
                 acceptedInvites = emptyList()
             }
@@ -112,14 +114,10 @@ class CalendarViewModel(
     val events: List<CalendarEvent>
         get() {
             val user = FirebaseAuth.getInstance().currentUser
-            
-            // Merge csuciEvents and customEvents, prioritizing the one from customEvents if it's the same event ID
-            // (this handles bookmarked/pinned CSUCI events that are saved to Firestore)
-            val merged = (customEvents + csuciEvents)
+            val merged = (customEvents + buildSelectedClassEvents() + csuciEvents)
             val distinctEvents = merged.groupBy { it.id }.map { (_, events) ->
                 if (events.size > 1) {
-                    // Prefer the version from Firestore which has isBookmarked/isPinned status
-                    events.find { it.isBookmarked || it.isPinned } 
+                    events.find { it.isBookmarked || it.isPinned }
                         ?: events.find { it.calendarId == "custom" }
                         ?: events.first()
                 } else {
@@ -135,13 +133,13 @@ class CalendarViewModel(
                 } else if (event.calendarId == "custom") {
                     val isShared = event.ownerId != null && event.ownerId != user?.uid
                     if (isShared) {
-                        // Shared events are only shown if the user has an active, accepted invitation.
-                        // This ensures that global deletion (removing invites) or kicking works immediately.
                         val hasActiveInvite = acceptedInvites.any { it.eventId == event.id }
                         filterShared && hasActiveInvite
                     } else {
                         filterCustom
                     }
+                } else if (event.calendarId == "schedule") {
+                    filterCustom
                 } else {
                     filterCsuci
                 }
@@ -207,6 +205,18 @@ class CalendarViewModel(
         }
     }
 
+    fun loadCustomEvents() {
+        viewModelScope.launch {
+            customEvents = FirestoreManager.fetchCustomEvents()
+        }
+    }
+
+    fun loadSelectedClasses() {
+        viewModelScope.launch {
+            selectedClasses = FirestoreManager.fetchSelectedClasses()
+        }
+    }
+
     fun addCustomEvent(event: CalendarEvent) {
         viewModelScope.launch {
             FirestoreManager.saveCustomEvent(event)
@@ -217,7 +227,7 @@ class CalendarViewModel(
         val user = FirebaseAuth.getInstance().currentUser ?: return
         viewModelScope.launch {
             if (event.ownerId == user.uid) {
-                SocialRepository.deleteEventForAll(user.uid, event.id, 
+                SocialRepository.deleteEventForAll(user.uid, event.id,
                     onSuccess = { },
                     onError = { errorMessage = it }
                 )
@@ -234,7 +244,6 @@ class CalendarViewModel(
         viewModelScope.launch {
             val targetStatus = !event.isPinned
             if (event.calendarId != "custom") {
-                // If it's a CSUCI event, save a copy to Firestore with the pin status
                 FirestoreManager.saveCustomEvent(event.copy(isPinned = targetStatus))
             } else {
                 FirestoreManager.updateEventPinStatus(event.id, targetStatus)
@@ -246,7 +255,6 @@ class CalendarViewModel(
         viewModelScope.launch {
             val targetStatus = !event.isBookmarked
             if (event.calendarId != "custom") {
-                // If it's a CSUCI event, save a copy to Firestore with the bookmark status
                 FirestoreManager.saveCustomEvent(event.copy(isBookmarked = targetStatus))
             } else {
                 FirestoreManager.updateEventBookmarkStatus(event.id, targetStatus)
@@ -256,18 +264,14 @@ class CalendarViewModel(
 
     fun acceptInvite(invite: EventInvite) {
         SocialRepository.acceptEventInvite(invite,
-            onSuccess = {
-                // Listener will update incomingInvites automatically
-            },
+            onSuccess = { },
             onError = { errorMessage = it }
         )
     }
 
     fun declineInvite(invite: EventInvite) {
         SocialRepository.declineEventInvite(invite,
-            onSuccess = {
-                // Listener will update incomingInvites automatically
-            },
+            onSuccess = { },
             onError = { errorMessage = it }
         )
     }
@@ -286,6 +290,32 @@ class CalendarViewModel(
             onSuccess = onSuccess,
             onError = { errorMessage = it }
         )
+    }
+
+    fun saveSelectedClass(
+        selectedClass: SelectedClass,
+        onComplete: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val success = FirestoreManager.saveSelectedClass(selectedClass)
+            if (success) {
+                loadSelectedClasses()
+            }
+            onComplete(success)
+        }
+    }
+
+    fun deleteSelectedClass(
+        selectedClassId: String,
+        onComplete: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val success = FirestoreManager.deleteSelectedClass(selectedClassId)
+            if (success) {
+                loadSelectedClasses()
+            }
+            onComplete(success)
+        }
     }
 
     fun onDateSelected(date: LocalDate) {
@@ -323,12 +353,16 @@ class CalendarViewModel(
         errorMessage = null
     }
 
+    private fun buildSelectedClassEvents(): List<CalendarEvent> {
+        return selectedClasses.flatMap { it.toCalendarEvents() }
+    }
+
     private fun clampSelectedDateToVisibleMonth(date: LocalDate, month: YearMonth): LocalDate {
         val safeDay = date.dayOfMonth.coerceAtMost(month.lengthOfMonth())
         return month.atDay(safeDay)
     }
 
-    private companion object {
+    companion object {
         const val CSUCI_CALENDAR_SUBSCRIBE_URL: String =
             "webcal://25livepub.collegenet.com/calendars/csuci-calendar-of-events.ics"
     }

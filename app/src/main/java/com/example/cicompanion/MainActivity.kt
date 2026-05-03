@@ -19,14 +19,13 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -36,31 +35,33 @@ import androidx.navigation.navArgument
 import com.example.cicompanion.appNavigation.DrawerProfileContent
 import com.example.cicompanion.appNavigation.TopBar
 import com.example.cicompanion.appNavigation.screenTitleForRoute
+import com.example.cicompanion.calendar.CalendarScreen
 import com.example.cicompanion.calendar.CalendarViewModel
-import com.example.cicompanion.calendar.CalendarApp
+import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.example.cicompanion.home.HomeScreen
 import com.example.cicompanion.home.HomeViewModel
 import com.example.cicompanion.maps.MapScreen
 import com.example.cicompanion.maps.MapViewModel
+import com.example.cicompanion.notifications.PushNotificationService
+import com.example.cicompanion.sidebar.SearchScreen
 import com.example.cicompanion.social.*
 import com.example.cicompanion.studyRoom.RoomListScreen
 import com.example.cicompanion.ui.NavBar
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.CICompanionTheme
-import com.example.cicompanion.firebase.FriendRequestNotificationSender
-import com.example.cicompanion.notifications.PushNotificationService
-import com.example.cicompanion.sidebar.SearchScreen
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 
+
 class MainActivity : ComponentActivity() {
+    // FOR PUSH NOTIFICATIONS runtime permission launcher for Android 13+
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
 
     private var pendingNotificationRoute by mutableStateOf<String?>(null)
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -97,6 +98,7 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    // PUSH NOTIFICATIONS helper for Android 13+ notification permission
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
 
@@ -120,7 +122,7 @@ fun AppNavigation(notificationRoute: String? = null,
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // Shared ViewModels to sync state across the app
+    // Create shared ViewModels here to sync across screens and persist during navigation
     val calendarViewModel: CalendarViewModel = viewModel()
     val homeViewModel: HomeViewModel = viewModel()
     val mapViewModel: MapViewModel = viewModel()
@@ -160,11 +162,12 @@ fun AppNavigation(notificationRoute: String? = null,
                     title = currentScreenTitle,
                     showBackButton =
                         currentRoute == Routes.FRIENDS_AND_REQUESTS ||
-                                currentRoute?.startsWith(Routes.MESSAGE_THREAD_BASE) == true,
+                                currentRoute?.startsWith(Routes.MESSAGE_THREAD_BASE) == true, // MESSAGING
                     onHamburgerClick = {
                         scope.launch { drawerState.open() }
                     },
                     onBackClick = {
+                        // MESSAGING  prefer normal back-stack behavior for thread screens
                         val popped = navController.popBackStack()
                         if (!popped) {
                             navController.navigate(Routes.PROFILE) {
@@ -173,7 +176,9 @@ fun AppNavigation(notificationRoute: String? = null,
                             }
                         }
                     },
-                    onNotificationClick = { },
+                    onNotificationClick = {
+                        // navController.navigate(Routes.NOTIFICATIONS)
+                    },
                     navController = navController
                 )
             },
@@ -215,7 +220,10 @@ fun AppNavigation(notificationRoute: String? = null,
                         )
                     }
                     composable(Routes.CALENDAR) {
-                        CalendarApp(viewModel = calendarViewModel)
+                        CalendarScreen(
+                            navController = navController,
+                            calendarViewModel = calendarViewModel
+                        )
                     }
                     composable(Routes.STUDY_ROOM) {
                         RoomListScreen(viewModel = viewModel(), navController = navController)

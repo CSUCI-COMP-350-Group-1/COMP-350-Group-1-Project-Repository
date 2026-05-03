@@ -17,6 +17,7 @@ import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import com.example.cicompanion.calendar.model.SelectedClass
 
 object FirestoreManager {
 
@@ -75,6 +76,122 @@ object FirestoreManager {
             .addOnFailureListener { exception ->
                 Log.e(TAG, "Failed to save FCM token for uid=$userId", exception)
             }
+    }
+
+    // CALENDAR SCHEDULE CHANGE:
+    // Save one selected class entry for the signed-in user.
+    suspend fun saveSelectedClass(selectedClass: SelectedClass): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        val db = FirebaseFirestore.getInstance()
+
+        val classData = hashMapOf(
+            "id" to selectedClass.id,
+            "majorCode" to selectedClass.majorCode,
+            "majorName" to selectedClass.majorName,
+            "courseCode" to selectedClass.courseCode,
+            "courseTitle" to selectedClass.courseTitle,
+            "typicallyOffered" to selectedClass.typicallyOffered,
+            "daysOfWeek" to selectedClass.daysOfWeek,
+            "startTime" to selectedClass.startTime,
+            "endTime" to selectedClass.endTime,
+            "startDate" to selectedClass.startDate,
+            "endDate" to selectedClass.endDate,
+            "location" to selectedClass.location,
+            "notes" to selectedClass.notes,
+            "termLabel" to selectedClass.termLabel,
+            "colorArgb" to selectedClass.colorArgb,
+            "reminderEnabled" to selectedClass.reminderEnabled,
+            "reminderMinutesBefore" to selectedClass.reminderMinutesBefore,
+            "createdAt" to selectedClass.createdAt,
+            "updatedAt" to selectedClass.updatedAt
+        )
+
+        return try {
+            db.collection("users")
+                .document(user.uid)
+                .collection("selectedClasses")
+                .document(selectedClass.id)
+                .set(classData)
+                .await()
+
+            true
+            // CALENDAR SCHEDULE CHANGE:
+            // Log the exact Firestore error so schedule save failures are easier to debug.
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving selected class: ${e.message}", e)
+            false
+        }
+    }
+
+    // CALENDAR SCHEDULE CHANGE:
+    // Delete one selected class entry for the signed-in user.
+    suspend fun deleteSelectedClass(selectedClassId: String): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        val db = FirebaseFirestore.getInstance()
+
+        return try {
+            db.collection("users")
+                .document(user.uid)
+                .collection("selectedClasses")
+                .document(selectedClassId)
+                .delete()
+                .await()
+
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting selected class", e)
+            false
+        }
+    }
+
+    // CALENDAR SCHEDULE CHANGE
+    // Fetch all selected class entries for the signed-in user.
+    suspend fun fetchSelectedClasses(): List<SelectedClass> {
+        val user = FirebaseAuth.getInstance().currentUser ?: return emptyList()
+        val db = FirebaseFirestore.getInstance()
+
+        return try {
+            val snapshot = db.collection("users")
+                .document(user.uid)
+                .collection("selectedClasses")
+                .get()
+                .await()
+
+            snapshot.documents.mapNotNull { document ->
+                SelectedClass(
+                    id = document.getString("id") ?: return@mapNotNull null,
+                    majorCode = document.getString("majorCode") ?: "",
+                    majorName = document.getString("majorName") ?: "",
+                    courseCode = document.getString("courseCode") ?: "",
+                    courseTitle = document.getString("courseTitle") ?: "",
+                    typicallyOffered = document.getString("typicallyOffered") ?: "",
+                    daysOfWeek = (document.get("daysOfWeek") as? List<*>)?.mapNotNull {
+                        (it as? Number)?.toInt()
+                    } ?: emptyList(),
+                    startTime = document.getString("startTime") ?: "",
+                    endTime = document.getString("endTime") ?: "",
+                    startDate = document.getString("startDate") ?: "",
+                    endDate = document.getString("endDate") ?: "",
+                    location = document.getString("location") ?: "",
+                    notes = document.getString("notes") ?: "",
+                    termLabel = document.getString("termLabel") ?: "",
+                    colorArgb = (document.getLong("colorArgb") ?: 0xFFEF3347).toInt(),
+                    reminderEnabled = document.getBoolean("reminderEnabled") ?: false,
+                    reminderMinutesBefore = document.getLong("reminderMinutesBefore")?.toInt(),
+                    createdAt = document.getLong("createdAt") ?: 0L,
+                    updatedAt = document.getLong("updatedAt") ?: 0L
+                )
+            }.sortedWith(
+                compareBy<SelectedClass>(
+                    { it.daysOfWeek.minOrNull() ?: Int.MAX_VALUE },
+                    { parseClassTimeForSort(it.startTime) },
+                    { it.courseCode }
+                )
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching selected classes", e)
+            emptyList()
+        }
     }
 
     suspend fun saveCustomEvent(event: CalendarEvent): Boolean {
@@ -381,5 +498,13 @@ object FirestoreManager {
             Log.e(TAG, "Error fetching quick access buttons", e)
             null
         }
+    }
+
+
+    // Parse stored HH:mm class times so saved classes can be sorted by time.
+    private fun parseClassTimeForSort(timeText: String): java.time.LocalTime {
+        return runCatching {
+            java.time.LocalTime.parse(timeText)
+        }.getOrDefault(java.time.LocalTime.MAX)
     }
 }
