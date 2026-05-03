@@ -15,6 +15,7 @@ data class CampusLocation(
     val icon: ImageVector,
     val color: Color,
     val isCustom: Boolean = false,
+    val isPinned: Boolean = false,
     val isFavorited: Boolean = false,
     val associatedEventId: String? = null
 )

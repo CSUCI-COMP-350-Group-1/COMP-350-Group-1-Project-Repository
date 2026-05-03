@@ -14,6 +14,7 @@ data class CustomPin(
     val longitude: Double = 0.0,
     val description: String = "",
     val colorArgb: Int = Color(0xFFE91E63).toArgb(), // Default pinkish
+    val isPinned: Boolean = false,
     val isFavorited: Boolean = false,
     val associatedEventId: String? = null
 ) {
@@ -30,6 +31,7 @@ data class CustomPin(
             icon = Icons.Default.PushPin,
             color = color,
             isCustom = true,
+            isPinned = isPinned,
             isFavorited = isFavorited,
             associatedEventId = associatedEventId
         )

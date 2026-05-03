@@ -94,6 +94,7 @@ object FirestoreManager {
             "maxMembers" to event.maxMembers,
             "isPinnedByLeader" to event.isPinnedByLeader,
             "isBookmarked" to event.isBookmarked
+            // "isShared" removed to comply with Firestore security rules
         )
 
         return try {
@@ -192,7 +193,8 @@ object FirestoreManager {
                     ownerId = ownerId,
                     maxMembers = maxMembers,
                     isPinnedByLeader = isPinnedByLeader,
-                    isBookmarked = isBookmarked
+                    isBookmarked = isBookmarked,
+                    isShared = false // Not stored in Firestore, logic in ViewModel determines visibility
                 )
             }
         } catch (e: Exception) {
@@ -240,7 +242,27 @@ object FirestoreManager {
                 .await()
 
             snapshot.documents.mapNotNull { doc ->
-                doc.toObject(CustomPin::class.java)
+                val id = doc.getString("id") ?: ""
+                val userId = doc.getString("userId") ?: ""
+                val name = doc.getString("name") ?: ""
+                val latitude = doc.getDouble("latitude") ?: 0.0
+                val longitude = doc.getDouble("longitude") ?: 0.0
+                val description = doc.getString("description") ?: ""
+                val colorArgb = doc.getLong("colorArgb")?.toInt() ?: 0
+                val isFavorited = doc.getBoolean("isFavorited") ?: doc.getBoolean("isPinned") ?: false
+                val associatedEventId = doc.getString("associatedEventId")
+
+                CustomPin(
+                    id = id,
+                    userId = userId,
+                    name = name,
+                    latitude = latitude,
+                    longitude = longitude,
+                    description = description,
+                    colorArgb = colorArgb,
+                    isFavorited = isFavorited,
+                    associatedEventId = associatedEventId
+                )
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching custom pins", e)
@@ -266,10 +288,21 @@ object FirestoreManager {
     suspend fun updateCustomPin(pin: CustomPin): Boolean {
         val user = FirebaseAuth.getInstance().currentUser ?: return false
         val db = FirebaseFirestore.getInstance()
+        val pinData = hashMapOf(
+            "id" to pin.id,
+            "userId" to user.uid,
+            "name" to pin.name,
+            "latitude" to pin.latitude,
+            "longitude" to pin.longitude,
+            "description" to pin.description,
+            "colorArgb" to pin.colorArgb,
+            "isFavorited" to pin.isFavorited,
+            "associatedEventId" to pin.associatedEventId
+        )
         return try {
             db.collection("users").document(user.uid)
                 .collection("customPins").document(pin.id)
-                .set(pin, SetOptions.merge())
+                .set(pinData, SetOptions.merge())
                 .await()
             true
         } catch (e: Exception) {

@@ -411,12 +411,9 @@ fun MapScreen(
                             showDetailsSheet = false
                             selectedLocation = null
                         },
-                        onToggleFavorite = {
-                            val pin = mapViewModel.customPins.find { it.id == location.id }
-                            if (pin != null) {
-                                mapViewModel.toggleFavorite(pin)
-                                selectedLocation = selectedLocation?.copy(isFavorited = !pin.isFavorited)
-                            }
+                        onTogglePin = {
+                            mapViewModel.togglePinLocation(location)
+                            selectedLocation = selectedLocation?.copy(isPinned = !location.isPinned)
                         },
                         onSendMessage = {
                             navController.navigate("${Routes.SOCIAL}?shareLocation=${location.name}")
@@ -719,7 +716,7 @@ fun LocationDetailsContent(
     events: List<CalendarEvent>,
     onGoToEvent: (CalendarEvent) -> Unit,
     onDeletePin: () -> Unit,
-    onToggleFavorite: () -> Unit,
+    onTogglePin: () -> Unit,
     onSendMessage: () -> Unit,
     onAssociateEvent: () -> Unit,
     onEditPin: () -> Unit,
@@ -757,16 +754,18 @@ fun LocationDetailsContent(
                     color = Color.Gray
                 )
             }
-            if (location.isCustom && !isTemp) {
+            if (!isTemp) {
                 Row {
-                    IconButton(onClick = onEditPin) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit Pin", tint = Color.Gray)
+                    if (location.isCustom) {
+                        IconButton(onClick = onEditPin) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit Pin", tint = Color.Gray)
+                        }
                     }
-                    IconButton(onClick = onToggleFavorite) {
+                    IconButton(onClick = onTogglePin) {
                         Icon(
-                            imageVector = if (location.isFavorited) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Favorite",
-                            tint = if (location.isFavorited) Color.Red else Color.Gray
+                            imageVector = Icons.Default.PushPin,
+                            contentDescription = "Pin",
+                            tint = if (location.isPinned) Color(0xFF9C27B0) else Color.Gray
                         )
                     }
                 }
@@ -1150,11 +1149,11 @@ fun MapContent(
             tempPinLocation?.let {
                 MarkerComposable(
                     state = rememberMarkerState(position = it),
-                    anchor = Offset(0.5f, 0.5f)
+                    anchor = Offset(0.5f, 1.0f)
                 ) {
                     CustomPinMarkerIcon(
                         color = CoralRed, 
-                        isFavorited = false, 
+                        isPinned = false, 
                         eventCount = 0,
                         isEditing = true
                     )
@@ -1192,11 +1191,11 @@ fun MapContent(
                 val hasPinnedEvent = locationEvents.any { it.isPinned }
                 val hasBookmarkedEvent = false // locationEvents.any { it.isBookmarked }
 
-                key(location.id, location.name, isSelected, eventCount, hasPinnedEvent, hasBookmarkedEvent, location.isCustom, location.isFavorited) {
+                key(location.id, location.name, isSelected, eventCount, hasPinnedEvent, hasBookmarkedEvent, location.isCustom, location.isPinned) {
                     MarkerComposable(
                         state = rememberMarkerState(position = location.position),
                         zIndex = if (isSelected) 100f else 1f,
-                        anchor = Offset(0.5f, if (isSelected) 1.0f else 0.5f),
+                        anchor = if (isSelected || location.isCustom) Offset(0.5f, 1.0f) else Offset(0.5f, 0.5f),
                         onClick = {
                             onLocationClick(location)
                             true 
@@ -1206,7 +1205,7 @@ fun MapContent(
                             SelectedPointerIcon(location, eventCount, hasPinnedEvent, hasBookmarkedEvent)
                         } else {
                             if (location.isCustom) {
-                                CustomPinMarkerIcon(location.color, location.isFavorited, eventCount)
+                                CustomPinMarkerIcon(location.color, location.isPinned, eventCount)
                             } else {
                                 LandmarkIcon(
                                     icon = location.icon, 
@@ -1215,7 +1214,7 @@ fun MapContent(
                                     hasPinnedEvent = hasPinnedEvent,
                                     hasBookmarkedEvent = hasBookmarkedEvent,
                                     isCustom = location.isCustom,
-                                    isFavorited = location.isFavorited
+                                    isPinned = location.isPinned
                                 )
                             }
                         }
@@ -1227,67 +1226,84 @@ fun MapContent(
 }
 
 @Composable
-fun CustomPinMarkerIcon(color: Color, isFavorited: Boolean, eventCount: Int, isEditing: Boolean = false) {
+fun CustomPinMarkerIcon(color: Color, isPinned: Boolean, eventCount: Int, isEditing: Boolean = false) {
     val infiniteTransition = rememberInfiniteTransition(label = "markerPulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = if (isEditing) 1.5f else 1.3f,
+        targetValue = if (isEditing) 1.6f else 1.3f,
         animationSpec = infiniteRepeatable(
-            animation = tween(if (isEditing) 800 else 1200, easing = LinearEasing),
+            animation = tween(1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "pulse"
     )
     val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
+        initialValue = 0.5f,
         targetValue = 0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(if (isEditing) 800 else 1200, easing = LinearEasing),
+            animation = tween(1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "pulseAlpha"
     )
 
-    Box(contentAlignment = Alignment.Center) {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(52.dp)) {
         // Pulsing background ring
         Box(
             modifier = Modifier
-                .size(if (isEditing) 44.dp else 38.dp)
+                .size(40.dp)
                 .graphicsLayer(scaleX = pulseScale, scaleY = pulseScale)
                 .background(color.copy(alpha = pulseAlpha), CircleShape)
         )
         
-        // Pin body
+        // Pin body (Teardrop shape)
         Box(
             modifier = Modifier
                 .size(34.dp)
-                .background(color, RoundedCornerShape(topStart = 17.dp, topEnd = 17.dp, bottomStart = 17.dp, bottomEnd = 2.dp))
                 .graphicsLayer(rotationZ = 45f)
-                .border(2.dp, when {
-                    isFavorited -> Color(0xFFFFD700) // Gold for favorited
-                    eventCount > 0 -> BrandOrange // Orange for associated events
-                    else -> Color.White
-                }, RoundedCornerShape(topStart = 17.dp, topEnd = 17.dp, bottomStart = 17.dp, bottomEnd = 2.dp))
-                .shadow(4.dp)
+                .shadow(elevation = 6.dp, shape = RoundedCornerShape(topStart = 17.dp, topEnd = 17.dp, bottomStart = 17.dp, bottomEnd = 2.dp))
+                .background(color, RoundedCornerShape(topStart = 17.dp, topEnd = 17.dp, bottomStart = 17.dp, bottomEnd = 2.dp))
+                .border(
+                    width = 2.dp,
+                    color = if (isPinned) Color(0xFF9C27B0) else Color.White,
+                    shape = RoundedCornerShape(topStart = 17.dp, topEnd = 17.dp, bottomStart = 17.dp, bottomEnd = 2.dp)
+                )
         )
         
-        // Icon inside
-        Icon(
-            imageVector = Icons.Default.PushPin,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(18.dp).offset(y = (-2).dp)
-        )
+        // Inner white circle to make it pop
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .background(Color.White, CircleShape)
+                .shadow(2.dp, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.PushPin,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(14.dp)
+            )
+        }
 
+        // Badge for associated events
         if (eventCount > 0) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(x = 6.dp, y = (-6).dp)
-                    .size(12.dp)
+                    .offset(x = (-4).dp, y = 4.dp)
+                    .size(18.dp)
                     .background(Color.Red, CircleShape)
-                    .border(1.dp, Color.White, CircleShape)
-            )
+                    .border(1.5.dp, Color.White, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = eventCount.toString(),
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }
@@ -1297,12 +1313,12 @@ fun SelectedPointerIcon(
     location: CampusLocation, 
     eventCount: Int = 0, 
     hasPinnedEvent: Boolean = false,
-    hasBookmarkedEvent: Boolean = false
+    @Suppress("UNUSED_PARAMETER") hasBookmarkedEvent: Boolean = false
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "markerBounce")
     val bounce by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = -15f, 
+        targetValue = -12f, 
         animationSpec = infiniteRepeatable(
             animation = tween(600, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -1313,22 +1329,21 @@ fun SelectedPointerIcon(
     Box(
         contentAlignment = Alignment.TopCenter,
         modifier = Modifier
-            .size(75.dp) 
+            .size(70.dp) 
             .graphicsLayer(translationY = bounce)
     ) {
         Icon(
             imageVector = Icons.Default.LocationOn,
             contentDescription = null,
             tint = location.color,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize().shadow(4.dp, CircleShape)
         )
         Surface(
             shape = CircleShape,
             color = Color.White,
-            modifier = Modifier.padding(top = 10.dp).size(30.dp),
+            modifier = Modifier.padding(top = 8.dp).size(32.dp),
             border = BorderStroke(2.5.dp, when {
-                /* hasBookmarkedEvent -> Color.Red // Red for bookmarked CSUCI */
-                location.isFavorited -> Color(0xFFFFD700) // Gold for favorited custom pins
+                location.isPinned -> Color(0xFF9C27B0) // Purple for pinned custom pins
                 hasPinnedEvent -> Color(0xFF9C27B0) // Purple for pinned
                 eventCount > 0 -> BrandOrange // Orange for regular events
                 else -> location.color
@@ -1349,10 +1364,19 @@ fun SelectedPointerIcon(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .size(14.dp)
+                    .offset(x = (-8).dp, y = 8.dp)
+                    .size(18.dp)
                     .background(Color.Red, CircleShape)
-                    .border(1.5.dp, Color.White, CircleShape)
-            )
+                    .border(1.5.dp, Color.White, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = eventCount.toString(),
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }
@@ -1363,23 +1387,22 @@ fun LandmarkIcon(
     color: Color, 
     eventCount: Int = 0, 
     hasPinnedEvent: Boolean = false,
-    hasBookmarkedEvent: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") hasBookmarkedEvent: Boolean = false,
     isCustom: Boolean = false,
-    isFavorited: Boolean = false
+    isPinned: Boolean = false
 ) {
-    Box(contentAlignment = Alignment.Center) {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(44.dp)) {
         Box(
             modifier = Modifier
                 .size(34.dp)
                 .background(color, CircleShape)
                 .border(2.5.dp, when {
-                    /* hasBookmarkedEvent -> Color.Red // Red border for bookmarked */
-                    isFavorited -> Color(0xFFFFD700) // Gold border for favorited
+                    isPinned -> Color(0xFF9C27B0) // Purple border for pinned
                     hasPinnedEvent -> Color(0xFF9C27B0) // Purple for pinned
                     eventCount > 0 -> BrandOrange // Orange for regular events
                     else -> Color.White
                 }, CircleShape)
-                .shadow(2.dp, CircleShape)
+                .shadow(4.dp, CircleShape)
                 .padding(7.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -1387,7 +1410,7 @@ fun LandmarkIcon(
                 imageVector = if (isCustom) Icons.Default.PushPin else icon, 
                 contentDescription = null, 
                 tint = Color.White, 
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
         }
 
@@ -1395,11 +1418,19 @@ fun LandmarkIcon(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(x = 4.dp, y = (-4).dp)
-                    .size(12.dp)
+                    .offset(x = (-2).dp, y = 2.dp)
+                    .size(16.dp)
                     .background(Color.Red, CircleShape)
-                    .border(1.dp, Color.White, CircleShape)
-            )
+                    .border(1.5.dp, Color.White, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = eventCount.toString(),
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }

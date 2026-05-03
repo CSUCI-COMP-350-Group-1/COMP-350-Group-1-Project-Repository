@@ -1,6 +1,7 @@
 package com.example.cicompanion.calendar
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +30,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.social.EventInvite
 import com.example.cicompanion.social.SocialRepository
@@ -55,7 +59,6 @@ private val SharedEventBlue = Color(0xFF2196F3)
 private val SharedEventLightBlue = Color(0xFFE3F2FD)
 private val CustomEventOrange = Color(0xFFFF9800)
 private val PinnedEventPurple = Color(0xFF9C27B0)
-private val BookmarkYellow = Color(0xFFFFC107)
 private val SoftText = Color(0xFF6E5555)
 private val CardOffWhite = Color(0xFFF6E6D8)
 private val DateCellWhite = Color(0xFFF7F4F8)
@@ -181,7 +184,8 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                     endExclusive = endZdt,
                     isAllDay = false,
                     ownerId = currentUser?.uid,
-                    maxMembers = cap
+                    maxMembers = cap,
+                    isShared = invitedFriends.isNotEmpty()
                 )
                 viewModel.addCustomEvent(newEvent)
                 
@@ -274,8 +278,10 @@ fun CalendarApp(viewModel: CalendarViewModel) {
             event = event,
             currentUserId = currentUser?.uid ?: "",
             onDismiss = { eventMembersToShow = null },
-            onKick = { targetUid ->
-                viewModel.kickUser(event.id, targetUid)
+            onKick = { targetUids ->
+                viewModel.kickUsers(event.id, targetUids)
+                eventMembersToShow = null
+                Toast.makeText(context, "Kicked ${targetUids.size} members", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -446,6 +452,7 @@ private fun CalendarHeroHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
+                @Suppress("DEPRECATION")
                 Text(
                     text = "CI Companion Calendar",
                     style = MaterialTheme.typography.headlineSmall,
@@ -454,6 +461,7 @@ private fun CalendarHeroHeader(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                @Suppress("DEPRECATION")
                 Text(
                     text = selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
                     style = MaterialTheme.typography.bodyLarge,
@@ -490,6 +498,7 @@ private fun FilterDropdown(viewModel: CalendarViewModel) {
                 .background(Color.White)
                 .width(200.dp)
         ) {
+            @Suppress("DEPRECATION")
             Text(
                 text = "Filter Events",
                 modifier = Modifier.padding(16.dp),
@@ -556,6 +565,7 @@ private fun FilterMenuItem(
                         )
                     }
                 }
+                @Suppress("DEPRECATION")
                 Text(text = label, style = MaterialTheme.typography.bodyMedium)
             }
         },
@@ -582,6 +592,7 @@ private fun ErrorMessage(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            @Suppress("DEPRECATION")
             Text(
                 text = message,
                 color = MaterialTheme.colorScheme.onErrorContainer,
@@ -589,6 +600,7 @@ private fun ErrorMessage(
                 style = MaterialTheme.typography.bodyMedium
             )
 
+            @Suppress("DEPRECATION")
             Text(
                 text = "Dismiss",
                 color = MaterialTheme.colorScheme.primary,
@@ -644,6 +656,7 @@ private fun ModeCard(
             .padding(horizontal = 12.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
+        @Suppress("DEPRECATION")
         Text(
             text = mode.name,
             color = textColor,
@@ -919,6 +932,7 @@ private fun HeaderWithArrows(
             onClick = onPrevious
         )
 
+        @Suppress("DEPRECATION")
         Text(
             text = title,
             modifier = Modifier.weight(1f),
@@ -947,6 +961,7 @@ private fun NavigationCircleButton(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
+        @Suppress("DEPRECATION")
         Text(
             text = symbol,
             color = MaterialTheme.colorScheme.primary,
@@ -988,6 +1003,7 @@ private fun WeekdayChip(
             .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
+        @Suppress("DEPRECATION")
         Text(
             text = text,
             textAlign = TextAlign.Center,
@@ -1086,6 +1102,7 @@ private fun DateCell(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
+            @Suppress("DEPRECATION")
             Text(
                 text = date.dayOfMonth.toString(),
                 style = MaterialTheme.typography.bodyLarge,
@@ -1205,6 +1222,7 @@ private fun EventsList(
 @Composable
 private fun EmptyEventsMessage() {
     SectionCard {
+        @Suppress("DEPRECATION")
         Text(
             text = "No events for this date.",
             style = MaterialTheme.typography.bodyLarge,
@@ -1230,6 +1248,7 @@ private fun EventCard(
     
     val containerColor = when {
         !isCustom -> EventCardGrey
+        isOwner && event.isShared -> SharedEventLightBlue
         isOwner -> CardOffWhite
         else -> SharedEventLightBlue
     }
@@ -1266,33 +1285,33 @@ private fun EventCard(
                             modifier = Modifier.size(18.dp)
                         )
                     }
-                } else {
-                    /* COMMENTED OUT BOOKMARK ICON
-                    IconButton(
-                        onClick = onToggleBookmark,
-                        modifier = Modifier.size(24.dp).offset(y = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (event.isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                            contentDescription = "Bookmark",
-                            tint = if (event.isBookmarked) BookmarkYellow else Color.Gray,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    */
                 }
                 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = HtmlUtils.stripHtml(event.title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    
-                    if (isCustom && !isOwner) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        @Suppress("DEPRECATION")
                         Text(
-                            text = "Shared Event",
+                            text = HtmlUtils.stripHtml(event.title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (isOwner && event.isShared) {
+                            Spacer(Modifier.width(4.dp))
+                            Icon(
+                                Icons.Default.Groups, 
+                                contentDescription = "Shared", 
+                                tint = SharedEventBlue, 
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    
+                    if (isCustom && (!isOwner || event.isShared)) {
+                        @Suppress("DEPRECATION")
+                        Text(
+                            text = if (isOwner) "Shared Event (You are Leader)" else "Shared Event",
                             style = MaterialTheme.typography.labelSmall,
                             color = SharedEventBlue,
                             fontWeight = FontWeight.Bold
@@ -1359,7 +1378,7 @@ private fun EventCard(
                                     .fillMaxSize()
                                     .background(CoralRed.copy(alpha = 0.1f), CircleShape),
                                 contentAlignment = Alignment.Center
-                            ) {
+                                ) {
                                 Icon(
                                     imageVector = if (isOwner) Icons.Default.Delete else Icons.AutoMirrored.Outlined.ExitToApp,
                                     contentDescription = if (isOwner) "Delete" else "Leave",
@@ -1370,8 +1389,8 @@ private fun EventCard(
                         }
                     }
                     EventBadge(
-                        text = if (event.isPinned) "Pinned" /* else if (event.isBookmarked) "Bookmarked" */ else if (isCustom) (if (isOwner) "Custom" else "Shared") else "CSUCI",
-                        color = if (event.isPinned) PinnedEventPurple /* else if (event.isBookmarked) BookmarkYellow */ else if (isCustom) (if (isOwner) CustomEventOrange else SharedEventBlue) else CoralRed
+                        text = if (event.isPinned) "Pinned" else if (isCustom) (if (isOwner) (if (event.isShared) "Shared (Leader)" else "Custom") else "Shared") else "CSUCI",
+                        color = if (event.isPinned) PinnedEventPurple else if (isCustom) (if (isOwner) (if (event.isShared) SharedEventBlue else CustomEventOrange) else SharedEventBlue) else CoralRed
                     )
                 }
             }
@@ -1398,12 +1417,16 @@ fun EventMembersDialog(
     event: CalendarEvent,
     currentUserId: String,
     onDismiss: () -> Unit,
-    onKick: (String) -> Unit
+    onKick: (List<String>) -> Unit
 ) {
     var members by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    var userToKick by remember { mutableStateOf<UserProfile?>(null) }
+    var selectedUsers by remember { mutableStateOf(setOf<String>()) }
     val isOwner = event.ownerId == currentUserId
+
+    val otherMembers = remember(members, event.ownerId) {
+        members.filter { it.uid != event.ownerId }
+    }
 
     DisposableEffect(event.id) {
         val registration = SocialRepository.listenToEventMembers(
@@ -1417,100 +1440,202 @@ fun EventMembersDialog(
         onDispose { registration.remove() }
     }
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Group, contentDescription = null, tint = CoralRed)
-                Spacer(Modifier.width(12.dp))
-                Text("Event Members", fontWeight = FontWeight.Bold)
-            }
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .wrapContentHeight()
+                .padding(vertical = 24.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = Color.White,
+            tonalElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        @Suppress("DEPRECATION")
+                        Text(
+                            text = "Event Members",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = BrandRedDark
+                        )
+                        @Suppress("DEPRECATION")
+                        Text(
+                            text = if (event.maxMembers != null) "${members.size + 1} / ${event.maxMembers} spots filled" else "${members.size + 1} members total",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
+                        )
+                    }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .background(Color.Gray.copy(alpha = 0.1f), CircleShape)
+                            .size(36.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray, modifier = Modifier.size(20.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
                 if (isLoading) {
-                    Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = CoralRed)
+                    Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                        @Suppress("DEPRECATION")
+                        CircularProgressIndicator(color = BrandRedDark, strokeWidth = 3.dp)
                     }
                 } else {
-                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 450.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Leader Section
                         item {
-                            Text("Leader", style = MaterialTheme.typography.labelMedium, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
-                            MemberRow(userId = event.ownerId ?: "", isOwner = true, currentUserId = currentUserId, onKick = {})
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                            MemberGroupHeader(text = "Host")
+                            PremiumMemberRow(
+                                userId = event.ownerId ?: "",
+                                isOwner = true,
+                                currentUserId = currentUserId,
+                                eventId = event.id
+                            )
                         }
                         
-                        item {
-                            Text("Members ${if (event.maxMembers != null) "(${members.size}/${event.maxMembers})" else "(${members.size})"}", 
-                                 style = MaterialTheme.typography.labelMedium, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
+                        // Others Section
+                        if (otherMembers.isNotEmpty() || !isOwner) {
+                            item {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                MemberGroupHeader(text = "Participants")
+                            }
                         }
-                        
-                        val otherMembers = members.filter { it.uid != event.ownerId }
+
                         if (otherMembers.isEmpty()) {
                             item { 
-                                Box(Modifier.fillMaxWidth().padding(vertical = 20.dp), contentAlignment = Alignment.Center) {
-                                    Text("This event does not have anyone in it.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray, textAlign = TextAlign.Center)
-                                }
+                                EmptyMembersPlaceholder()
                             }
                         } else {
                             items(otherMembers, key = { it.uid }) { member ->
-                                MemberRow(
+                                PremiumMemberRow(
                                     userId = member.uid,
                                     displayName = SocialRepository.displayNameOrEmail(member),
                                     photoUrl = member.photoUrl,
                                     isOwner = false,
                                     canKick = isOwner,
+                                    isSelected = selectedUsers.contains(member.uid),
+                                    onToggleSelect = {
+                                        selectedUsers = if (selectedUsers.contains(member.uid)) {
+                                            selectedUsers - member.uid
+                                        } else {
+                                            selectedUsers + member.uid
+                                        }
+                                    },
                                     currentUserId = currentUserId,
-                                    onKick = { userToKick = member }
+                                    eventId = event.id
                                 )
                             }
                         }
                     }
                 }
-            }
-        },
-        confirmButton = {
-            @Suppress("DEPRECATION")
-            TextButton(onClick = onDismiss) { Text("Close", color = CoralRed, fontWeight = FontWeight.Bold) }
-        }
-    )
 
-    userToKick?.let { member ->
-        AlertDialog(
-            onDismissRequest = { userToKick = null },
-            title = { Text("Kick Member") },
-            text = { Text("Are you sure you want to kick ${SocialRepository.displayNameOrEmail(member)} from this event?") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onKick(member.uid)
-                        userToKick = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CoralRed)
-                ) {
-                    @Suppress("DEPRECATION")
-                    Text("Kick")
-                }
-            },
-            dismissButton = {
-                @Suppress("DEPRECATION")
-                TextButton(onClick = { userToKick = null }) {
-                    Text("Cancel", color = Color.Gray)
+                if (isOwner && otherMembers.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    val canKickSelected = selectedUsers.isNotEmpty()
+                    
+                    Button(
+                        onClick = { if (canKickSelected) onKick(selectedUsers.toList()) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .shadow(if (canKickSelected) 8.dp else 0.dp, RoundedCornerShape(16.dp)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (canKickSelected) BrandRedDark else Color.Gray.copy(alpha = 0.2f),
+                            contentColor = if (canKickSelected) Color.White else Color.Gray
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        enabled = canKickSelected
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (canKickSelected) {
+                                Icon(Icons.Default.PersonRemove, contentDescription = null)
+                                Spacer(Modifier.width(12.dp))
+                                @Suppress("DEPRECATION")
+                                Text("Remove selected (${selectedUsers.size})", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            } else {
+                                @Suppress("DEPRECATION")
+                                Text("Select members to remove", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
                 }
             }
-        )
+        }
     }
 }
 
 @Composable
-fun MemberRow(
+fun MemberGroupHeader(text: String) {
+    @Suppress("DEPRECATION")
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        color = Color.Gray,
+        letterSpacing = 1.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+    )
+}
+
+@Composable
+fun EmptyMembersPlaceholder() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                Icons.Outlined.Group, 
+                contentDescription = null, 
+                modifier = Modifier.size(48.dp), 
+                tint = Color.Gray.copy(alpha = 0.3f)
+            )
+            Spacer(Modifier.height(8.dp))
+            @Suppress("DEPRECATION")
+            Text(
+                "No other members yet",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray
+            )
+        }
+    }
+}
+
+@Composable
+fun PremiumMemberRow(
     userId: String,
     displayName: String = "Loading...",
     photoUrl: String = "",
     isOwner: Boolean,
     canKick: Boolean = false,
+    isSelected: Boolean = false,
+    onToggleSelect: () -> Unit = {},
     currentUserId: String,
-    onKick: () -> Unit
+    eventId: String
 ) {
     var profile by remember { mutableStateOf<UserProfile?>(null) }
     
@@ -1522,23 +1647,77 @@ fun MemberRow(
 
     val name = profile?.let { SocialRepository.displayNameOrEmail(it) } ?: displayName
     val photo = profile?.photoUrl ?: photoUrl
+    val isSelectable = canKick && !isOwner && userId != currentUserId
+    val isMe = userId == currentUserId
 
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(enabled = isSelectable) { onToggleSelect() },
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) BrandRedDark.copy(alpha = 0.05f) else Color.Transparent
+        ),
+        border = if (isSelected) BorderStroke(1.dp, BrandRedDark.copy(alpha = 0.3f)) else null
     ) {
-        UserAvatar(photoUrl = photo)
-        Spacer(modifier = Modifier.width(12.dp))
-        @Suppress("DEPRECATION")
-        Text(
-            text = if (userId == currentUserId) "$name (You)" else name, 
-            modifier = Modifier.weight(1f), 
-            fontWeight = if (userId == currentUserId) FontWeight.Bold else FontWeight.Normal,
-            style = MaterialTheme.typography.bodyLarge
-        )
-        if (canKick && !isOwner && userId != currentUserId) {
-            IconButton(onClick = onKick, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.PersonRemove, contentDescription = "Kick", tint = CoralRed, modifier = Modifier.size(20.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                UserAvatar(photoUrl = photo)
+                if (isOwner) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(18.dp)
+                            .background(Color.White, CircleShape)
+                            .padding(2.dp)
+                            .background(CustomEventOrange, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Star, contentDescription = null, tint = Color.White, modifier = Modifier.size(10.dp))
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                @Suppress("DEPRECATION")
+                Text(
+                    text = if (isMe) "$name (You)" else name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (isOwner || isMe) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isMe) BrandRedDark else Color.DarkGray
+                )
+                if (isOwner) {
+                    @Suppress("DEPRECATION")
+                    Text("Event Host", style = MaterialTheme.typography.bodySmall, color = CustomEventOrange)
+                } else if (isMe) {
+                    @Suppress("DEPRECATION")
+                    Text("You", style = MaterialTheme.typography.bodySmall, color = BrandRedDark.copy(alpha = 0.7f))
+                }
+            }
+
+            if (isSelectable) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggleSelect() },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = BrandRedDark,
+                        uncheckedColor = Color.Gray.copy(alpha = 0.5f)
+                    )
+                )
+            } else if (isOwner) {
+                Icon(
+                    Icons.Default.Shield, 
+                    contentDescription = "Admin", 
+                    tint = CustomEventOrange.copy(alpha = 0.6f),
+                    modifier = Modifier.size(20.dp).padding(end = 4.dp)
+                )
             }
         }
     }
@@ -1566,6 +1745,7 @@ private fun AddEventDialog(
         shape = RoundedCornerShape(24.dp),
         containerColor = Color.White,
         title = { 
+            @Suppress("DEPRECATION")
             Text(
                 text = "New Shared Event",
                 style = MaterialTheme.typography.headlineSmall,
@@ -1574,13 +1754,13 @@ private fun AddEventDialog(
             )
         },
         text = {
+            @Suppress("DEPRECATION")
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                @Suppress("DEPRECATION")
                 Text(
                     text = "Date: ${selectedDate.format(DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy"))}",
                     style = MaterialTheme.typography.bodyMedium,
@@ -1638,11 +1818,13 @@ private fun AddEventDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Invite Friends", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.weight(1f))
+                        @Suppress("DEPRECATION")
                         TextButton(onClick = { showFriendPicker = true }) {
                             Text("+ Add", color = SharedEventBlue)
                         }
                     }
                     if (invitedFriends.isEmpty()) {
+                        @Suppress("DEPRECATION")
                         Text("No one invited. You can do this later.", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                     } else {
                         Column(modifier = Modifier.heightIn(max = 120.dp)) {
@@ -1650,6 +1832,7 @@ private fun AddEventDialog(
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
                                     UserAvatar(photoUrl = friend.photoUrl)
                                     Spacer(modifier = Modifier.width(8.dp))
+                                    @Suppress("DEPRECATION")
                                     Text(SocialRepository.displayNameOrEmail(friend), style = MaterialTheme.typography.bodySmall)
                                     Spacer(Modifier.weight(1f))
                                     IconButton(onClick = { invitedFriends = invitedFriends.filter { it.uid != friend.uid } }, modifier = Modifier.size(24.dp)) {
@@ -1664,6 +1847,7 @@ private fun AddEventDialog(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    @Suppress("DEPRECATION")
                     Text("Time Range", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = startTime, onTimeChange = { startTime = it }) }
@@ -1724,6 +1908,7 @@ private fun EditEventDialog(
         shape = RoundedCornerShape(24.dp),
         containerColor = Color.White,
         title = { 
+            @Suppress("DEPRECATION")
             Text(
                 text = "Edit Event",
                 style = MaterialTheme.typography.headlineSmall,
@@ -1732,13 +1917,13 @@ private fun EditEventDialog(
             )
         },
         text = {
+            @Suppress("DEPRECATION")
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                @Suppress("DEPRECATION")
                 Text(
                     text = "Date: ${event.start.toLocalDate().format(DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy"))}",
                     style = MaterialTheme.typography.bodyMedium,
@@ -1829,6 +2014,7 @@ fun WheelTimePicker(
             onItemSelected = { hour = it },
             modifier = Modifier.weight(1f)
         )
+        @Suppress("DEPRECATION")
         Text(":", style = MaterialTheme.typography.headlineMedium)
         WheelPicker(
             items = (0..59).toList(),
@@ -1889,6 +2075,7 @@ fun <T> WheelPicker(
                     modifier = Modifier.height(itemHeight).fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
+                    @Suppress("DEPRECATION")
                     Text(
                         text = format(items[index]),
                         style = MaterialTheme.typography.bodyLarge,
@@ -1948,8 +2135,9 @@ fun FriendPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Invite a Friend", fontWeight = FontWeight.Bold) },
+        title = { @Suppress("DEPRECATION") Text("Invite a Friend", fontWeight = FontWeight.Bold) },
         text = {
+            @Suppress("DEPRECATION")
             Column(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
                     value = searchQuery,
@@ -1966,11 +2154,9 @@ fun FriendPickerDialog(
                         CircularProgressIndicator(color = CoralRed)
                     }
                 } else if (friends.isEmpty()) {
-                    @Suppress("DEPRECATION")
                     Text(if (eventId != null) "All eligible friends are already invited." else "You don't have any friends to invite.", 
                         textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 } else if (filteredFriends.isEmpty()) {
-                    @Suppress("DEPRECATION")
                     Text("No friends match \"$searchQuery\"", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
@@ -1986,13 +2172,11 @@ fun FriendPickerDialog(
                                 UserAvatar(photoUrl = friend.photoUrl)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
-                                    @Suppress("DEPRECATION")
                                     Text(
                                         text = SocialRepository.displayNameOrEmail(friend),
                                         style = MaterialTheme.typography.bodyLarge,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    @Suppress("DEPRECATION")
                                     Text(
                                         text = friend.email,
                                         style = MaterialTheme.typography.bodySmall,
@@ -2009,7 +2193,6 @@ fun FriendPickerDialog(
         dismissButton = {
             @Suppress("DEPRECATION")
             TextButton(onClick = onDismiss) {
-                @Suppress("DEPRECATION")
                 Text("Cancel", color = CoralRed, fontWeight = FontWeight.Bold)
             }
         }
@@ -2022,7 +2205,6 @@ private fun buildSelectedDateEvents(
 ): List<CalendarEvent> {
     return events.filter { it.occursOn(selectedDate) }.sortedWith(
         compareByDescending<CalendarEvent> { it.isPinned }
-            // .thenByDescending { it.isBookmarked }
             .thenByDescending { it.calendarId == "custom" }
             .thenBy { it.start }
     )
@@ -2070,7 +2252,7 @@ private fun buildDayEventInfoMap(events: List<CalendarEvent>, currentUserId: Str
         val lastDay = event.lastDateInclusive()
         val isCustom = event.calendarId == "custom"
         val isPinned = event.isPinned
-        val isShared = isCustom && event.ownerId != currentUserId
+        val isShared = isCustom && (event.ownerId != currentUserId || event.isShared)
 
         while (!day.isAfter(lastDay)) {
             val current = infoMap[day] ?: DayEventInfo()
@@ -2165,15 +2347,15 @@ fun InviteDetailDialog(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Event, contentDescription = null, tint = CoralRed)
                 Spacer(Modifier.width(12.dp))
+                @Suppress("DEPRECATION")
                 Text(invite.eventTitle, fontWeight = FontWeight.Bold)
             }
         },
         text = {
+            @Suppress("DEPRECATION")
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    @Suppress("DEPRECATION")
                     Text("From: ", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                    @Suppress("DEPRECATION")
                     Text(invite.fromDisplayName, style = MaterialTheme.typography.bodyMedium, color = SharedEventBlue)
                 }
                 
@@ -2185,14 +2367,12 @@ fun InviteDetailDialog(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
                     Spacer(Modifier.width(8.dp))
-                    @Suppress("DEPRECATION")
                     Text(start.format(dayFormatter), style = MaterialTheme.typography.bodySmall)
                 }
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
                     Spacer(Modifier.width(8.dp))
-                    @Suppress("DEPRECATION")
                     Text("${start.format(timeFormatter)} - ${end.format(timeFormatter)}", style = MaterialTheme.typography.bodySmall)
                 }
                 
@@ -2200,14 +2380,12 @@ fun InviteDetailDialog(
                     Row(verticalAlignment = Alignment.Top) {
                         Icon(Icons.Outlined.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
                         Spacer(Modifier.width(8.dp))
-                        @Suppress("DEPRECATION")
                         Text(invite.eventLocation, style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 
                 if (!invite.eventDescription.isNullOrBlank()) {
                     HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                    @Suppress("DEPRECATION")
                     Text(invite.eventDescription, style = MaterialTheme.typography.bodyMedium)
                 }
                 
@@ -2224,7 +2402,6 @@ fun InviteDetailDialog(
                         ) {
                             Icon(Icons.Outlined.PushPin, contentDescription = null, tint = PinnedEventPurple, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(8.dp))
-                            @Suppress("DEPRECATION")
                             Text("The leader has this event pinned", style = MaterialTheme.typography.labelSmall, color = PinnedEventPurple, fontWeight = FontWeight.Medium)
                         }
                     }

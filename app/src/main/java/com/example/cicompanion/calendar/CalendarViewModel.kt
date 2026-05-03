@@ -41,6 +41,8 @@ class CalendarViewModel(
     var incomingInvites by mutableStateOf<List<EventInvite>>(emptyList())
         private set
 
+    private var acceptedInvites by mutableStateOf<List<EventInvite>>(emptyList())
+
     var filterCsuci by mutableStateOf(true)
         private set
     var filterCustom by mutableStateOf(true)
@@ -63,6 +65,7 @@ class CalendarViewModel(
 
     private var customEventsListener: ListenerRegistration? = null
     private var incomingInvitesListener: ListenerRegistration? = null
+    private var acceptedInvitesListener: ListenerRegistration? = null
 
     init {
         loadOnlineCalendar()
@@ -72,6 +75,7 @@ class CalendarViewModel(
             val user = firebaseAuth.currentUser
             customEventsListener?.remove()
             incomingInvitesListener?.remove()
+            acceptedInvitesListener?.remove()
             if (user != null) {
                 // Real-time listener for custom events (includes shared ones and bookmarked CSUCI ones)
                 customEventsListener = SocialRepository.listenToCustomEvents(user.uid,
@@ -84,9 +88,16 @@ class CalendarViewModel(
                     onInvitesChanged = { incomingInvites = it },
                     onError = { errorMessage = it }
                 )
+
+                // Real-time listener for accepted invites (to filter out deleted/kicked events)
+                acceptedInvitesListener = SocialRepository.listenToAcceptedEventInvites(user.uid,
+                    onInvitesChanged = { acceptedInvites = it },
+                    onError = { errorMessage = it }
+                )
             } else {
                 customEvents = emptyList()
                 incomingInvites = emptyList()
+                acceptedInvites = emptyList()
             }
         }
     }
@@ -95,6 +106,7 @@ class CalendarViewModel(
         super.onCleared()
         customEventsListener?.remove()
         incomingInvitesListener?.remove()
+        acceptedInvitesListener?.remove()
     }
 
     val events: List<CalendarEvent>
@@ -122,7 +134,14 @@ class CalendarViewModel(
                     filterBookmarked
                 } else if (event.calendarId == "custom") {
                     val isShared = event.ownerId != null && event.ownerId != user?.uid
-                    if (isShared) filterShared else filterCustom
+                    if (isShared) {
+                        // Shared events are only shown if the user has an active, accepted invitation.
+                        // This ensures that global deletion (removing invites) or kicking works immediately.
+                        val hasActiveInvite = acceptedInvites.any { it.eventId == event.id }
+                        filterShared && hasActiveInvite
+                    } else {
+                        filterCustom
+                    }
                 } else {
                     filterCsuci
                 }
@@ -256,6 +275,14 @@ class CalendarViewModel(
     fun kickUser(eventId: String, targetUserId: String, onSuccess: () -> Unit = {}) {
         val ownerId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         SocialRepository.kickFromEvent(ownerId, targetUserId, eventId,
+            onSuccess = onSuccess,
+            onError = { errorMessage = it }
+        )
+    }
+
+    fun kickUsers(eventId: String, targetUserIds: List<String>, onSuccess: () -> Unit = {}) {
+        val ownerId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        SocialRepository.kickMultipleFromEvent(ownerId, targetUserIds, eventId,
             onSuccess = onSuccess,
             onError = { errorMessage = it }
         )

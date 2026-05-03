@@ -77,8 +77,8 @@ fun HomeScreen(
         allEvents.filter { it.isPinned }
     }
 
-    val favoritePins = remember(mapViewModel.customPins) {
-        mapViewModel.customPins.filter { it.isFavorited }
+    val pinnedPins = remember(mapViewModel.customPins) {
+        mapViewModel.customPins.filter { it.isPinned }
     }
 
     var showCustomizer by remember { mutableStateOf(false) }
@@ -109,10 +109,10 @@ fun HomeScreen(
             )
         }
 
-        if (pinnedEvents.isNotEmpty() || favoritePins.isNotEmpty()) {
+        if (pinnedEvents.isNotEmpty() || pinnedPins.isNotEmpty()) {
             item {
                 Text(
-                    text = "Pinned & Favorites",
+                    text = "Pinned",
                     modifier = Modifier.padding(start = 16.dp, top = 24.dp),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
@@ -133,9 +133,9 @@ fun HomeScreen(
                 )
             }
 
-            // Favorite Pins
-            items(favoritePins) { pin ->
-                FavoritePinItem(
+            // Pinned Pins
+            items(pinnedPins) { pin ->
+                PinnedPinItem(
                     pin = pin,
                     onNavigateToMap = {
                         navController.navigate(Routes.MAP)
@@ -223,7 +223,7 @@ fun HomeScreen(
 }
 
 @Composable
-fun FavoritePinItem(pin: CustomPin, onNavigateToMap: () -> Unit) {
+fun PinnedPinItem(pin: CustomPin, onNavigateToMap: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -239,9 +239,9 @@ fun FavoritePinItem(pin: CustomPin, onNavigateToMap: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                Icons.Default.Favorite,
+                Icons.Default.PushPin,
                 contentDescription = null,
-                tint = Color(0xFFFFD700), // Gold
+                tint = Color(0xFF9C27B0), // Pinned purple
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))

@@ -18,7 +18,8 @@ data class CalendarEvent(
     val ownerId: String? = null,
     val maxMembers: Int? = null,
     val isPinnedByLeader: Boolean = false,
-    val isBookmarked: Boolean = false
+    val isBookmarked: Boolean = false,
+    val isShared: Boolean = false
 ) {
     fun lastDateInclusive(): LocalDate {
         return if (isAllDay) {

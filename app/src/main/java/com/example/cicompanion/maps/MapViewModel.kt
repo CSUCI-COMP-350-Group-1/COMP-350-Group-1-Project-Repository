@@ -161,11 +161,31 @@ class MapViewModel : ViewModel() {
         }
     }
 
-    fun toggleFavorite(pin: CustomPin) {
+    fun togglePinLocation(location: CampusLocation) {
         viewModelScope.launch {
-            val updatedPin = pin.copy(isFavorited = !pin.isFavorited)
-            FirestoreManager.updateCustomPin(updatedPin)
-            // No need to manually reload, listener handles it
+            val user = FirebaseAuth.getInstance().currentUser ?: return@launch
+            val existingPin = customPins.find { it.id == location.id }
+            val targetStatus = !(existingPin?.isPinned ?: location.isPinned)
+            
+            if (location.isCustom) {
+                val pin = existingPin ?: return@launch
+                val updatedPin = pin.copy(isPinned = targetStatus)
+                FirestoreManager.updateCustomPin(updatedPin)
+            } else {
+                // For built-in locations, save/update as a CustomPin with the same ID to track pinning
+                val pinToSave = CustomPin(
+                    id = location.id,
+                    userId = user.uid,
+                    name = location.name,
+                    latitude = location.position.latitude,
+                    longitude = location.position.longitude,
+                    description = location.description,
+                    colorArgb = location.color.toArgb(),
+                    isPinned = targetStatus,
+                    associatedEventId = location.associatedEventId
+                )
+                FirestoreManager.saveCustomPin(pinToSave)
+            }
         }
     }
     

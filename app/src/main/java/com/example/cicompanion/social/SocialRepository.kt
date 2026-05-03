@@ -3,11 +3,12 @@ package com.example.cicompanion.social
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.example.cicompanion.maps.CustomPin
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.QuerySnapshot
-import kotlinx.coroutines.tasks.await
+import com.google.firebase.firestore.SetOptions
 import java.time.format.DateTimeFormatter
 import java.time.ZonedDateTime
 
@@ -468,7 +469,16 @@ object SocialRepository {
             sentAt = System.currentTimeMillis()
         )
 
-        eventInvitesCollection().document(inviteId).set(invite)
+        val db = FirebaseFirestore.getInstance()
+        val batch = db.batch()
+        
+        val inviteRef = eventInvitesCollection().document(inviteId)
+        batch.set(inviteRef, invite)
+        
+        // Removed isShared update to comply with security rules.
+        // Visibility logic moved to ViewModel using ownerId != currentUserId.
+
+        batch.commit()
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { onError(it.message ?: "Could not send event invite.") }
     }
@@ -520,6 +530,30 @@ object SocialRepository {
             }
     }
 
+    /**
+     * Real-time listener for accepted event invites of the current user.
+     */
+    fun listenToAcceptedEventInvites(
+        currentUserId: String,
+        onInvitesChanged: (List<EventInvite>) -> Unit,
+        onError: (String) -> Unit
+    ): ListenerRegistration {
+        return eventInvitesCollection()
+            .whereEqualTo("toUserId", currentUserId)
+            .whereEqualTo("status", "accepted")
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    onError(e.message ?: "Error listening to accepted invites.")
+                    return@addSnapshotListener
+                }
+                if (snapshot == null) {
+                    onInvitesChanged(emptyList())
+                    return@addSnapshotListener
+                }
+                onInvitesChanged(snapshot.documents.mapNotNull { it.toObject(EventInvite::class.java) })
+            }
+    }
+
     fun acceptEventInvite(
         invite: EventInvite,
         onSuccess: () -> Unit,
@@ -542,8 +576,10 @@ object SocialRepository {
                 "isAllDay" to invite.isAllDay,
                 "calendarId" to "custom",
                 "isPinned" to false,
+                "isBookmarked" to false,
                 "ownerId" to invite.fromUserId,
                 "isPinnedByLeader" to invite.isPinnedByLeader
+                // isShared removed to comply with rules
             )
             
             val eventRef = db.collection("users").document(invite.toUserId)
@@ -585,15 +621,21 @@ object SocialRepository {
     }
 
     /**
-     * Fetches all user IDs who have an invite (accepted or pending) for a specific event.
+     * Fetches all user IDs who have an invite (accepted or pending) for a specific event sent by the current user.
      */
     fun fetchInvitedUserIds(
         eventId: String,
         onSuccess: (List<String>) -> Unit,
         onError: (String) -> Unit
     ) {
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+        if (currentUserId == null) {
+            onError("User not authenticated")
+            return
+        }
         eventInvitesCollection()
             .whereEqualTo("eventId", eventId)
+            .whereEqualTo("fromUserId", currentUserId)
             .get()
             .addOnSuccessListener { snapshot ->
                 val ids = snapshot?.documents?.mapNotNull { it.getString("toUserId") } ?: emptyList()
@@ -693,7 +735,8 @@ object SocialRepository {
                         ownerId = ownerId,
                         maxMembers = maxMembers,
                         isPinnedByLeader = isPinnedByLeader,
-                        isBookmarked = isBookmarked
+                        isBookmarked = isBookmarked,
+                        isShared = false // Logic in ViewModel determines visibility based on ownerId
                     )
                 }
                 onEventsChanged(events)
@@ -741,10 +784,10 @@ object SocialRepository {
             .whereEqualTo("eventId", eventId)
             .get()
             .addOnSuccessListener { snapshot ->
-                db.runBatch { batch ->
-                    batch.delete(eventRef)
-                    snapshot.documents.forEach { batch.delete(it.reference) }
-                }.addOnSuccessListener { onSuccess() }
+                val batch = db.batch()
+                batch.delete(eventRef)
+                snapshot.documents.forEach { batch.delete(it.reference) }
+                batch.commit().addOnSuccessListener { onSuccess() }
                 .addOnFailureListener { onError(it.message ?: "Failed to leave event.") }
             }
     }
@@ -756,16 +799,31 @@ object SocialRepository {
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        val db = FirebaseFirestore.getInstance()
         val inviteId = "${ownerId}_${targetUserId}_${eventId}"
         val inviteRef = eventInvitesCollection().document(inviteId)
-        val eventRef = db.collection("users").document(targetUserId).collection("customEvents").document(eventId)
         
-        db.runBatch { batch ->
+        // Only delete the invite. We cannot delete documents in other users' collections.
+        inviteRef.delete()
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { onError(it.message ?: "Failed to kick user.") }
+    }
+
+    fun kickMultipleFromEvent(
+        ownerId: String,
+        targetUserIds: List<String>,
+        eventId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val db = FirebaseFirestore.getInstance()
+        val batch = db.batch()
+        targetUserIds.forEach { targetUserId ->
+            val inviteId = "${ownerId}_${targetUserId}_${eventId}"
+            val inviteRef = eventInvitesCollection().document(inviteId)
             batch.delete(inviteRef)
-            batch.delete(eventRef)
-        }.addOnSuccessListener { onSuccess() }
-        .addOnFailureListener { onError(it.message ?: "Failed to kick user.") }
+        }
+        batch.commit().addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { onError(it.message ?: "Failed to kick users.") }
     }
 
     fun deleteEventForAll(
@@ -778,21 +836,24 @@ object SocialRepository {
         
         eventInvitesCollection()
             .whereEqualTo("eventId", eventId)
+            .whereEqualTo("fromUserId", ownerId)
             .get()
             .addOnSuccessListener { snapshot ->
-                db.runTransaction { transaction ->
-                    transaction.delete(db.collection("users").document(ownerId).collection("customEvents").document(eventId))
-                    
-                    snapshot.documents.forEach { doc ->
-                        val memberId = doc.getString("toUserId")
-                        if (memberId != null) {
-                            transaction.delete(db.collection("users").document(memberId).collection("customEvents").document(eventId))
-                        }
-                        transaction.delete(doc.reference)
-                    }
-                }.addOnSuccessListener { onSuccess() }
-                .addOnFailureListener { onError(it.message ?: "Failed to delete event globally.") }
+                val batch = db.batch()
+                
+                // Delete owner's copy
+                val ownerEventRef = db.collection("users").document(ownerId)
+                    .collection("customEvents").document(eventId)
+                batch.delete(ownerEventRef)
+                
+                // Delete all invites (makes the event disappear for members via VM filtering)
+                snapshot.documents.forEach { batch.delete(it.reference) }
+                
+                batch.commit()
+                    .addOnSuccessListener { onSuccess() }
+                    .addOnFailureListener { onError(it.message ?: "Failed to delete event globally.") }
             }
+            .addOnFailureListener { onError(it.message ?: "Failed to find invites for deletion.") }
     }
 
     private fun usersCollection() = FirebaseFirestore.getInstance().collection("users")
