@@ -2,7 +2,9 @@ package com.example.cicompanion.calendar
 
 import android.app.DatePickerDialog
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -86,6 +88,7 @@ fun ScheduleTab(viewModel: CalendarViewModel) {
             modifier = Modifier.fillMaxSize().background(Color.White),
             contentAlignment = Alignment.Center
         ) {
+            @Suppress("DEPRECATION")
             Text("Please sign in to manage your schedule.")
         }
         return
@@ -141,11 +144,11 @@ fun ScheduleTab(viewModel: CalendarViewModel) {
 
             if (viewModel.selectedClasses.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    @Suppress("DEPRECATION")
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Outlined.School, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color.LightGray)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("No classes added yet.", color = Color.Gray)
-                        @Suppress("DEPRECATION")
                         Text("Tap '+' to add your first class.", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -205,8 +208,8 @@ fun ScheduleTab(viewModel: CalendarViewModel) {
     classToDelete?.let { item ->
         AlertDialog(
             onDismissRequest = { classToDelete = null },
-            title = { Text("Remove Class") },
-            text = { Text("Are you sure you want to remove ${item.courseCode} from your schedule?") },
+            title = { @Suppress("DEPRECATION") Text("Remove Class") },
+            text = { @Suppress("DEPRECATION") Text("Are you sure you want to remove ${item.courseCode} from your schedule?") },
             confirmButton = {
                 Button(
                     onClick = {
@@ -219,11 +222,13 @@ fun ScheduleTab(viewModel: CalendarViewModel) {
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = CoralRed)
                 ) {
+                    @Suppress("DEPRECATION")
                     Text("Remove")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { classToDelete = null }) {
+                    @Suppress("DEPRECATION")
                     Text("Cancel", color = Color.Gray)
                 }
             }
@@ -244,6 +249,13 @@ fun AddClassDialog(
     
     var startTime by remember { mutableStateOf(LocalTime.of(9, 0)) }
     var endTime by remember { mutableStateOf(LocalTime.of(10, 15)) }
+
+    var hasSecondTimeRange by remember { mutableStateOf(false) }
+    val selectedDays2 = remember { mutableStateListOf<Int>() }
+    var startTime2 by remember { mutableStateOf(LocalTime.of(9, 0)) }
+    var endTime2 by remember { mutableStateOf(LocalTime.of(10, 15)) }
+    var notes2Text by rememberSaveable { mutableStateOf("") }
+
     var startDateText by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
     var endDateText by rememberSaveable { mutableStateOf(LocalDate.now().plusMonths(4).toString()) }
     var locationText by rememberSaveable { mutableStateOf("") }
@@ -265,6 +277,14 @@ fun AddClassDialog(
             selectedDays.addAll(editingClass.daysOfWeek)
             startTime = LocalTime.parse(editingClass.startTime)
             endTime = LocalTime.parse(editingClass.endTime)
+
+            hasSecondTimeRange = editingClass.hasSecondTimeRange
+            selectedDays2.clear()
+            selectedDays2.addAll(editingClass.daysOfWeek2)
+            startTime2 = if (editingClass.startTime2.isNotBlank()) LocalTime.parse(editingClass.startTime2) else LocalTime.of(9, 0)
+            endTime2 = if (editingClass.endTime2.isNotBlank()) LocalTime.parse(editingClass.endTime2) else LocalTime.of(10, 15)
+            notes2Text = editingClass.notes2
+
             startDateText = editingClass.startDate
             endDateText = editingClass.endDate
             locationText = editingClass.location
@@ -296,14 +316,17 @@ fun AddClassDialog(
                 OutlinedButton(
                     onClick = { showMajorPicker = true },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = CoralRed),
+                    border = BorderStroke(1.dp, CoralRed.copy(alpha = 0.5f))
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
+                        @Suppress("DEPRECATION")
                         Text(
                             text = selectedMajor?.let { "${it.code} - ${it.name}" } ?: "Select Major",
-                            color = if (selectedMajor == null) Color.Gray else Color.Black,
+                            color = if (selectedMajor == null) Color.Gray else CoralRed,
                             modifier = Modifier.weight(1f),
                             textAlign = TextAlign.Start,
                             maxLines = 1
@@ -315,14 +338,17 @@ fun AddClassDialog(
                     onClick = { showCoursePicker = true },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = selectedMajor != null,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = CoralRed, disabledContentColor = Color.Gray),
+                    border = BorderStroke(1.dp, if (selectedMajor != null) CoralRed.copy(alpha = 0.5f) else Color.Gray.copy(alpha = 0.5f))
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Book, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
+                        @Suppress("DEPRECATION")
                         Text(
                             text = selectedCourse?.let { "${it.code} - ${it.title}" } ?: "Select Course",
-                            color = if (selectedCourse == null) Color.Gray else Color.Black,
+                            color = if (selectedCourse == null) Color.Gray else CoralRed,
                             modifier = Modifier.weight(1f),
                             textAlign = TextAlign.Start,
                             maxLines = 1
@@ -331,6 +357,7 @@ fun AddClassDialog(
                 }
 
                 Column {
+                    @Suppress("DEPRECATION")
                     Text("Meeting Days", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
                     DayChipRows(
@@ -343,13 +370,66 @@ fun AddClassDialog(
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    @Suppress("DEPRECATION")
                     Text("Time Range", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = startTime, onTimeChange = { startTime = it }) }
+                        @Suppress("DEPRECATION")
                         Text("to", Modifier.padding(horizontal = 8.dp))
                         Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = endTime, onTimeChange = { endTime = it }) }
                     }
                 }
+
+                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    @Suppress("DEPRECATION")
+                    Text("Add 2nd Time Range (e.g. Lab)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.weight(1f))
+                    Switch(
+                        checked = hasSecondTimeRange, 
+                        onCheckedChange = { hasSecondTimeRange = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = CoralRed,
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = Color.LightGray.copy(alpha = 0.5f)
+                        )
+                    )
+                }
+
+                if (hasSecondTimeRange) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        @Suppress("DEPRECATION")
+                        Text("2nd Meeting Days", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        DayChipRows(
+                            selectedDays = selectedDays2,
+                            onToggleDay = { dayValue ->
+                                if (dayValue in selectedDays2) selectedDays2.remove(dayValue)
+                                else selectedDays2.add(dayValue)
+                            }
+                        )
+                        
+                        @Suppress("DEPRECATION")
+                        Text("2nd Time Range", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = startTime2, onTimeChange = { startTime2 = it }) }
+                            @Suppress("DEPRECATION")
+                            Text("to", Modifier.padding(horizontal = 8.dp))
+                            Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = endTime2, onTimeChange = { endTime2 = it }) }
+                        }
+                        
+                        OutlinedTextField(
+                            value = notes2Text,
+                            onValueChange = { notes2Text = it },
+                            label = { Text("Notes for 2nd Time (e.g. Lab Section)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     DatePickerField(
@@ -387,7 +467,7 @@ fun AddClassDialog(
                 OutlinedTextField(
                     value = notesText,
                     onValueChange = { notesText = it },
-                    label = { Text("Notes") },
+                    label = { Text("General Notes") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -408,6 +488,11 @@ fun AddClassDialog(
                             daysOfWeek = selectedDays.sorted(),
                             startTime = startTime.toString(),
                             endTime = endTime.toString(),
+                            hasSecondTimeRange = hasSecondTimeRange,
+                            daysOfWeek2 = selectedDays2.sorted(),
+                            startTime2 = startTime2.toString(),
+                            endTime2 = endTime2.toString(),
+                            notes2 = notes2Text.trim(),
                             startDate = startDateText,
                             endDate = endDateText,
                             location = locationText.trim(),
@@ -425,12 +510,14 @@ fun AddClassDialog(
                 enabled = selectedMajor != null && selectedCourse != null && selectedDays.isNotEmpty(),
                 shape = RoundedCornerShape(12.dp)
             ) {
+                @Suppress("DEPRECATION")
                 Text(if (editingClass == null) "Add Class" else "Save Changes", color = Color.White, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             @Suppress("DEPRECATION")
             TextButton(onClick = onDismiss) {
+                @Suppress("DEPRECATION")
                 Text("Back", color = CoralRed, fontWeight = FontWeight.Bold)
             }
         }
@@ -498,10 +585,12 @@ fun <T> CatalogItemPickerDialog(
                 )
 
                 if (items.isEmpty()) {
+                    @Suppress("DEPRECATION")
                     Text("No items available.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                         items(filteredItems) { item ->
+                            @Suppress("DEPRECATION")
                             Text(
                                 text = itemLabel(item),
                                 modifier = Modifier
@@ -520,6 +609,7 @@ fun <T> CatalogItemPickerDialog(
         dismissButton = {
             @Suppress("DEPRECATION")
             TextButton(onClick = onDismiss) {
+                @Suppress("DEPRECATION")
                 Text("Cancel", color = CoralRed, fontWeight = FontWeight.Bold)
             }
         }
@@ -540,11 +630,23 @@ private fun DayChipRows(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         dayOptions.forEach { (value, label) ->
+            val isSelected = value in selectedDays
             FilterChip(
-                selected = value in selectedDays,
+                selected = isSelected,
                 onClick = { onToggleDay(value) },
                 label = { Text(label) },
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = CoralRed,
+                    selectedLabelColor = Color.White,
+                    labelColor = CoralRed
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = isSelected,
+                    borderColor = CoralRed.copy(alpha = 0.5f),
+                    selectedBorderColor = CoralRed
+                )
             )
         }
     }
@@ -560,6 +662,7 @@ private fun DatePickerField(
     val context = LocalContext.current
     @Suppress("DEPRECATION")
     Column(modifier = modifier) {
+        @Suppress("DEPRECATION")
         Text(text = label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = SoftText)
         Spacer(modifier = Modifier.height(4.dp))
         OutlinedButton(
@@ -570,9 +673,11 @@ private fun DatePickerField(
                 }, parsedDate.year, parsedDate.monthValue - 1, parsedDate.dayOfMonth).show()
             },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = CoralRed),
+            border = BorderStroke(1.dp, CoralRed.copy(alpha = 0.5f))
         ) {
-            Text(value, color = Color.Black)
+            Text(value, color = CoralRed)
         }
     }
 }
@@ -600,11 +705,13 @@ private fun SavedClassCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
+                    @Suppress("DEPRECATION")
                     Text(
                         text = "${selectedClass.courseCode} - ${selectedClass.courseTitle}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
+                    @Suppress("DEPRECATION")
                     Text(
                         text = selectedClass.majorName,
                         style = MaterialTheme.typography.bodySmall,
@@ -626,6 +733,7 @@ private fun SavedClassCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
                 Spacer(modifier = Modifier.width(8.dp))
+                @Suppress("DEPRECATION")
                 Text(
                     text = "${formatTimeForDisplay(selectedClass.startTime)} - ${formatTimeForDisplay(selectedClass.endTime)}",
                     style = MaterialTheme.typography.bodyMedium
@@ -635,28 +743,104 @@ private fun SavedClassCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
                 Spacer(modifier = Modifier.width(8.dp))
+                @Suppress("DEPRECATION")
                 Text(
                     text = selectedClass.meetingPatternLabel(),
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
 
+            if (selectedClass.hasSecondTimeRange) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(CoralRed.copy(alpha = 0.05f))
+                        .border(1.dp, CoralRed.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Science, contentDescription = null, modifier = Modifier.size(14.dp), tint = CoralRed)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        @Suppress("DEPRECATION")
+                        Text(
+                            text = if (selectedClass.notes2.isNotBlank()) selectedClass.notes2 else "Secondary Meeting / Lab",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = CoralRed
+                        )
+                    }
+                    
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.CalendarToday, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        @Suppress("DEPRECATION")
+                        Text(
+                            text = selectedClass.daysOfWeek2.sorted().joinToString(" ") { day ->
+                                when(day) {
+                                    1 -> "Mon"
+                                    2 -> "Tue"
+                                    3 -> "Wed"
+                                    4 -> "Thu"
+                                    5 -> "Fri"
+                                    6 -> "Sat"
+                                    7 -> "Sun"
+                                    else -> ""
+                                }
+                            },
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        @Suppress("DEPRECATION")
+                        Text(
+                            text = "${formatTimeForDisplay(selectedClass.startTime2)} - ${formatTimeForDisplay(selectedClass.endTime2)}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+
             if (selectedClass.location.isNotBlank()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
                     Spacer(modifier = Modifier.width(8.dp))
+                    @Suppress("DEPRECATION")
                     Text(text = selectedClass.location, style = MaterialTheme.typography.bodyMedium)
                 }
             }
 
-            if (selectedClass.termLabel.isNotBlank()) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(CoralRed.copy(alpha = 0.1f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(selectedClass.termLabel, color = CoralRed, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (selectedClass.termLabel.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(CoralRed.copy(alpha = 0.1f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        @Suppress("DEPRECATION")
+                        Text(selectedClass.termLabel, color = CoralRed, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                if (selectedClass.notes.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Outlined.Info, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        @Suppress("DEPRECATION")
+                        Text(
+                            text = selectedClass.notes,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.Gray,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }

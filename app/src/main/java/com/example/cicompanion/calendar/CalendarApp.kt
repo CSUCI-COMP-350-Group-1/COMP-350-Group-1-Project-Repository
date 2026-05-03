@@ -163,7 +163,7 @@ fun CalendarApp(viewModel: CalendarViewModel) {
         AddEventDialog(
             selectedDate = viewModel.selectedDate,
             onDismiss = { showAddEventDialog = false },
-            onConfirm = { title, desc, loc, start, end, cap, invitedFriends ->
+            onConfirm = { title, desc, loc, start, end, invitedFriends ->
                 val startZdt = ZonedDateTime.of(viewModel.selectedDate, start, ZonedDateTime.now().zone)
                 val endZdt = ZonedDateTime.of(viewModel.selectedDate, end, ZonedDateTime.now().zone)
                 val newEvent = CalendarEvent(
@@ -177,7 +177,7 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                     endExclusive = endZdt,
                     isAllDay = false,
                     ownerId = currentUser?.uid,
-                    maxMembers = cap,
+                    maxMembers = null,
                     isShared = invitedFriends.isNotEmpty()
                 )
                 viewModel.addCustomEvent(newEvent)
@@ -1377,7 +1377,7 @@ fun EventMembersDialog(
                             color = BrandRedDark
                         )
                         Text(
-                            text = if (event.maxMembers != null) "${members.size + 1} / ${event.maxMembers} spots filled" else "${members.size + 1} members total",
+                            text = "${members.size + 1} members total",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.Gray
                         )
@@ -1622,14 +1622,13 @@ fun PremiumMemberRow(
 private fun AddEventDialog(
     selectedDate: LocalDate,
     onDismiss: () -> Unit,
-    onConfirm: (String, String, String, LocalTime, LocalTime, Int?, List<UserProfile>) -> Unit
+    onConfirm: (String, String, String, LocalTime, LocalTime, List<UserProfile>) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
     var startTime by remember { mutableStateOf(LocalTime.of(9, 0)) }
     var endTime by remember { mutableStateOf(LocalTime.of(10, 0)) }
-    var memberCap by remember { mutableStateOf<Int?>(null) }
     
     var invitedFriends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var showFriendPicker by remember { mutableStateOf(false) }
@@ -1685,29 +1684,6 @@ private fun AddEventDialog(
                 )
 
                 Column {
-                    Text("Member Capacity", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-                    @OptIn(ExperimentalLayoutApi::class)
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf(null, 2, 5, 10, 20).forEach { cap ->
-                            FilterChip(
-                                selected = memberCap == cap,
-                                onClick = { memberCap = cap },
-                                label = { 
-                                    Text(
-                                        text = cap?.toString() ?: "No Cap",
-                                        modifier = Modifier.padding(horizontal = 4.dp)
-                                    ) 
-                                }
-                            )
-                        }
-                    }
-                }
-
-                Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Invite Friends", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.weight(1f))
@@ -1748,7 +1724,7 @@ private fun AddEventDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(title, description, location, startTime, endTime, memberCap, invitedFriends) },
+                onClick = { onConfirm(title, description, location, startTime, endTime, invitedFriends) },
                 colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
                 enabled = title.isNotBlank(),
                 shape = RoundedCornerShape(12.dp)
