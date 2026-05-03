@@ -57,6 +57,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
     var email by remember { mutableStateOf("") }
     var photoUrl by remember { mutableStateOf<String?>(null) }
     var bio by remember { mutableStateOf("") }
+    var major by remember { mutableStateOf("") }
     var friendCount by remember { mutableIntStateOf(0) }
     var requestStatus by remember { mutableStateOf<String?>(null) }
     var targetUserProfile by remember { mutableStateOf<UserProfile?>(null) }
@@ -79,6 +80,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             email = "Sign in to sync your data"
             photoUrl = null
             bio = ""
+            major = ""
             friendCount = 0
             requestStatus = null
             targetUserProfile = null
@@ -95,6 +97,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                     email = profile.email
                     photoUrl = profile.photoUrl
                     bio = profile.bio
+                    major = profile.major
                 },
                 onError = {
                     if (isOwnProfile) {
@@ -102,6 +105,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                         email = currentUser?.email ?: ""
                         photoUrl = currentUser?.photoUrl?.toString()
                         bio = ""
+                        major = ""
                     }
                 }
             )
@@ -126,6 +130,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             email = "Sign in to sync your data"
             photoUrl = null
             bio = ""
+            major = ""
             friendCount = 0
             requestStatus = null
             targetUserProfile = null
@@ -151,7 +156,9 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                 userDisplayName = displayName,
                 userEmail = email,
                 photoUrl = photoUrl,
+                userMajor = major,
                 friendCount = friendCount,
+                showFriendCount = currentUser != null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
@@ -524,7 +531,9 @@ fun ProfileHeader(
     userDisplayName: String,
     userEmail: String,
     photoUrl: String?,
+    userMajor: String,
     friendCount: Int,
+    showFriendCount: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -566,18 +575,41 @@ fun ProfileHeader(
                 maxLines = 1
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Surface(
-                color = BrandRed.copy(alpha = 0.1f),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                val friendText = if (friendCount == 1) "1 Friend" else "$friendCount Friends"
-                Text(
-                    text = friendText,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    color = BrandRed
-                )
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (showFriendCount) {
+                    Surface(
+                        color = BrandRed.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        val friendText = if (friendCount == 1) "1 Friend" else "$friendCount Friends"
+                        Text(
+                            text = friendText,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = BrandRed
+                        )
+                    }
+                }
+
+                if (userMajor.isNotBlank()) {
+                    if (showFriendCount) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Surface(
+                        color = BrandRed.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = userMajor,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = BrandRed
+                        )
+                    }
+                }
             }
         }
     }

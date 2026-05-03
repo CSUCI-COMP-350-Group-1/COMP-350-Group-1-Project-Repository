@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +30,7 @@ fun EditProfileScreen(navController: NavHostController) {
     var userProfile by remember { mutableStateOf<UserProfile?>(null) }
     var showNameDialog by remember { mutableStateOf(false) }
     var showBioDialog by remember { mutableStateOf(false) }
+    var showMajorDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(currentUser?.uid) {
@@ -69,7 +71,6 @@ fun EditProfileScreen(navController: NavHostController) {
                 Spacer(Modifier.width(12.dp))
                 Text("Edit Display Name", fontSize = 14.sp)
                 Spacer(Modifier.weight(1f))
-                Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -85,23 +86,21 @@ fun EditProfileScreen(navController: NavHostController) {
                 Spacer(Modifier.width(12.dp))
                 Text("Edit Bio", fontSize = 14.sp)
                 Spacer(Modifier.weight(1f))
-                Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
             OutlinedButton(
-                onClick = { /* TODO: Implement */ },
+                onClick = { showMajorDialog = true },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(12.dp),
                 border = BorderStroke(1.dp, Color.LightGray),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
             ) {
-                Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.School, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(12.dp))
-                Text("Edit Profile Picture", fontSize = 14.sp)
+                Text("Edit Major", fontSize = 14.sp)
                 Spacer(Modifier.weight(1f))
-                Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
             }
 
             errorMessage?.let {
@@ -153,6 +152,24 @@ fun EditProfileScreen(navController: NavHostController) {
                     onSuccess = {
                         showBioDialog = false
                         userProfile = userProfile?.copy(bio = newBio)
+                    },
+                    onError = { msg -> errorMessage = msg }
+                )
+            }
+        )
+    }
+
+    if (showMajorDialog && userProfile != null) {
+        MajorDialog(
+            currentMajor = userProfile!!.major,
+            onDismiss = { showMajorDialog = false },
+            onUpdate = { newMajor ->
+                SocialRepository.updateMajor(
+                    userId = userProfile!!.uid,
+                    newMajor = newMajor,
+                    onSuccess = {
+                        showMajorDialog = false
+                        userProfile = userProfile?.copy(major = newMajor)
                     },
                     onError = { msg -> errorMessage = msg }
                 )
@@ -235,6 +252,45 @@ fun BioDialog(
             Button(
                 onClick = { onUpdate(newBio) },
                 enabled = newBio != currentBio,
+                colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+            ) {
+                Text("Update")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = Color.Gray)
+            }
+        }
+    )
+}
+
+@Composable
+fun MajorDialog(
+    currentMajor: String,
+    onDismiss: () -> Unit,
+    onUpdate: (String) -> Unit
+) {
+    var newMajor by remember { mutableStateOf(currentMajor) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Major") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = newMajor,
+                    onValueChange = { newMajor = it },
+                    label = { Text("Major") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onUpdate(newMajor) },
+                enabled = newMajor != currentMajor,
                 colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
             ) {
                 Text("Update")

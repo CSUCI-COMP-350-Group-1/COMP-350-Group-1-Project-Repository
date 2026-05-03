@@ -95,6 +95,18 @@ object SocialRepository {
             .addOnFailureListener { e -> onError(e.message ?: "Failed to update bio") }
     }
 
+    fun updateMajor(
+        userId: String,
+        newMajor: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        usersCollection().document(userId)
+            .update("major", newMajor)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onError(e.message ?: "Failed to update major") }
+    }
+
     private fun handleSearchableUsersSuccess(
         snapshot: QuerySnapshot,
         currentUserId: String,
