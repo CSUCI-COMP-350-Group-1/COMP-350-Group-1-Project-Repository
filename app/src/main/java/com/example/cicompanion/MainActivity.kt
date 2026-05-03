@@ -49,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import com.example.cicompanion.calendar.CalendarScreen
 import com.example.cicompanion.firebase.FriendRequestNotificationSender
 import com.example.cicompanion.notifications.PushNotificationService
 import com.example.cicompanion.sidebar.SearchScreen
@@ -200,7 +201,13 @@ fun AppNavigation(notificationRoute: String? = null,
                         MapScreen(navController, calendarViewModel)
                     }
                     composable(Routes.CALENDAR) {
-                        CalendarApp(viewModel = calendarViewModel)
+                        // CALENDAR SCHEDULE CHANGE:
+                        // Route to the new tabbed calendar screen so users can switch
+                        // between Calendar and Schedule without changing unrelated navigation.
+                        CalendarScreen(
+                            navController = navController,
+                            calendarViewModel = calendarViewModel
+                        )
                     }
                     composable(Routes.STUDY_ROOM) {
                         RoomListScreen(viewModel = viewModel(), navController = navController)
