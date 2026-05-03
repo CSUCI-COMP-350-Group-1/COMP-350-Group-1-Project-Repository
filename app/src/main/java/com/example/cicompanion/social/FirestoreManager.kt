@@ -332,6 +332,9 @@ object FirestoreManager {
     suspend fun saveCustomEvent(event: CalendarEvent): Boolean {
         val user = FirebaseAuth.getInstance().currentUser ?: return false
         val db = FirebaseFirestore.getInstance()
+
+        // CUSTOM EVENT FIX:
+        // Firestore rules for customEvents require ownerId and isBookmarked.
         val eventData = hashMapOf(
             "id" to event.id,
             "title" to event.title,
@@ -341,17 +344,21 @@ object FirestoreManager {
             "end" to event.endExclusive.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
             "isAllDay" to event.isAllDay,
             "calendarId" to "custom",
-            "isPinned" to event.isPinned
+            "isPinned" to event.isPinned,
+            "ownerId" to user.uid,
+            "isBookmarked" to false
         )
 
         return try {
-            db.collection("users").document(user.uid)
-                .collection("customEvents").document(event.id)
+            db.collection("users")
+                .document(user.uid)
+                .collection("customEvents")
+                .document(event.id)
                 .set(eventData)
                 .await()
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error saving custom event", e)
+            Log.e(TAG, "Error saving custom event: ${e.message}", e)
             false
         }
     }
