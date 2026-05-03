@@ -5,11 +5,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -24,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -39,7 +36,6 @@ import com.example.cicompanion.social.SocialRepository
 import com.example.cicompanion.social.UserProfile
 import com.example.cicompanion.social.UserAvatar
 import com.example.cicompanion.ui.theme.BrandRedDark
-import com.example.cicompanion.ui.theme.BrandRedLighter
 import com.example.cicompanion.utils.HtmlUtils
 import com.google.firebase.auth.FirebaseAuth
 import java.time.DayOfWeek
@@ -54,13 +50,10 @@ import java.time.temporal.WeekFields
 import java.util.Locale
 import java.util.UUID
 
-private val CoralRed = Color(0xFFEF3347)
 private val SharedEventBlue = Color(0xFF2196F3)
 private val SharedEventLightBlue = Color(0xFFE3F2FD)
 private val CustomEventOrange = Color(0xFFFF9800)
 private val PinnedEventPurple = Color(0xFF9C27B0)
-private val SoftText = Color(0xFF6E5555)
-private val CardOffWhite = Color(0xFFF6E6D8)
 private val DateCellWhite = Color(0xFFF7F4F8)
 private val DateCellBorder = Color(0xFFE2BFB7)
 private val EventCardGrey = Color(0xFFF2F2F2)
@@ -325,11 +318,12 @@ private fun CalendarScreenBody(
             .padding(0.dp)
     ) {
         CalendarHeroHeader(
-            selectedDate = viewModel.selectedDate,
-            viewModel = viewModel,
+            title = "CI Companion Calendar",
+            subtitle = viewModel.selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 16.dp),
+            trailingContent = { FilterDropdown(viewModel = viewModel) }
         )
 
         Column(
@@ -430,51 +424,6 @@ fun IncomingInvitesSection(
 }
 
 @Composable
-private fun CalendarHeroHeader(
-    selectedDate: LocalDate,
-    viewModel: CalendarViewModel,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(BrandRedLighter, BrandRedDark)
-                )
-            )
-            .padding(20.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                @Suppress("DEPRECATION")
-                Text(
-                    text = "CI Companion Calendar",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                @Suppress("DEPRECATION")
-                Text(
-                    text = selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            }
-
-            FilterDropdown(viewModel = viewModel)
-        }
-    }
-}
-
-@Composable
 private fun FilterDropdown(viewModel: CalendarViewModel) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -498,7 +447,6 @@ private fun FilterDropdown(viewModel: CalendarViewModel) {
                 .background(Color.White)
                 .width(200.dp)
         ) {
-            @Suppress("DEPRECATION")
             Text(
                 text = "Filter Events",
                 modifier = Modifier.padding(16.dp),
@@ -565,7 +513,6 @@ private fun FilterMenuItem(
                         )
                     }
                 }
-                @Suppress("DEPRECATION")
                 Text(text = label, style = MaterialTheme.typography.bodyMedium)
             }
         },
@@ -592,7 +539,6 @@ private fun ErrorMessage(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            @Suppress("DEPRECATION")
             Text(
                 text = message,
                 color = MaterialTheme.colorScheme.onErrorContainer,
@@ -600,7 +546,6 @@ private fun ErrorMessage(
                 style = MaterialTheme.typography.bodyMedium
             )
 
-            @Suppress("DEPRECATION")
             Text(
                 text = "Dismiss",
                 color = MaterialTheme.colorScheme.primary,
@@ -641,7 +586,7 @@ private fun ModeCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val accentColor = modeAccentColor()
+    val accentColor = CoralRed
     val containerColor = if (isSelected) accentColor else DateCellWhite
     val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else accentColor
     val borderColor = if (isSelected) Color.Transparent else DateCellBorder
@@ -656,7 +601,6 @@ private fun ModeCard(
             .padding(horizontal = 12.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
-        @Suppress("DEPRECATION")
         Text(
             text = mode.name,
             color = textColor,
@@ -886,37 +830,6 @@ private fun MonthView(
 }
 
 @Composable
-private fun SectionCard(
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = CardOffWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            content = content
-        )
-    }
-}
-
-@Composable
-private fun SectionHeading(text: String) {
-    @Suppress("DEPRECATION")
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurface,
-        fontWeight = FontWeight.Bold
-    )
-}
-
-@Composable
 private fun HeaderWithArrows(
     title: String,
     onPrevious: () -> Unit,
@@ -932,7 +845,6 @@ private fun HeaderWithArrows(
             onClick = onPrevious
         )
 
-        @Suppress("DEPRECATION")
         Text(
             text = title,
             modifier = Modifier.weight(1f),
@@ -961,7 +873,6 @@ private fun NavigationCircleButton(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        @Suppress("DEPRECATION")
         Text(
             text = symbol,
             color = MaterialTheme.colorScheme.primary,
@@ -1003,7 +914,6 @@ private fun WeekdayChip(
             .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        @Suppress("DEPRECATION")
         Text(
             text = text,
             textAlign = TextAlign.Center,
@@ -1102,7 +1012,6 @@ private fun DateCell(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            @Suppress("DEPRECATION")
             Text(
                 text = date.dayOfMonth.toString(),
                 style = MaterialTheme.typography.bodyLarge,
@@ -1222,7 +1131,6 @@ private fun EventsList(
 @Composable
 private fun EmptyEventsMessage() {
     SectionCard {
-        @Suppress("DEPRECATION")
         Text(
             text = "No events for this date.",
             style = MaterialTheme.typography.bodyLarge,
@@ -1289,7 +1197,6 @@ private fun EventCard(
                 
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        @Suppress("DEPRECATION")
                         Text(
                             text = HtmlUtils.stripHtml(event.title),
                             style = MaterialTheme.typography.titleMedium,
@@ -1309,7 +1216,6 @@ private fun EventCard(
                     }
                     
                     if (isCustom && (!isOwner || event.isShared)) {
-                        @Suppress("DEPRECATION")
                         Text(
                             text = if (isOwner) "Shared Event (You are Leader)" else "Shared Event",
                             style = MaterialTheme.typography.labelSmall,
@@ -1402,7 +1308,6 @@ private fun EventCard(
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
                     Icon(Icons.Outlined.Info, contentDescription = null, modifier = Modifier.size(14.dp), tint = PinnedEventPurple)
                     Spacer(Modifier.width(6.dp))
-                    @Suppress("DEPRECATION")
                     Text("The leader has this event pinned", style = MaterialTheme.typography.labelSmall, color = PinnedEventPurple)
                 }
             }
@@ -1465,14 +1370,12 @@ fun EventMembersDialog(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        @Suppress("DEPRECATION")
                         Text(
                             text = "Event Members",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.ExtraBold,
                             color = BrandRedDark
                         )
-                        @Suppress("DEPRECATION")
                         Text(
                             text = if (event.maxMembers != null) "${members.size + 1} / ${event.maxMembers} spots filled" else "${members.size + 1} members total",
                             style = MaterialTheme.typography.bodySmall,
@@ -1493,7 +1396,6 @@ fun EventMembersDialog(
 
                 if (isLoading) {
                     Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                        @Suppress("DEPRECATION")
                         CircularProgressIndicator(color = BrandRedDark, strokeWidth = 3.dp)
                     }
                 } else {
@@ -1572,10 +1474,8 @@ fun EventMembersDialog(
                             if (canKickSelected) {
                                 Icon(Icons.Default.PersonRemove, contentDescription = null)
                                 Spacer(Modifier.width(12.dp))
-                                @Suppress("DEPRECATION")
                                 Text("Remove selected (${selectedUsers.size})", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             } else {
-                                @Suppress("DEPRECATION")
                                 Text("Select members to remove", fontWeight = FontWeight.Bold)
                             }
                         }
@@ -1588,7 +1488,6 @@ fun EventMembersDialog(
 
 @Composable
 fun MemberGroupHeader(text: String) {
-    @Suppress("DEPRECATION")
     Text(
         text = text.uppercase(),
         style = MaterialTheme.typography.labelSmall,
@@ -1615,7 +1514,6 @@ fun EmptyMembersPlaceholder() {
                 tint = Color.Gray.copy(alpha = 0.3f)
             )
             Spacer(Modifier.height(8.dp))
-            @Suppress("DEPRECATION")
             Text(
                 "No other members yet",
                 style = MaterialTheme.typography.bodyMedium,
@@ -1686,7 +1584,6 @@ fun PremiumMemberRow(
             Spacer(modifier = Modifier.width(16.dp))
             
             Column(modifier = Modifier.weight(1f)) {
-                @Suppress("DEPRECATION")
                 Text(
                     text = if (isMe) "$name (You)" else name,
                     style = MaterialTheme.typography.bodyLarge,
@@ -1694,10 +1591,8 @@ fun PremiumMemberRow(
                     color = if (isMe) BrandRedDark else Color.DarkGray
                 )
                 if (isOwner) {
-                    @Suppress("DEPRECATION")
                     Text("Event Host", style = MaterialTheme.typography.bodySmall, color = CustomEventOrange)
                 } else if (isMe) {
-                    @Suppress("DEPRECATION")
                     Text("You", style = MaterialTheme.typography.bodySmall, color = BrandRedDark.copy(alpha = 0.7f))
                 }
             }
@@ -1745,7 +1640,6 @@ private fun AddEventDialog(
         shape = RoundedCornerShape(24.dp),
         containerColor = Color.White,
         title = { 
-            @Suppress("DEPRECATION")
             Text(
                 text = "New Shared Event",
                 style = MaterialTheme.typography.headlineSmall,
@@ -1754,7 +1648,6 @@ private fun AddEventDialog(
             )
         },
         text = {
-            @Suppress("DEPRECATION")
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1818,13 +1711,11 @@ private fun AddEventDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Invite Friends", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.weight(1f))
-                        @Suppress("DEPRECATION")
                         TextButton(onClick = { showFriendPicker = true }) {
                             Text("+ Add", color = SharedEventBlue)
                         }
                     }
                     if (invitedFriends.isEmpty()) {
-                        @Suppress("DEPRECATION")
                         Text("No one invited. You can do this later.", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                     } else {
                         Column(modifier = Modifier.heightIn(max = 120.dp)) {
@@ -1832,7 +1723,6 @@ private fun AddEventDialog(
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
                                     UserAvatar(photoUrl = friend.photoUrl)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    @Suppress("DEPRECATION")
                                     Text(SocialRepository.displayNameOrEmail(friend), style = MaterialTheme.typography.bodySmall)
                                     Spacer(Modifier.weight(1f))
                                     IconButton(onClick = { invitedFriends = invitedFriends.filter { it.uid != friend.uid } }, modifier = Modifier.size(24.dp)) {
@@ -1847,11 +1737,9 @@ private fun AddEventDialog(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    @Suppress("DEPRECATION")
                     Text("Time Range", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = startTime, onTimeChange = { startTime = it }) }
-                        @Suppress("DEPRECATION")
                         Text("to", Modifier.padding(horizontal = 8.dp))
                         Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = endTime, onTimeChange = { endTime = it }) }
                     }
@@ -1859,7 +1747,6 @@ private fun AddEventDialog(
             }
         },
         confirmButton = {
-            @Suppress("DEPRECATION")
             Button(
                 onClick = { onConfirm(title, description, location, startTime, endTime, memberCap, invitedFriends) },
                 colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
@@ -1870,7 +1757,6 @@ private fun AddEventDialog(
             }
         },
         dismissButton = {
-            @Suppress("DEPRECATION")
             TextButton(onClick = onDismiss) {
                 Text("Back", color = CoralRed, fontWeight = FontWeight.Bold)
             }
@@ -1908,7 +1794,6 @@ private fun EditEventDialog(
         shape = RoundedCornerShape(24.dp),
         containerColor = Color.White,
         title = { 
-            @Suppress("DEPRECATION")
             Text(
                 text = "Edit Event",
                 style = MaterialTheme.typography.headlineSmall,
@@ -1917,7 +1802,6 @@ private fun EditEventDialog(
             )
         },
         text = {
-            @Suppress("DEPRECATION")
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1966,7 +1850,6 @@ private fun EditEventDialog(
             }
         },
         confirmButton = {
-            @Suppress("DEPRECATION")
             Button(
                 onClick = { onConfirm(title, description, location, startTime, endTime) },
                 colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
@@ -1977,115 +1860,11 @@ private fun EditEventDialog(
             }
         },
         dismissButton = {
-            @Suppress("DEPRECATION")
             TextButton(onClick = onDismiss) {
                 Text("Back", color = CoralRed, fontWeight = FontWeight.Bold)
             }
         }
     )
-}
-
-@Composable
-fun WheelTimePicker(
-    initialTime: LocalTime,
-    onTimeChange: (LocalTime) -> Unit
-) {
-    var hour by remember { mutableIntStateOf(if (initialTime.hour == 0) 12 else if (initialTime.hour > 12) initialTime.hour - 12 else initialTime.hour) }
-    var minute by remember { mutableIntStateOf(initialTime.minute) }
-    var amPm by remember { mutableStateOf(if (initialTime.hour < 12) "AM" else "PM") }
-
-    LaunchedEffect(hour, minute, amPm) {
-        val h = when (amPm) {
-            "AM" -> if (hour == 12) 0 else hour
-            "PM" -> if (hour == 12) 12 else hour + 12
-            else -> hour
-        }
-        onTimeChange(LocalTime.of(h, minute))
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth().height(120.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        WheelPicker(
-            items = (1..12).toList(),
-            initialIndex = hour - 1,
-            onItemSelected = { hour = it },
-            modifier = Modifier.weight(1f)
-        )
-        @Suppress("DEPRECATION")
-        Text(":", style = MaterialTheme.typography.headlineMedium)
-        WheelPicker(
-            items = (0..59).toList(),
-            initialIndex = minute,
-            onItemSelected = { minute = it },
-            format = { String.format(Locale.US, "%02d", it) },
-            modifier = Modifier.weight(1f)
-        )
-        WheelPicker(
-            items = listOf("AM", "PM"),
-            initialIndex = if (amPm == "AM") 0 else 1,
-            onItemSelected = { amPm = it },
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-@Composable
-fun <T> WheelPicker(
-    items: List<T>,
-    initialIndex: Int,
-    onItemSelected: (T) -> Unit,
-    modifier: Modifier = Modifier,
-    format: (T) -> String = { it.toString() }
-) {
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
-    val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
-    val itemHeight = 40.dp
-
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (!listState.isScrollInProgress) {
-            val centerIndex = listState.firstVisibleItemIndex
-            if (centerIndex in items.indices) {
-                onItemSelected(items[centerIndex])
-            }
-        }
-    }
-
-    Box(modifier = modifier.height(itemHeight * 3), contentAlignment = Alignment.Center) {
-        // Overlay for selection
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(itemHeight)
-                .background(CoralRed.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                .border(1.dp, CoralRed.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-        )
-
-        LazyColumn(
-            state = listState,
-            flingBehavior = flingBehavior,
-            contentPadding = PaddingValues(vertical = itemHeight),
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            items(items.size) { index ->
-                Box(
-                    modifier = Modifier.height(itemHeight).fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    @Suppress("DEPRECATION")
-                    Text(
-                        text = format(items[index]),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = if (listState.firstVisibleItemIndex == index) CoralRed else Color.Gray
-                    )
-                }
-            }
-        }
-    }
 }
 
 @Composable
@@ -2135,9 +1914,8 @@ fun FriendPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { @Suppress("DEPRECATION") Text("Invite a Friend", fontWeight = FontWeight.Bold) },
+        title = { Text("Invite a Friend", fontWeight = FontWeight.Bold) },
         text = {
-            @Suppress("DEPRECATION")
             Column(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
                     value = searchQuery,
@@ -2191,7 +1969,6 @@ fun FriendPickerDialog(
         },
         confirmButton = {},
         dismissButton = {
-            @Suppress("DEPRECATION")
             TextButton(onClick = onDismiss) {
                 Text("Cancel", color = CoralRed, fontWeight = FontWeight.Bold)
             }
@@ -2226,8 +2003,6 @@ private fun buildWeekDates(
 private fun buildOrderedDays(firstDayOfWeek: DayOfWeek): List<DayOfWeek> {
     return (0..6).map { firstDayOfWeek.plus(it.toLong()) }
 }
-
-private fun modeAccentColor(): Color = CoralRed
 
 @Composable
 private fun resolveDateCellBackgroundColor(isSelected: Boolean): Color {
@@ -2303,7 +2078,6 @@ private fun EventBadge(text: String, color: Color) {
             .padding(horizontal = 10.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
-        @Suppress("DEPRECATION")
         Text(
             text = text,
             color = color,
@@ -2315,7 +2089,6 @@ private fun EventBadge(text: String, color: Color) {
 
 @Composable
 private fun EventMetaLine(text: String) {
-    @Suppress("DEPRECATION")
     Text(
         text = text,
         style = MaterialTheme.typography.bodyMedium,
@@ -2325,7 +2098,6 @@ private fun EventMetaLine(text: String) {
 
 @Composable
 private fun EventDescription(text: String) {
-    @Suppress("DEPRECATION")
     Text(
         text = text,
         style = MaterialTheme.typography.bodyMedium,
@@ -2347,12 +2119,10 @@ fun InviteDetailDialog(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Event, contentDescription = null, tint = CoralRed)
                 Spacer(Modifier.width(12.dp))
-                @Suppress("DEPRECATION")
                 Text(invite.eventTitle, fontWeight = FontWeight.Bold)
             }
         },
         text = {
-            @Suppress("DEPRECATION")
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("From: ", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
@@ -2409,13 +2179,11 @@ fun InviteDetailDialog(
             }
         },
         confirmButton = {
-            @Suppress("DEPRECATION")
             Button(onClick = onAccept, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)), shape = RoundedCornerShape(12.dp)) {
                 Text("Accept", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            @Suppress("DEPRECATION")
             TextButton(onClick = onDecline) {
                 Text("Decline", color = CoralRed, fontWeight = FontWeight.Bold)
             }

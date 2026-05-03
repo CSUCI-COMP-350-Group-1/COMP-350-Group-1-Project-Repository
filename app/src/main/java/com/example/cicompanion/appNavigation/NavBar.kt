@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -34,7 +35,7 @@ fun NavBar(navController: NavHostController) {
     val items = listOf(
         NavBarItem("Home", Routes.HOME, Icons.Filled.Home),
         NavBarItem("Social", Routes.SOCIAL, Icons.Filled.People),
-        NavBarItem("Calendar", Routes.CALENDAR, Icons.Filled.CalendarMonth),
+        NavBarItem("Calendar", Routes.CALENDAR, Icons.AutoMirrored.Filled.EventNote),
         NavBarItem("Map", Routes.MAP, Icons.Filled.LocationOn)
     )
     val navBarBackground = NavBackground
@@ -71,7 +72,8 @@ fun NavBar(navController: NavHostController) {
                 label = { 
                     Text(
                         text = item.title,
-                        color = if(isSelected) BrandRedLight else GrayIcon
+                        color = if(isSelected) BrandRedLight else GrayIcon,
+                        maxLines = 1
                     )
                 },
                 selected = isSelected,
