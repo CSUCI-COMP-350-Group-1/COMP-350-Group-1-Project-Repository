@@ -25,7 +25,7 @@ object FirestoreManager {
      * Saves the signed-in user's profile data to Firestore.
      * The document ID is the user's Firebase UID.
      */
-    fun saveUserToFirestore(user: FirebaseUser,onSuccess: (() -> Unit)? = null) {
+    fun saveUserToFirestore(user: FirebaseUser, onSuccess: (() -> Unit)? = null) {
         val db = FirebaseFirestore.getInstance()
         val userRef = db.collection("users").document(user.uid)
 
@@ -37,11 +37,10 @@ object FirestoreManager {
                 "lastSignInAt" to System.currentTimeMillis()
             )
 
-            // Initialize display names if this is a new user or missing data
-            if (!document.exists() || document.getString("originalDisplayName").isNullOrBlank()) {
-                val initialName = user.displayName ?: ""
-                data["displayName"] = initialName
-                data["originalDisplayName"] = initialName
+            // Initialize display names and bio only if this is a new user
+            if (!document.exists()) {
+                data["displayName"] = user.displayName ?: ""
+                data["bio"] = ""
             }
 
             userRef.set(data, SetOptions.merge())
