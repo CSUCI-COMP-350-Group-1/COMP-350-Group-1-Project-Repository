@@ -17,8 +17,18 @@ import kotlinx.coroutines.tasks.await
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import com.example.cicompanion.calendar.model.SelectedClass
+import com.example.cicompanion.calendar.model.EventNotificationPreference
+import java.security.MessageDigest
+
 
 object FirestoreManager {
+
+    // Parse stored HH:mm class times so saved classes can be sorted by time.
+    private fun parseClassTimeForSort(timeText: String): java.time.LocalTime {
+        return runCatching {
+            java.time.LocalTime.parse(timeText)
+        }.getOrDefault(java.time.LocalTime.MAX)
+    }
 
     private const val TAG = "FirestoreManager"
 
@@ -75,6 +85,132 @@ object FirestoreManager {
             .addOnFailureListener { exception ->
                 Log.e(TAG, "Failed to save FCM token for uid=$userId", exception)
             }
+    }
+    // EVENT NOTIFICATION:
+    // Build a stable Firestore-safe document ID from the event ID.
+    fun buildEventNotificationPreferenceId(eventId: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val bytes = digest.digest(eventId.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { byte -> "%02x".format(byte) }
+    }
+
+    // EVENT NOTIFICATION:
+    // Save or remove one event notification opt-in for the current user.
+    // For class events, this saves a recurring class preference.
+    // For one-time events, this saves a single-event preference.
+    suspend fun saveEventNotificationPreference(event: CalendarEvent, enabled: Boolean): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        val db = FirebaseFirestore.getInstance()
+        val target = deriveEventNotificationTarget(event)
+        val preferenceId = buildEventNotificationPreferenceId(
+            targetType = target.targetType,
+            targetId = target.targetId
+        )
+
+        return try {
+            val docRef = db.collection("users")
+                .document(user.uid)
+                .collection("eventNotificationPreferences")
+                .document(preferenceId)
+
+            if (enabled) {
+                val payload = hashMapOf(
+                    "preferenceId" to preferenceId,
+                    "targetType" to target.targetType,
+                    "targetId" to target.targetId,
+                    "title" to event.title,
+                    "calendarId" to event.calendarId,
+                    "start" to event.start.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
+                    "enabled" to true,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+
+                docRef.set(payload).await()
+            } else {
+                docRef.delete().await()
+            }
+
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving event notification preference: ${e.message}", e)
+            false
+        }
+    }
+
+    // EVENT NOTIFICATION:
+    // Load all enabled preference IDs for the current signed-in user.
+    suspend fun fetchEnabledEventNotificationPreferenceIds(): Set<String> {
+        val user = FirebaseAuth.getInstance().currentUser ?: return emptySet()
+        val db = FirebaseFirestore.getInstance()
+
+        return try {
+            val snapshot = db.collection("users")
+                .document(user.uid)
+                .collection("eventNotificationPreferences")
+                .whereEqualTo("enabled", true)
+                .get()
+                .await()
+
+            snapshot.documents.mapNotNull { document ->
+                document.getString("preferenceId")
+            }.toSet()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching event notification preferences: ${e.message}", e)
+            emptySet()
+        }
+    }
+
+    // EVENT NOTIFICATION:
+    // Classes should opt in once for all future occurrences.
+    // One-time events should stay tied to the exact event occurrence.
+    private const val TARGET_TYPE_RECURRING_CLASS = "recurring_class"
+    private const val TARGET_TYPE_SINGLE_EVENT = "single_event"
+
+    private val recurringClassOccurrenceRegex = Regex("^(.*)-\\d{4}-\\d{2}-\\d{2}$")
+
+    private data class EventNotificationTarget(
+        val targetType: String,
+        val targetId: String
+    )
+
+    private fun deriveEventNotificationTarget(event: CalendarEvent): EventNotificationTarget {
+        return if (event.calendarId == "schedule") {
+            val recurringClassId = recurringClassOccurrenceRegex
+                .matchEntire(event.id)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.takeIf { it.isNotBlank() }
+                ?: event.id
+
+            EventNotificationTarget(
+                targetType = TARGET_TYPE_RECURRING_CLASS,
+                targetId = recurringClassId
+            )
+        } else {
+            EventNotificationTarget(
+                targetType = TARGET_TYPE_SINGLE_EVENT,
+                targetId = event.id
+            )
+        }
+    }
+
+    // EVENT NOTIFICATION
+    // Build stable Firestore-safe document ID from targetType + targetId.
+    fun buildEventNotificationPreferenceId(
+        targetType: String,
+        targetId: String
+    ): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val bytes = digest.digest("$targetType::$targetId".toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { byte -> "%02x".format(byte) }
+    }
+
+    fun buildEventNotificationPreferenceIdForEvent(event: CalendarEvent): String {
+        val target = deriveEventNotificationTarget(event)
+        return buildEventNotificationPreferenceId(
+            targetType = target.targetType,
+            targetId = target.targetId
+        )
     }
 
     // CALENDAR SCHEDULE CHANGE:
@@ -352,10 +488,5 @@ object FirestoreManager {
     }
 
 
-    // Parse stored HH:mm class times so saved classes can be sorted by time.
-    private fun parseClassTimeForSort(timeText: String): java.time.LocalTime {
-        return runCatching {
-            java.time.LocalTime.parse(timeText)
-        }.getOrDefault(java.time.LocalTime.MAX)
-    }
+
 }

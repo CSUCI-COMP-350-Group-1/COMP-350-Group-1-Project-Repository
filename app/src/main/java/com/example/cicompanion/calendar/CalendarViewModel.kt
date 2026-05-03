@@ -40,6 +40,11 @@ class CalendarViewModel(
     var selectedClasses: List<SelectedClass> by mutableStateOf(emptyList())
         private set
 
+    // EVENT NOTIFICATION CHANGE:
+    // Stores the enabled preference IDs for the current signed-in user.
+    var enabledEventNotificationPreferenceIds: Set<String> by mutableStateOf(emptySet())
+        private set
+
     var filterCsuci by mutableStateOf(true)
         private set
     var filterCustom by mutableStateOf(true)
@@ -59,16 +64,16 @@ class CalendarViewModel(
     init {
         loadOnlineCalendar()
 
-        // CALENDAR SCHEDULE CHANGE:
-        // Reload both custom events and selected classes whenever auth changes.
+        // EVENT NOTIFICATION CHANGE:
+        // Reload both custom events and event notification preferences on auth changes.
         val auth = FirebaseAuth.getInstance()
         auth.addAuthStateListener { firebaseAuth ->
             if (firebaseAuth.currentUser != null) {
                 loadCustomEvents()
-                loadSelectedClasses()
+                loadEventNotificationPreferences()
             } else {
                 customEvents = emptyList()
-                selectedClasses = emptyList()
+                enabledEventNotificationPreferenceIds = emptySet()
             }
         }
     }
@@ -232,6 +237,36 @@ class CalendarViewModel(
 
     fun clearError() {
         errorMessage = null
+    }
+
+    // EVENT NOTIFICATION
+    fun loadEventNotificationPreferences() {
+        viewModelScope.launch {
+            enabledEventNotificationPreferenceIds =
+                FirestoreManager.fetchEnabledEventNotificationPreferenceIds()
+        }
+    }
+
+    // EVENT NOTIFICATION:
+    // Class events check the recurring class preference ID.
+    // One-time events check the exact occurrence preference ID.
+    fun isEventNotificationEnabled(event: CalendarEvent): Boolean {
+        val preferenceId = FirestoreManager.buildEventNotificationPreferenceIdForEvent(event)
+        return preferenceId in enabledEventNotificationPreferenceIds
+    }
+
+    fun setEventNotificationEnabled(
+        event: CalendarEvent,
+        enabled: Boolean,
+        onComplete: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val success = FirestoreManager.saveEventNotificationPreference(event, enabled)
+            if (success) {
+                loadEventNotificationPreferences()
+            }
+            onComplete(success)
+        }
     }
 
     // CALENDAR SCHEDULE CHANGE:

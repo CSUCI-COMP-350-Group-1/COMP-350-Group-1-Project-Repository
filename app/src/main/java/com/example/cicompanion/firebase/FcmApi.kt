@@ -25,4 +25,9 @@ interface FcmApi {
     suspend fun sendDirectMessagePush(
         @Body body: Map<String, String>
     )
+    // EVENT NOTIFICATION CHANGE:
+    @POST("/send-event-reminder")
+    suspend fun sendEventReminderPush(
+        @Body body: Map<String, String>
+    )
 }

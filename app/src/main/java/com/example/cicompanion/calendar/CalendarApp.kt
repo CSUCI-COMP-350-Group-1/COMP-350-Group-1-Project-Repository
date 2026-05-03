@@ -74,6 +74,13 @@ fun CalendarApp(viewModel: CalendarViewModel) {
 
     var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
 
+
+    // EVENT NOTIFICATION
+    // Load this user's event notification toggles when the calendar screen is shown.
+    LaunchedEffect(Unit) {
+        viewModel.loadEventNotificationPreferences()
+    }
+
     DisposableEffect(Unit) {
         val listener = FirebaseAuth.AuthStateListener { auth ->
             currentUser = auth.currentUser
@@ -134,19 +141,25 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                 .padding(padding)
                 .fillMaxSize()
         ) {
+            // EVENT NOTIFICATION CHANGE:
+            // Use the real CalendarScreenBody signature from this file.
             CalendarScreenBody(
                 scrollState = scrollState,
                 viewModel = viewModel,
                 selectedDateEvents = selectedDateEvents,
                 dayEventInfoMap = dayEventInfoMap,
                 onDismissError = viewModel::clearError,
-                onDateSelected = { 
+                onDateSelected = {
                     viewModel.onDateSelected(it)
-                    viewModel.setHighlightedEvent(null) 
+                    viewModel.setHighlightedEvent(null)
                 },
                 onRequestDelete = { eventToDelete = it },
                 onRequestEdit = { eventToEdit = it },
-                onTogglePin = viewModel::togglePinEvent
+                onTogglePin = viewModel::togglePinEvent,
+                isEventNotificationEnabled = viewModel::isEventNotificationEnabled,
+                onToggleEventNotification = { event, enabled ->
+                    viewModel.setEventNotificationEnabled(event, enabled)
+                }
             )
         }
     }
@@ -233,7 +246,9 @@ private fun CalendarScreenBody(
     onDateSelected: (LocalDate) -> Unit,
     onRequestDelete: (CalendarEvent) -> Unit,
     onRequestEdit: (CalendarEvent) -> Unit,
-    onTogglePin: (CalendarEvent) -> Unit
+    onTogglePin: (CalendarEvent) -> Unit,
+    isEventNotificationEnabled: (CalendarEvent) -> Boolean,
+    onToggleEventNotification: (CalendarEvent, Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -271,6 +286,8 @@ private fun CalendarScreenBody(
                 )
             }
 
+            // EVENT NOTIFICATION CHANGE:
+            // Use the real CalendarContent signature from this file.
             CalendarContent(
                 mode = viewModel.mode,
                 visibleMonth = viewModel.visibleMonth,
@@ -287,7 +304,9 @@ private fun CalendarScreenBody(
                 onDeleteEvent = onRequestDelete,
                 onEditEvent = onRequestEdit,
                 onTogglePin = onTogglePin,
-                highlightedEventId = viewModel.highlightedEventId
+                highlightedEventId = viewModel.highlightedEventId,
+                isEventNotificationEnabled = isEventNotificationEnabled,
+                onToggleEventNotification = onToggleEventNotification
             )
         }
     }
@@ -535,7 +554,11 @@ private fun CalendarContent(
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
-    highlightedEventId: String? = null
+    highlightedEventId: String? = null,
+
+    // EVENT NOTIFICATION CHANGE:
+    isEventNotificationEnabled: (CalendarEvent) -> Boolean,
+    onToggleEventNotification: (CalendarEvent, Boolean) -> Unit
 ) {
     when (mode) {
         CalendarMode.MONTH -> MonthView(
@@ -549,8 +572,11 @@ private fun CalendarContent(
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
-            highlightedEventId = highlightedEventId
+            highlightedEventId = highlightedEventId,
+            isEventNotificationEnabled = isEventNotificationEnabled,
+            onToggleEventNotification = onToggleEventNotification
         )
+
         CalendarMode.DAY -> DayView(
             selectedDate = selectedDate,
             events = selectedDateEvents,
@@ -559,8 +585,11 @@ private fun CalendarContent(
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
-            highlightedEventId = highlightedEventId
+            highlightedEventId = highlightedEventId,
+            isEventNotificationEnabled = isEventNotificationEnabled,
+            onToggleEventNotification = onToggleEventNotification
         )
+
         CalendarMode.WEEK -> WeekView(
             selectedDate = selectedDate,
             dayEventInfoMap = dayEventInfoMap,
@@ -571,7 +600,9 @@ private fun CalendarContent(
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
-            highlightedEventId = highlightedEventId
+            highlightedEventId = highlightedEventId,
+            isEventNotificationEnabled = isEventNotificationEnabled,
+            onToggleEventNotification = onToggleEventNotification
         )
     }
 }
@@ -585,7 +616,11 @@ private fun DayView(
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
-    highlightedEventId: String? = null
+    highlightedEventId: String? = null,
+
+    // EVENT NOTIFICATION CHANGE:
+    isEventNotificationEnabled: (CalendarEvent) -> Boolean,
+    onToggleEventNotification: (CalendarEvent, Boolean) -> Unit
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy") }
 
@@ -604,7 +639,9 @@ private fun DayView(
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
-            highlightedEventId = highlightedEventId
+            highlightedEventId = highlightedEventId,
+            isEventNotificationEnabled = isEventNotificationEnabled,
+            onToggleEventNotification = onToggleEventNotification
         )
     }
 }
@@ -620,7 +657,11 @@ private fun WeekView(
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
-    highlightedEventId: String? = null
+    highlightedEventId: String? = null,
+
+    // EVENT NOTIFICATION CHANGE:
+    isEventNotificationEnabled: (CalendarEvent) -> Boolean,
+    onToggleEventNotification: (CalendarEvent, Boolean) -> Unit
 ) {
     val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
     val weekDates = remember(selectedDate, firstDayOfWeek) {
@@ -652,7 +693,9 @@ private fun WeekView(
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
-            highlightedEventId = highlightedEventId
+            highlightedEventId = highlightedEventId,
+            isEventNotificationEnabled = isEventNotificationEnabled,
+            onToggleEventNotification = onToggleEventNotification
         )
     }
 }
@@ -669,7 +712,11 @@ private fun MonthView(
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
-    highlightedEventId: String? = null
+    highlightedEventId: String? = null,
+
+    // EVENT NOTIFICATION CHANGE:
+    isEventNotificationEnabled: (CalendarEvent) -> Boolean,
+    onToggleEventNotification: (CalendarEvent, Boolean) -> Unit
 ) {
     val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
     val monthCells = remember(visibleMonth, firstDayOfWeek) {
@@ -701,7 +748,9 @@ private fun MonthView(
             onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
-            highlightedEventId = highlightedEventId
+            highlightedEventId = highlightedEventId,
+            isEventNotificationEnabled = isEventNotificationEnabled,
+            onToggleEventNotification = onToggleEventNotification
         )
     }
 }
@@ -977,16 +1026,22 @@ private fun EventsSection(
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
-    highlightedEventId: String? = null
+    highlightedEventId: String? = null,
+
+    // EVENT NOTIFICATION CHANGE:
+    isEventNotificationEnabled: (CalendarEvent) -> Boolean,
+    onToggleEventNotification: (CalendarEvent, Boolean) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionHeading(text = title)
         EventsList(
-            events = events, 
-            onDeleteEvent = onDeleteEvent, 
+            events = events,
+            onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
-            highlightedEventId = highlightedEventId
+            highlightedEventId = highlightedEventId,
+            isEventNotificationEnabled = isEventNotificationEnabled,
+            onToggleEventNotification = onToggleEventNotification
         )
     }
 }
@@ -997,7 +1052,11 @@ private fun EventsList(
     onDeleteEvent: (CalendarEvent) -> Unit,
     onEditEvent: (CalendarEvent) -> Unit,
     onTogglePin: (CalendarEvent) -> Unit,
-    highlightedEventId: String? = null
+    highlightedEventId: String? = null,
+
+    // EVENT NOTIFICATION CHANGE:
+    isEventNotificationEnabled: (CalendarEvent) -> Boolean,
+    onToggleEventNotification: (CalendarEvent, Boolean) -> Unit
 ) {
     if (events.isEmpty()) {
         EmptyEventsMessage()
@@ -1013,7 +1072,11 @@ private fun EventsList(
                 onDelete = { onDeleteEvent(event) },
                 onEdit = { onEditEvent(event) },
                 onTogglePin = { onTogglePin(event) },
-                isHighlighted = event.id == highlightedEventId
+                isHighlighted = event.id == highlightedEventId,
+                notificationsEnabled = isEventNotificationEnabled(event),
+                onNotificationToggle = { enabled ->
+                    onToggleEventNotification(event, enabled)
+                }
             )
         }
     }
@@ -1032,16 +1095,18 @@ private fun EmptyEventsMessage() {
 
 @Composable
 private fun EventCard(
-    event: CalendarEvent, 
-    onDelete: () -> Unit, 
+    event: CalendarEvent,
+    onDelete: () -> Unit,
     onEdit: () -> Unit,
-    onTogglePin: () -> Unit, 
-    isHighlighted: Boolean = false
+    onTogglePin: () -> Unit,
+    isHighlighted: Boolean = false,
+
+    // EVENT NOTIFICATION CHANGE:
+    notificationsEnabled: Boolean,
+    onNotificationToggle: (Boolean) -> Unit
 ) {
     val isCustom = event.calendarId == "custom"
 
-    // Removed the purple highlight when navigating from pinned events.
-    // Using normal CardOffWhite and no border.
     val containerColor = CardOffWhite
     val borderColor = Color.Transparent
 
@@ -1077,7 +1142,7 @@ private fun EventCard(
                         )
                     }
                 }
-                
+
                 Text(
                     text = HtmlUtils.stripHtml(event.title),
                     modifier = Modifier.weight(1f),
@@ -1086,7 +1151,10 @@ private fun EventCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     if (isCustom) {
                         IconButton(
                             onClick = onEdit,
@@ -1126,6 +1194,7 @@ private fun EventCard(
                             }
                         }
                     }
+
                     EventBadge(
                         text = if (event.isPinned) "Pinned" else if (isCustom) "Custom" else "CSUCI",
                         color = if (event.isPinned) PinnedEventPurple else if (isCustom) CustomEventOrange else CoralRed
@@ -1136,6 +1205,26 @@ private fun EventCard(
             EventMetaLine(text = event.timeLabel())
             event.location?.let { EventMetaLine(text = "Location: ${HtmlUtils.stripHtml(it)}") }
             event.description?.let { EventDescription(text = HtmlUtils.stripHtml(it)) }
+
+            // EVENT NOTIFICATION CHANGE:
+            // Per-user event reminder toggle directly in the event card.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Push reminders",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Switch(
+                    checked = notificationsEnabled,
+                    onCheckedChange = onNotificationToggle
+                )
+            }
         }
     }
 }

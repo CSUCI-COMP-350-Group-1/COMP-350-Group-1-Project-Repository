@@ -91,6 +91,16 @@ class PushNotificationService : FirebaseMessagingService() {
     private fun createNotificationChannelsIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
+        // EVENT NOTIFICATION:
+        // New channel for calendar event reminders.
+        val eventReminderChannel = NotificationChannel(
+            EVENT_REMINDER_CHANNEL_ID,
+            EVENT_REMINDER_CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Calendar event reminder notifications"
+        }
+
         val friendRequestChannel = NotificationChannel(
             FRIEND_REQUEST_CHANNEL_ID,
             FRIEND_REQUEST_CHANNEL_NAME,
@@ -111,6 +121,7 @@ class PushNotificationService : FirebaseMessagingService() {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(friendRequestChannel)
         manager.createNotificationChannel(directMessageChannel)
+        manager.createNotificationChannel(eventReminderChannel)
     }
 
     companion object {
@@ -120,6 +131,10 @@ class PushNotificationService : FirebaseMessagingService() {
         // MESSAGING CHANGE
         const val DIRECT_MESSAGE_CHANNEL_ID = "direct_message_notifications"
         private const val DIRECT_MESSAGE_CHANNEL_NAME = "Direct Messages"
+
+        // EVENT NOTIFICATION CHANGE:
+        const val EVENT_REMINDER_CHANNEL_ID = "event_reminder_notifications"
+        private const val EVENT_REMINDER_CHANNEL_NAME = "Event Reminders"
 
         const val EXTRA_DESTINATION_ROUTE = "destination_route"
     }
