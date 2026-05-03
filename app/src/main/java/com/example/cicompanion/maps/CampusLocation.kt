@@ -17,5 +17,6 @@ data class CampusLocation(
     val isCustom: Boolean = false,
     val isPinned: Boolean = false,
     val isFavorited: Boolean = false,
-    val associatedEventId: String? = null
+    val associatedEventId: String? = null,
+    val searchKeywords: List<String> = emptyList()
 )

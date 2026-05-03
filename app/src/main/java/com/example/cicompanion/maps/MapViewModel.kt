@@ -21,7 +21,7 @@ class MapViewModel : ViewModel() {
 
     var isPinMode by mutableStateOf(false)
         private set
-    
+
     var editingPinId by mutableStateOf<String?>(null)
         private set
 
@@ -47,7 +47,7 @@ class MapViewModel : ViewModel() {
             // Clear existing listener on auth change
             customPinsListener?.remove()
             customPinsListener = null
-            
+
             if (user != null) {
                 loadCustomPins()
             } else {
@@ -63,11 +63,11 @@ class MapViewModel : ViewModel() {
 
         isLoading = true
         customPinsListener = SocialRepository.listenToCustomPins(user.uid,
-            onPinsChanged = { 
+            onPinsChanged = {
                 customPins = it
                 isLoading = false
             },
-            onError = { 
+            onError = {
                 errorMessage = it
                 isLoading = false
             }
@@ -93,7 +93,7 @@ class MapViewModel : ViewModel() {
         tempPinLocation = null
         editingPinId = null
     }
-    
+
     fun startEditingLocation(pinId: String) {
         val pin = customPins.find { it.id == pinId } ?: return
         isPinMode = true
@@ -106,7 +106,7 @@ class MapViewModel : ViewModel() {
             tempPinLocation = latLng
         }
     }
-    
+
     fun clearTempPin() {
         tempPinLocation = null
     }
@@ -114,7 +114,7 @@ class MapViewModel : ViewModel() {
     fun savePin(name: String, description: String, color: Color, associatedEventId: String? = null) {
         val location = tempPinLocation ?: return
         val user = FirebaseAuth.getInstance().currentUser ?: return
-        
+
         val pinToSave = if (editingPinId != null) {
             val existing = customPins.find { it.id == editingPinId }
             existing?.copy(
@@ -137,14 +137,14 @@ class MapViewModel : ViewModel() {
                 associatedEventId = associatedEventId
             )
         }
-        
+
         viewModelScope.launch {
             val success = if (editingPinId != null) {
                 FirestoreManager.updateCustomPin(pinToSave)
             } else {
                 FirestoreManager.saveCustomPin(pinToSave)
             }
-            
+
             if (success) {
                 // No need to manually reload, listener handles it
                 isPinMode = false
@@ -162,33 +162,18 @@ class MapViewModel : ViewModel() {
     }
 
     fun togglePinLocation(location: CampusLocation) {
+        // Only allow pinning for custom locations
+        if (!location.isCustom) return
+
         viewModelScope.launch {
-            val user = FirebaseAuth.getInstance().currentUser ?: return@launch
-            val existingPin = customPins.find { it.id == location.id }
-            val targetStatus = !(existingPin?.isPinned ?: location.isPinned)
-            
-            if (location.isCustom) {
-                val pin = existingPin ?: return@launch
-                val updatedPin = pin.copy(isPinned = targetStatus)
-                FirestoreManager.updateCustomPin(updatedPin)
-            } else {
-                // For built-in locations, save/update as a CustomPin with the same ID to track pinning
-                val pinToSave = CustomPin(
-                    id = location.id,
-                    userId = user.uid,
-                    name = location.name,
-                    latitude = location.position.latitude,
-                    longitude = location.position.longitude,
-                    description = location.description,
-                    colorArgb = location.color.toArgb(),
-                    isPinned = targetStatus,
-                    associatedEventId = location.associatedEventId
-                )
-                FirestoreManager.saveCustomPin(pinToSave)
-            }
+            val existingPin = customPins.find { it.id == location.id } ?: return@launch
+            val targetStatus = !existingPin.isPinned
+
+            val updatedPin = existingPin.copy(isPinned = targetStatus)
+            FirestoreManager.updateCustomPin(updatedPin)
         }
     }
-    
+
     fun associateEvent(pinId: String, eventId: String?) {
         viewModelScope.launch {
             val pin = customPins.find { it.id == pinId } ?: return@launch
