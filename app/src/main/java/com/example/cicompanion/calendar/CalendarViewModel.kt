@@ -7,9 +7,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.cicompanion.calendar.data.repository.CalendarRepository
 import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.calendar.model.SelectedClass
 import com.example.cicompanion.social.FirestoreManager
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
@@ -33,7 +33,13 @@ class CalendarViewModel(
 
     private var csuciEvents: List<CalendarEvent> by mutableStateOf(emptyList())
     private var customEvents: List<CalendarEvent> by mutableStateOf(emptyList())
-    
+
+    // CALENDAR SCHEDULE CHANGE:
+    // Store the user's saved classes separately from custom events.
+    // These are converted to CalendarEvent items only when building the UI list.
+    var selectedClasses: List<SelectedClass> by mutableStateOf(emptyList())
+        private set
+
     var filterCsuci by mutableStateOf(true)
         private set
     var filterCustom by mutableStateOf(true)
@@ -50,27 +56,28 @@ class CalendarViewModel(
     var errorMessage: String? by mutableStateOf(null)
         private set
 
-    private var authListenerJob: Job? = null
-
     init {
         loadOnlineCalendar()
-        
-        // Setup listener for auth changes to clear/reload data
+
+        // CALENDAR SCHEDULE CHANGE:
+        // Reload both custom events and selected classes whenever auth changes.
         val auth = FirebaseAuth.getInstance()
         auth.addAuthStateListener { firebaseAuth ->
             if (firebaseAuth.currentUser != null) {
                 loadCustomEvents()
+                loadSelectedClasses()
             } else {
                 customEvents = emptyList()
+                selectedClasses = emptyList()
             }
         }
     }
 
     val events: List<CalendarEvent>
-        get() = (customEvents + csuciEvents).filter { event ->
+        get() = (customEvents + buildSelectedClassEvents() + csuciEvents).filter { event ->
             if (event.isPinned) {
                 filterPinned
-            } else if (event.calendarId == "custom") {
+            } else if (event.calendarId == "custom" || event.calendarId == "schedule") {
                 filterCustom
             } else {
                 filterCsuci
@@ -80,7 +87,7 @@ class CalendarViewModel(
     fun updateMode(newMode: CalendarMode) {
         mode = newMode
     }
-    
+
     fun toggleFilterCsuci() {
         filterCsuci = !filterCsuci
     }
@@ -132,6 +139,14 @@ class CalendarViewModel(
         }
     }
 
+    // CALENDAR SCHEDULE CHANGE:
+    // Load the user's saved class schedule entries from Firestore.
+    fun loadSelectedClasses() {
+        viewModelScope.launch {
+            selectedClasses = FirestoreManager.fetchSelectedClasses()
+        }
+    }
+
     fun addCustomEvent(event: CalendarEvent) {
         viewModelScope.launch {
             FirestoreManager.saveCustomEvent(event)
@@ -151,6 +166,36 @@ class CalendarViewModel(
             val targetStatus = !event.isPinned
             FirestoreManager.updateEventPinStatus(event.id, targetStatus)
             loadCustomEvents()
+        }
+    }
+
+    // CALENDAR SCHEDULE CHANGE:
+    // Save one class entry, then refresh the schedule list.
+    fun saveSelectedClass(
+        selectedClass: SelectedClass,
+        onComplete: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val success = FirestoreManager.saveSelectedClass(selectedClass)
+            if (success) {
+                loadSelectedClasses()
+            }
+            onComplete(success)
+        }
+    }
+
+    // CALENDAR SCHEDULE CHANGE:
+    // Delete one class entry, then refresh the schedule list.
+    fun deleteSelectedClass(
+        selectedClassId: String,
+        onComplete: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val success = FirestoreManager.deleteSelectedClass(selectedClassId)
+            if (success) {
+                loadSelectedClasses()
+            }
+            onComplete(success)
         }
     }
 
@@ -187,6 +232,15 @@ class CalendarViewModel(
 
     fun clearError() {
         errorMessage = null
+    }
+
+    // CALENDAR SCHEDULE CHANGE:
+    // Convert saved classes into normal calendar events so the existing calendar
+    // UI can display them without needing a separate event renderer.
+    private fun buildSelectedClassEvents(): List<CalendarEvent> {
+        return selectedClasses.flatMap { selectedClass ->
+            selectedClass.toCalendarEvents()
+        }
     }
 
     private fun clampSelectedDateToVisibleMonth(date: LocalDate, month: YearMonth): LocalDate {
