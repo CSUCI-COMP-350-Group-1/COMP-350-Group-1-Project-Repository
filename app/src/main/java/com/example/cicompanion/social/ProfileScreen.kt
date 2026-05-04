@@ -58,9 +58,12 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
     var photoUrl by remember { mutableStateOf<String?>(null) }
     var bio by remember { mutableStateOf("") }
     var major by remember { mutableStateOf("") }
+    var userNote by remember { mutableStateOf<UserNote?>(null) }
     var friendCount by remember { mutableIntStateOf(0) }
     var requestStatus by remember { mutableStateOf<String?>(null) }
     var targetUserProfile by remember { mutableStateOf<UserProfile?>(null) }
+
+    var showStatusDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
@@ -81,6 +84,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             photoUrl = null
             bio = ""
             major = ""
+            userNote = null
             friendCount = 0
             requestStatus = null
             targetUserProfile = null
@@ -98,6 +102,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                     photoUrl = profile.photoUrl
                     bio = profile.bio
                     major = profile.major
+                    userNote = if (profile.note?.isExpired() == false) profile.note else null
                 },
                 onError = {
                     if (isOwnProfile) {
@@ -106,6 +111,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                         photoUrl = currentUser?.photoUrl?.toString()
                         bio = ""
                         major = ""
+                        userNote = null
                     }
                 }
             )
@@ -131,6 +137,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             photoUrl = null
             bio = ""
             major = ""
+            userNote = null
             friendCount = 0
             requestStatus = null
             targetUserProfile = null
@@ -158,6 +165,9 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                 photoUrl = photoUrl,
                 userMajor = major,
                 friendCount = friendCount,
+                userNote = userNote,
+                isOwnProfile = isOwnProfile,
+                onAddStatusClick = { showStatusDialog = true },
                 showFriendCount = currentUser != null,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -226,6 +236,28 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             }
         }
     }
+
+//    if (showStatusDialog && currentUser != null) {
+//        StatusDialog(
+//            currentNote = userNote,
+//            onDismiss = { showStatusDialog = false },
+//            onConfirm = { content, durationMs ->
+//                val newNote = UserNote(
+//                    content = content,
+//                    expiresAt = System.currentTimeMillis() + durationMs
+//                )
+//                SocialRepository.updateUserNote(
+//                    userId = currentUser!!.uid,
+//                    note = newNote,
+//                    onSuccess = {
+//                        userNote = newNote
+//                        showStatusDialog = false
+//                    },
+//                    onError = { /* Handle error */ }
+//                )
+//            }
+//        )
+//    }
 }
 
 @Composable
@@ -341,7 +373,7 @@ fun ViewOnlyProfileActions(
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null)
                     Spacer(Modifier.width(12.dp))
-                    Text("Request Sent (Cancel)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Cancel Request", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
             "accepted" -> {
@@ -533,6 +565,9 @@ fun ProfileHeader(
     photoUrl: String?,
     userMajor: String,
     friendCount: Int,
+    userNote: UserNote? = null,
+    isOwnProfile: Boolean = false,
+    onAddStatusClick: () -> Unit = {},
     showFriendCount: Boolean = true,
     modifier: Modifier = Modifier
 ) {
@@ -540,23 +575,47 @@ fun ProfileHeader(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(80.dp)
-                .clip(CircleShape)
-                .background(Color.White)
-                .border(2.dp, Color.White, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            if (photoUrl != null) {
-                AsyncImage(
-                    model = photoUrl,
-                    contentDescription = "Profile Picture",
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                DefaultAvatar()
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(contentAlignment = Alignment.TopStart) {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .border(2.dp, Color.White, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (photoUrl != null) {
+                        AsyncImage(
+                            model = photoUrl,
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        DefaultAvatar()
+                    }
+                }
+
+//                UserNoteBubble(
+//                    note = userNote,
+//                    modifier = Modifier.offset(x = (-12).dp, y = (-16).dp)
+//                )
             }
+
+//            if (isOwnProfile) {
+//                TextButton(
+//                    onClick = onAddStatusClick,
+//                    contentPadding = PaddingValues(0.dp),
+//                    modifier = Modifier.height(24.dp)
+//                ) {
+//                    Text(
+//                        text = if (userNote != null && !userNote.isExpired()) "Edit Status" else "Add Status",
+//                        fontSize = 11.sp,
+//                        color = Color.Gray,
+//                        fontWeight = FontWeight.Medium
+//                    )
+//                }
+//            }
         }
 
         Spacer(modifier = Modifier.width(20.dp))

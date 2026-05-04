@@ -107,6 +107,18 @@ object SocialRepository {
             .addOnFailureListener { e -> onError(e.message ?: "Failed to update major") }
     }
 
+    fun updateUserNote(
+        userId: String,
+        note: UserNote?,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        usersCollection().document(userId)
+            .update("note", note)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onError(e.message ?: "Failed to update status") }
+    }
+
     private fun handleSearchableUsersSuccess(
         snapshot: QuerySnapshot,
         currentUserId: String,
