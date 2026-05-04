@@ -799,22 +799,25 @@ fun LocationDetailsContent(
                 Text(
                     text = if (isTemp) "Shared Temporary Pin" else location.type.name.lowercase().replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Black
+                )
+
+                @Suppress("DEPRECATION")
+                Text(
+                    text = if (isTemp) "Clicking empty space on the map or another point will remove this pin." else location.type.name.lowercase().replaceFirstChar { it.uppercase() },
+                    style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray
                 )
             }
             if (!isTemp) {
                 Row {
-                    if (location.isCustom) {
-                        IconButton(onClick = onEditPin) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit Pin", tint = Color.Gray)
-                        }
+//                    if (location.isCustom) {
+////                        IconButton(onClick = onEditPin) {
+////                            Icon(Icons.Default.Edit, contentDescription = "Edit Pin", tint = Color.Gray)
+//                        }
                     }
-                    IconButton(onClick = onTogglePin) {
-                        Icon(
-                            imageVector = Icons.Default.PushPin,
-                            contentDescription = "Pin",
-                            tint = if (location.isPinned) Color(0xFF9C27B0) else Color.Gray
-                        )
+                    IconButton(onClick = onEditPin) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit Pin", tint = Color.Gray)
                     }
                 }
             }
@@ -939,7 +942,7 @@ fun LocationDetailsContent(
         
         Spacer(modifier = Modifier.height(32.dp))
     }
-}
+
 
 @Composable
 fun MapEventItem(event: CalendarEvent, onMoreClick: () -> Unit) {
@@ -1509,7 +1512,7 @@ fun LocationInfoCard(location: CampusLocation, onClose: () -> Unit, onDetailsCli
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (location.isCustom) Icons.Default.PushPin else location.icon,
+                       imageVector = if (location.isCustom) Icons.Default.PushPin else location.icon,
                         contentDescription = null, 
                         tint = location.color, 
                         modifier = Modifier.size(24.dp)

@@ -706,43 +706,7 @@ private fun MessageBubble(
                             )
                         }
                         
-                        if (message.type == "pin" && !isMine && !isPinAlreadySaved) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(
-                                onClick = {
-                                    val lat = message.metadata["lat"]?.toDoubleOrNull() ?: return@Button
-                                    val lng = message.metadata["lng"]?.toDoubleOrNull() ?: return@Button
-                                    val name = message.metadata["pinName"] ?: "Shared Pin"
-                                    val desc = message.metadata["description"] ?: ""
-                                    val color = message.metadata["colorArgb"]?.toIntOrNull() ?: Color(0xFFEF3347).toArgb()
-                                    val eventId = message.metadata["associatedEventId"]
-                                    
-                                    val newPin = CustomPin(
-                                        id = java.util.UUID.randomUUID().toString(),
-                                        userId = FirebaseAuth.getInstance().currentUser?.uid ?: "",
-                                        name = name,
-                                        latitude = lat,
-                                        longitude = lng,
-                                        description = desc,
-                                        colorArgb = color,
-                                        associatedEventId = if (eventId.isNullOrBlank()) null else eventId
-                                    )
-                                    
-                                    scope.launch {
-                                        FirestoreManager.saveCustomPin(newPin)
-                                        isPinAlreadySaved = true
-                                        onPinSaved()
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                                modifier = Modifier.height(32.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Add to My Map", fontSize = 12.sp)
-                            }
-                        } else if (message.type == "pin" && !isMine && isPinAlreadySaved) {
+                        if (message.type == "pin" && !isMine && isPinAlreadySaved) {
                             Text("Saved to Map", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                         }
 
@@ -779,7 +743,10 @@ private fun MessageBubble(
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                             modifier = Modifier.height(32.dp)
                         ) {
-                            Text("View on Map", fontSize = 12.sp)
+                            Text(
+                                text = if (message.type == "pin") "View/Add Pin on Map" else "View on Map",
+                                fontSize = 12.sp
+                            )
                         }
                     }
                     "event_invite" -> {
