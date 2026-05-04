@@ -60,7 +60,7 @@ fun NavBar(navController: NavHostController) {
         val currentRoute = navBackStackEntry?.destination?.route
 
         items.forEach { item ->
-            val isSelected = currentRoute == item.route
+            val isSelected = currentRoute?.substringBefore('?') == item.route
 
             NavigationBarItem(
                 icon = { Icon(

@@ -112,6 +112,22 @@ object MessagingRepository {
             }
     }
 
+    fun deleteMessage(
+        conversationId: String,
+        messageId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        FirebaseFirestore.getInstance()
+            .collection(CONVERSATIONS_COLLECTION)
+            .document(conversationId)
+            .collection(MESSAGES_SUBCOLLECTION)
+            .document(messageId)
+            .delete()
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onError(e.message ?: "Could not delete message.") }
+    }
+
     fun sendMessage(
         currentUser: FirebaseUser,
         friend: UserProfile,

@@ -225,6 +225,13 @@ fun AppNavigation(notificationRoute: String? = null,
                             calendarViewModel = calendarViewModel
                         )
                     }
+                    composable(Routes.SCHEDULE) {
+                        CalendarScreen(
+                            navController = navController,
+                            calendarViewModel = calendarViewModel,
+                            initialTab = 1
+                        )
+                    }
                     composable(Routes.STUDY_ROOM) {
                         RoomListScreen(viewModel = viewModel(), navController = navController)
                     }

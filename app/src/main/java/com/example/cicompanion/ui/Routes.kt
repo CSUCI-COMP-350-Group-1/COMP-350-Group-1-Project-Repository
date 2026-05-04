@@ -5,6 +5,7 @@ object Routes {
     const val SOCIAL = "social" 
     const val MAP = "map"
     const val CALENDAR = "calendar"
+    const val SCHEDULE = "schedule"
     const val STUDY_ROOM = "studyRoom"
     const val PROFILE = "profile"
     const val NOTIFICATIONS = "notifications"
