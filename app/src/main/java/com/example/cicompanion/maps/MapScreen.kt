@@ -802,6 +802,7 @@ fun LocationDetailsContent(
                     color = Color.Black
                 )
 
+                Spacer(modifier = Modifier.height(2.dp))
                 @Suppress("DEPRECATION")
                 Text(
                     text = if (isTemp) "Clicking empty space on the map or another point will remove this pin." else location.type.name.lowercase().replaceFirstChar { it.uppercase() },
@@ -816,8 +817,10 @@ fun LocationDetailsContent(
 ////                            Icon(Icons.Default.Edit, contentDescription = "Edit Pin", tint = Color.Gray)
 //                        }
                     }
+                if (location.isCustom) {
                     IconButton(onClick = onEditPin) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit Pin", tint = Color.Gray)
+                        }
                     }
                 }
             }
