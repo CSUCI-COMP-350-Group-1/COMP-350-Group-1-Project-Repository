@@ -749,10 +749,27 @@ private fun MessageBubble(
                         Spacer(modifier = Modifier.height(8.dp))
                         Button(
                             onClick = {
-                                val lat = message.metadata["lat"]
-                                val lng = message.metadata["lng"]
+                                val lat = message.metadata["lat"]?.toDoubleOrNull()
+                                val lng = message.metadata["lng"]?.toDoubleOrNull()
                                 if (lat != null && lng != null) {
-                                    navController.navigate(Routes.mapWithLocation(lat.toDouble(), lng.toDouble()))
+                                    val route = if (message.type == "pin") {
+                                        Routes.mapWithLocation(
+                                            lat = lat,
+                                            lng = lng,
+                                            tempName = message.metadata["pinName"] ?: "Shared Pin",
+                                            tempDesc = message.metadata["description"],
+                                            tempColor = message.metadata["colorArgb"]?.toIntOrNull(),
+                                            tempEventId = message.metadata["associatedEventId"]
+                                        )
+                                    } else {
+                                        Routes.mapWithLocation(
+                                            lat = lat,
+                                            lng = lng,
+                                            tempName = "Shared Location",
+                                            tempDesc = "A location shared with you"
+                                        )
+                                    }
+                                    navController.navigate(route)
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(

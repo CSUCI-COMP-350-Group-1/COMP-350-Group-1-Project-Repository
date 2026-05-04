@@ -84,11 +84,11 @@ fun ScheduleTab(viewModel: CalendarViewModel) {
     }
 
     if (currentUser == null) {
+        @Suppress("DEPRECATION")
         Box(
             modifier = Modifier.fillMaxSize().background(Color.White),
             contentAlignment = Alignment.Center
         ) {
-            @Suppress("DEPRECATION")
             Text("Please sign in to manage your schedule.")
         }
         return
@@ -254,6 +254,7 @@ fun AddClassDialog(
     val selectedDays2 = remember { mutableStateListOf<Int>() }
     var startTime2 by remember { mutableStateOf(LocalTime.of(9, 0)) }
     var endTime2 by remember { mutableStateOf(LocalTime.of(10, 15)) }
+    var location2Text by rememberSaveable { mutableStateOf("") }
     var notes2Text by rememberSaveable { mutableStateOf("") }
 
     var startDateText by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
@@ -283,6 +284,7 @@ fun AddClassDialog(
             selectedDays2.addAll(editingClass.daysOfWeek2)
             startTime2 = if (editingClass.startTime2.isNotBlank()) LocalTime.parse(editingClass.startTime2) else LocalTime.of(9, 0)
             endTime2 = if (editingClass.endTime2.isNotBlank()) LocalTime.parse(editingClass.endTime2) else LocalTime.of(10, 15)
+            location2Text = editingClass.location2
             notes2Text = editingClass.notes2
 
             startDateText = editingClass.startDate
@@ -334,24 +336,43 @@ fun AddClassDialog(
                     }
                 }
 
-                OutlinedButton(
-                    onClick = { showCoursePicker = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = selectedMajor != null,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = CoralRed, disabledContentColor = Color.Gray),
-                    border = BorderStroke(1.dp, if (selectedMajor != null) CoralRed.copy(alpha = 0.5f) else Color.Gray.copy(alpha = 0.5f))
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Book, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    OutlinedButton(
+                        onClick = { showCoursePicker = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = selectedMajor != null,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = CoralRed, disabledContentColor = Color.Gray),
+                        border = BorderStroke(1.dp, if (selectedMajor != null) CoralRed.copy(alpha = 0.5f) else Color.Gray.copy(alpha = 0.5f))
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Book, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            @Suppress("DEPRECATION")
+                            Text(
+                                text = selectedCourse?.let { "${it.code} - ${it.title}" } ?: "Select Course",
+                                color = if (selectedCourse == null) Color.Gray else CoralRed,
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.Start,
+                                maxLines = 1
+                            )
+                        }
+                    }
+
+                    if (selectedCourse != null) {
                         @Suppress("DEPRECATION")
                         Text(
-                            text = selectedCourse?.let { "${it.code} - ${it.title}" } ?: "Select Course",
-                            color = if (selectedCourse == null) Color.Gray else CoralRed,
-                            modifier = Modifier.weight(1f),
-                            textAlign = TextAlign.Start,
-                            maxLines = 1
+                            text = buildString {
+                                append("Information: ")
+                                append(selectedCourse!!.typicallyOffered)
+                                if (locationText.isNotBlank()) {
+                                    append(" - ")
+                                    append(locationText)
+                                }
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(horizontal = 8.dp)
                         )
                     }
                 }
@@ -419,6 +440,32 @@ fun AddClassDialog(
                             Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = endTime2, onTimeChange = { endTime2 = it }) }
                         }
                         
+                        OutlinedTextField(
+                            value = location2Text,
+                            onValueChange = { location2Text = it },
+                            label = { Text("2nd Location (e.g. Lab Room)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            singleLine = true
+                        )
+
+                        if (selectedCourse != null) {
+                            @Suppress("DEPRECATION")
+                            Text(
+                                text = buildString {
+                                    append("Information: ")
+                                    append(selectedCourse!!.typicallyOffered)
+                                    if (location2Text.isNotBlank()) {
+                                        append(" - ")
+                                        append(location2Text)
+                                    }
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            )
+                        }
+
                         OutlinedTextField(
                             value = notes2Text,
                             onValueChange = { notes2Text = it },
@@ -492,6 +539,7 @@ fun AddClassDialog(
                             daysOfWeek2 = selectedDays2.sorted(),
                             startTime2 = startTime2.toString(),
                             endTime2 = endTime2.toString(),
+                            location2 = location2Text.trim(),
                             notes2 = notes2Text.trim(),
                             startDate = startDateText,
                             endDate = endDateText,
@@ -802,6 +850,15 @@ private fun SavedClassCard(
                             text = "${formatTimeForDisplay(selectedClass.startTime2)} - ${formatTimeForDisplay(selectedClass.endTime2)}",
                             style = MaterialTheme.typography.bodySmall
                         )
+                    }
+
+                    if (selectedClass.location2.isNotBlank()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.LocationOn, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            @Suppress("DEPRECATION")
+                            Text(text = selectedClass.location2, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }

@@ -1351,13 +1351,13 @@ fun CustomPinMarkerIcon(color: Color, isPinned: Boolean, eventCount: Int, isEdit
                     .border(1.5.dp, Color.White, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                @Suppress("DEPRECATION")
-                Text(
-                    text = eventCount.toString(),
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
+//                @Suppress("DEPRECATION")
+//                Text(
+//                    text = eventCount.toString(),
+//                    color = Color.White,
+//                    fontSize = 10.sp,
+//                    fontWeight = FontWeight.Bold
+//                )
             }
         }
     }
@@ -1425,13 +1425,13 @@ fun SelectedPointerIcon(
                     .border(1.5.dp, Color.White, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                @Suppress("DEPRECATION")
-                Text(
-                    text = eventCount.toString(),
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
+//                @Suppress("DEPRECATION")
+//                Text(
+//                    text = eventCount.toString(),
+//                    color = Color.White,
+//                    fontSize = 10.sp,
+//                    fontWeight = FontWeight.Bold
+//                )
             }
         }
     }
@@ -1480,13 +1480,13 @@ fun LandmarkIcon(
                     .border(1.5.dp, Color.White, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                @Suppress("DEPRECATION")
-                Text(
-                    text = eventCount.toString(),
-                    color = Color.White,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold
-                )
+//                @Suppress("DEPRECATION")
+//                Text(
+//                    text = eventCount.toString(),
+//                    color = Color.White,
+//                    fontSize = 9.sp,
+//                    fontWeight = FontWeight.Bold
+//                )
             }
         }
     }

@@ -23,6 +23,7 @@ data class SelectedClass(
     val daysOfWeek2: List<Int> = emptyList(),
     val startTime2: String = "",
     val endTime2: String = "",
+    val location2: String = "",
     val notes2: String = "",
 
     val startDate: String = "",              // "2026-08-24"
@@ -58,8 +59,8 @@ data class SelectedClass(
                         if (cursor.dayOfWeek.value in meetingDays) {
                             val startDateTime = ZonedDateTime.of(cursor, classStartTime, zoneId)
                             val endDateTime = ZonedDateTime.of(cursor, classEndTime, zoneId)
-                            val descriptionText = buildDescription(notes)
-                            events += createEvent(cursor, startDateTime, endDateTime, descriptionText)
+                            val descriptionText = buildDescription(notes, rangeLocation = location)
+                            events += createEvent(cursor, startDateTime, endDateTime, descriptionText, rangeLocation = location)
                         }
                         cursor = cursor.plusDays(1)
                     }
@@ -77,8 +78,8 @@ data class SelectedClass(
                         if (cursor.dayOfWeek.value in meetingDays2) {
                             val startDateTime = ZonedDateTime.of(cursor, classStartTime2, zoneId)
                             val endDateTime = ZonedDateTime.of(cursor, classEndTime2, zoneId)
-                            val descriptionText = buildDescription(notes2, isSecondRange = true)
-                            events += createEvent(cursor, startDateTime, endDateTime, descriptionText, isSecondRange = true, secondRangeNote = notes2)
+                            val descriptionText = buildDescription(notes2, rangeLocation = location2, isSecondRange = true)
+                            events += createEvent(cursor, startDateTime, endDateTime, descriptionText, isSecondRange = true, secondRangeNote = notes2, rangeLocation = location2)
                         }
                         cursor = cursor.plusDays(1)
                     }
@@ -89,15 +90,29 @@ data class SelectedClass(
         }.getOrDefault(emptyList())
     }
 
-    private fun buildDescription(customNotes: String, isSecondRange: Boolean = false): String {
+    private fun buildDescription(customNotes: String, rangeLocation: String = "", isSecondRange: Boolean = false): String {
         return buildString {
             if (isSecondRange) {
                 append("Secondary Meeting / Lab\n")
             }
             append("Class Schedule")
+            
+            val infoLine = buildString {
+                if (typicallyOffered.isNotBlank()) append(typicallyOffered)
+                if (rangeLocation.isNotBlank()) {
+                    if (isNotEmpty()) append(" - ")
+                    append(rangeLocation)
+                }
+            }
+            
+            if (infoLine.isNotBlank()) {
+                append("\nInformation: ").append(infoLine)
+            }
+
             if (termLabel.isNotBlank()) {
                 append("\nTerm: ").append(termLabel)
             }
+
             if (customNotes.isNotBlank()) {
                 append("\nNotes: ").append(customNotes)
             }
@@ -110,7 +125,8 @@ data class SelectedClass(
         end: ZonedDateTime,
         description: String,
         isSecondRange: Boolean = false,
-        secondRangeNote: String = ""
+        secondRangeNote: String = "",
+        rangeLocation: String = ""
     ): CalendarEvent {
         val suffix = if (isSecondRange) "-2" else ""
         val titleSuffix = if (isSecondRange) {
@@ -122,7 +138,7 @@ data class SelectedClass(
             calendarId = "schedule",
             title = "$courseCode - $courseTitle$titleSuffix",
             description = description,
-            location = location.ifBlank { null },
+            location = rangeLocation.ifBlank { location.ifBlank { null } },
             htmlLink = null,
             start = start,
             endExclusive = end,

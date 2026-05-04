@@ -77,7 +77,7 @@ object FirestoreManager {
      */
     private fun encodeNotesWithSecondRange(selectedClass: SelectedClass): String {
         if (!selectedClass.hasSecondTimeRange) return selectedClass.notes
-        val data = "||2ND_RANGE||${selectedClass.daysOfWeek2.joinToString(",")}|${selectedClass.startTime2}|${selectedClass.endTime2}|${selectedClass.notes2}"
+        val data = "||2ND_RANGE||${selectedClass.daysOfWeek2.joinToString(",")}|${selectedClass.startTime2}|${selectedClass.endTime2}|${selectedClass.location2}|${selectedClass.notes2}"
         return if (selectedClass.notes.isBlank()) data else "${selectedClass.notes}\n$data"
     }
 
@@ -90,16 +90,32 @@ object FirestoreManager {
         
         val parts = encoded.split(delimiter)
         val userNotes = parts[0].trim()
-        val rangeData = parts.getOrNull(1)?.split("|") ?: return base.copy(notes = encoded)
+        val rangeData = parts.getOrNull(1)?.split("|", limit = 5) ?: return base.copy(notes = encoded)
         
-        return base.copy(
-            notes = userNotes,
-            hasSecondTimeRange = true,
-            daysOfWeek2 = rangeData.getOrNull(0)?.split(",")?.mapNotNull { it.toIntOrNull() } ?: emptyList(),
-            startTime2 = rangeData.getOrNull(1) ?: "",
-            endTime2 = rangeData.getOrNull(2) ?: "",
-            notes2 = rangeData.getOrNull(3) ?: ""
-        )
+        return if (rangeData.size >= 5) {
+            base.copy(
+                notes = userNotes,
+                hasSecondTimeRange = true,
+                daysOfWeek2 = rangeData[0].split(",").mapNotNull { it.toIntOrNull() },
+                startTime2 = rangeData[1],
+                endTime2 = rangeData[2],
+                location2 = rangeData[3],
+                notes2 = rangeData[4]
+            )
+        } else if (rangeData.size == 4) {
+            // Old format: days|start|end|notes2
+            base.copy(
+                notes = userNotes,
+                hasSecondTimeRange = true,
+                daysOfWeek2 = rangeData[0].split(",").mapNotNull { it.toIntOrNull() },
+                startTime2 = rangeData[1],
+                endTime2 = rangeData[2],
+                location2 = "",
+                notes2 = rangeData[3]
+            )
+        } else {
+            base.copy(notes = encoded)
+        }
     }
 
     suspend fun saveSelectedClass(selectedClass: SelectedClass): Boolean {
