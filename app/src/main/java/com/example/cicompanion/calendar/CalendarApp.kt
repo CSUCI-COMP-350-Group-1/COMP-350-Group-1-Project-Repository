@@ -78,6 +78,12 @@ fun CalendarApp(viewModel: CalendarViewModel) {
 
     var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
 
+    // EVENT NOTIFICATION MERGE:
+    // Load this user's event notification toggles when the calendar screen is shown.
+    LaunchedEffect(Unit) {
+        viewModel.loadEventNotificationPreferences()
+    }
+
     DisposableEffect(Unit) {
         val listener = FirebaseAuth.AuthStateListener { auth ->
             currentUser = auth.currentUser
@@ -92,7 +98,7 @@ fun CalendarApp(viewModel: CalendarViewModel) {
         buildSelectedDateEvents(viewModel.events, viewModel.selectedDate)
     }
 
-    val dayEventInfoMap = remember(viewModel.events) {
+    val dayEventInfoMap = remember(viewModel.events, currentUser?.uid) {
         buildDayEventInfoMap(viewModel.events, currentUser?.uid)
     }
 
@@ -144,9 +150,9 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                 selectedDateEvents = selectedDateEvents,
                 dayEventInfoMap = dayEventInfoMap,
                 onDismissError = viewModel::clearError,
-                onDateSelected = { 
+                onDateSelected = {
                     viewModel.onDateSelected(it)
-                    viewModel.setHighlightedEvent(null) 
+                    viewModel.setHighlightedEvent(null)
                 },
                 onRequestDelete = { eventToDelete = it },
                 onRequestEdit = { eventToEdit = it },
@@ -154,7 +160,13 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                 onToggleBookmark = viewModel::toggleBookmarkEvent,
                 onRequestInvite = { eventToInvite = it },
                 onShowMembers = { eventMembersToShow = it },
-                onInviteClick = { inviteToShowDetails = it }
+                onInviteClick = { inviteToShowDetails = it },
+
+                // EVENT NOTIFICATION MERGE:
+                isEventNotificationEnabled = viewModel::isEventNotificationEnabled,
+                onToggleEventNotification = { event, enabled ->
+                    viewModel.setEventNotificationEnabled(event, enabled)
+                }
             )
         }
     }
@@ -210,7 +222,10 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                     start = startZdt,
                     endExclusive = endZdt
                 )
-                viewModel.addCustomEvent(updatedEvent)
+                // EVENT NOTIFICATION MERGE:
+                // Editing creates a new single-event notification version,
+                // so the old opt-in is removed.
+                viewModel.updateCustomEvent(event, updatedEvent)
                 eventToEdit = null
             }
         )
@@ -309,7 +324,11 @@ private fun CalendarScreenBody(
     onToggleBookmark: (CalendarEvent) -> Unit,
     onRequestInvite: (CalendarEvent) -> Unit,
     onShowMembers: (CalendarEvent) -> Unit,
-    onInviteClick: (EventInvite) -> Unit
+    onInviteClick: (EventInvite) -> Unit,
+
+    // EVENT NOTIFICATION MERGE:
+    isEventNotificationEnabled: (CalendarEvent) -> Boolean,
+    onToggleEventNotification: (CalendarEvent, Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -376,7 +395,10 @@ private fun CalendarScreenBody(
                 onToggleBookmark = onToggleBookmark,
                 onRequestInvite = onRequestInvite,
                 onShowMembers = onShowMembers,
-                highlightedEventId = viewModel.highlightedEventId
+                highlightedEventId = viewModel.highlightedEventId,
+                // EVENT NOTIFICATION MERGE:
+                isEventNotificationEnabled = isEventNotificationEnabled,
+                onToggleEventNotification = onToggleEventNotification
             )
         }
     }
@@ -631,6 +653,11 @@ private fun CalendarContent(
     onToggleBookmark: (CalendarEvent) -> Unit,
     onRequestInvite: (CalendarEvent) -> Unit,
     onShowMembers: (CalendarEvent) -> Unit,
+
+    // EVENT NOTIFICATION MERGE:
+    isEventNotificationEnabled: (CalendarEvent) -> Boolean,
+    onToggleEventNotification: (CalendarEvent, Boolean) -> Unit,
+
     highlightedEventId: String? = null
 ) {
     when (mode) {
@@ -648,8 +675,14 @@ private fun CalendarContent(
             onToggleBookmark = onToggleBookmark,
             onRequestInvite = onRequestInvite,
             onShowMembers = onShowMembers,
+
+            // EVENT NOTIFICATION MERGE:
+            isEventNotificationEnabled = isEventNotificationEnabled,
+            onToggleEventNotification = onToggleEventNotification,
+
             highlightedEventId = highlightedEventId
         )
+
         CalendarMode.DAY -> DayView(
             selectedDate = selectedDate,
             events = selectedDateEvents,
@@ -661,8 +694,14 @@ private fun CalendarContent(
             onToggleBookmark = onToggleBookmark,
             onRequestInvite = onRequestInvite,
             onShowMembers = onShowMembers,
+
+            // EVENT NOTIFICATION MERGE:
+            isEventNotificationEnabled = isEventNotificationEnabled,
+            onToggleEventNotification = onToggleEventNotification,
+
             highlightedEventId = highlightedEventId
         )
+
         CalendarMode.WEEK -> WeekView(
             selectedDate = selectedDate,
             dayEventInfoMap = dayEventInfoMap,
@@ -676,6 +715,11 @@ private fun CalendarContent(
             onToggleBookmark = onToggleBookmark,
             onRequestInvite = onRequestInvite,
             onShowMembers = onShowMembers,
+
+            // EVENT NOTIFICATION MERGE:
+            isEventNotificationEnabled = isEventNotificationEnabled,
+            onToggleEventNotification = onToggleEventNotification,
+
             highlightedEventId = highlightedEventId
         )
     }
@@ -693,6 +737,9 @@ private fun DayView(
     onToggleBookmark: (CalendarEvent) -> Unit,
     onRequestInvite: (CalendarEvent) -> Unit,
     onShowMembers: (CalendarEvent) -> Unit,
+    // EVENT NOTIFICATION MERGE:
+    isEventNotificationEnabled: (CalendarEvent) -> Boolean,
+    onToggleEventNotification: (CalendarEvent, Boolean) -> Unit,
     highlightedEventId: String? = null
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy") }
@@ -715,6 +762,11 @@ private fun DayView(
             onToggleBookmark = onToggleBookmark,
             onRequestInvite = onRequestInvite,
             onShowMembers = onShowMembers,
+
+            // EVENT NOTIFICATION MERGE:
+            isEventNotificationEnabled = isEventNotificationEnabled,
+            onToggleEventNotification = onToggleEventNotification,
+
             highlightedEventId = highlightedEventId
         )
     }
@@ -734,6 +786,9 @@ private fun WeekView(
     onToggleBookmark: (CalendarEvent) -> Unit,
     onRequestInvite: (CalendarEvent) -> Unit,
     onShowMembers: (CalendarEvent) -> Unit,
+    // EVENT NOTIFICATION MERGE:
+    isEventNotificationEnabled: (CalendarEvent) -> Boolean,
+    onToggleEventNotification: (CalendarEvent, Boolean) -> Unit,
     highlightedEventId: String? = null
 ) {
     val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
@@ -769,6 +824,11 @@ private fun WeekView(
             onToggleBookmark = onToggleBookmark,
             onRequestInvite = onRequestInvite,
             onShowMembers = onShowMembers,
+
+            // EVENT NOTIFICATION MERGE:
+            isEventNotificationEnabled = isEventNotificationEnabled,
+            onToggleEventNotification = onToggleEventNotification,
+
             highlightedEventId = highlightedEventId
         )
     }
@@ -789,6 +849,9 @@ private fun MonthView(
     onToggleBookmark: (CalendarEvent) -> Unit,
     onRequestInvite: (CalendarEvent) -> Unit,
     onShowMembers: (CalendarEvent) -> Unit,
+    // EVENT NOTIFICATION MERGE:
+    isEventNotificationEnabled: (CalendarEvent) -> Boolean,
+    onToggleEventNotification: (CalendarEvent, Boolean) -> Unit,
     highlightedEventId: String? = null
 ) {
     val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
@@ -824,6 +887,11 @@ private fun MonthView(
             onToggleBookmark = onToggleBookmark,
             onRequestInvite = onRequestInvite,
             onShowMembers = onShowMembers,
+
+            // EVENT NOTIFICATION MERGE:
+            isEventNotificationEnabled = isEventNotificationEnabled,
+            onToggleEventNotification = onToggleEventNotification,
+
             highlightedEventId = highlightedEventId
         )
     }
@@ -1077,18 +1145,28 @@ private fun EventsSection(
     onToggleBookmark: (CalendarEvent) -> Unit,
     onRequestInvite: (CalendarEvent) -> Unit,
     onShowMembers: (CalendarEvent) -> Unit,
+
+    // EVENT NOTIFICATION MERGE:
+    isEventNotificationEnabled: (CalendarEvent) -> Boolean,
+    onToggleEventNotification: (CalendarEvent, Boolean) -> Unit,
+
     highlightedEventId: String? = null
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionHeading(text = title)
         EventsList(
-            events = events, 
-            onDeleteEvent = onDeleteEvent, 
+            events = events,
+            onDeleteEvent = onDeleteEvent,
             onEditEvent = onEditEvent,
             onTogglePin = onTogglePin,
             onToggleBookmark = onToggleBookmark,
             onRequestInvite = onRequestInvite,
             onShowMembers = onShowMembers,
+
+            // EVENT NOTIFICATION MERGE:
+            isEventNotificationEnabled = isEventNotificationEnabled,
+            onToggleEventNotification = onToggleEventNotification,
+
             highlightedEventId = highlightedEventId
         )
     }
@@ -1103,6 +1181,11 @@ private fun EventsList(
     onToggleBookmark: (CalendarEvent) -> Unit,
     onRequestInvite: (CalendarEvent) -> Unit,
     onShowMembers: (CalendarEvent) -> Unit,
+
+    // EVENT NOTIFICATION MERGE:
+    isEventNotificationEnabled: (CalendarEvent) -> Boolean,
+    onToggleEventNotification: (CalendarEvent, Boolean) -> Unit,
+
     highlightedEventId: String? = null
 ) {
     if (events.isEmpty()) {
@@ -1122,7 +1205,13 @@ private fun EventsList(
                 onToggleBookmark = { onToggleBookmark(event) },
                 onInvite = { onRequestInvite(event) },
                 onShowMembers = { onShowMembers(event) },
-                isHighlighted = event.id == highlightedEventId
+                isHighlighted = event.id == highlightedEventId,
+
+                // EVENT NOTIFICATION MERGE:
+                notificationsEnabled = isEventNotificationEnabled(event),
+                onNotificationToggle = { enabled ->
+                    onToggleEventNotification(event, enabled)
+                }
             )
         }
     }
@@ -1141,14 +1230,18 @@ private fun EmptyEventsMessage() {
 
 @Composable
 private fun EventCard(
-    event: CalendarEvent, 
-    onDelete: () -> Unit, 
+    event: CalendarEvent,
+    onDelete: () -> Unit,
     onEdit: () -> Unit,
     onTogglePin: () -> Unit,
     onToggleBookmark: () -> Unit,
     onInvite: () -> Unit,
     onShowMembers: () -> Unit,
-    isHighlighted: Boolean = false
+    isHighlighted: Boolean = false,
+
+    // EVENT NOTIFICATION MERGE:
+    notificationsEnabled: Boolean,
+    onNotificationToggle: (Boolean) -> Unit
 ) {
     val isCustom = event.calendarId == "custom"
     val currentUser = FirebaseAuth.getInstance().currentUser
@@ -1313,6 +1406,26 @@ private fun EventCard(
             }
 
             event.description?.let { EventDescription(text = HtmlUtils.stripHtml(it)) }
+            // EVENT NOTIFICATION MERGE:
+            // Per-user push reminder toggle.
+            // Classes opt in once; custom/campus/shared events opt in per event version.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Push reminders",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Switch(
+                    checked = notificationsEnabled,
+                    onCheckedChange = onNotificationToggle
+                )
+            }
         }
     }
 }
