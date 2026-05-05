@@ -49,6 +49,7 @@ import java.time.temporal.TemporalAdjusters
 import java.time.temporal.WeekFields
 import java.util.Locale
 import java.util.UUID
+import com.example.cicompanion.firebase.EventInviteNotificationSender
 
 private val SharedEventBlue = Color(0xFF2196F3)
 private val SharedEventLightBlue = Color(0xFFE3F2FD)
@@ -193,10 +194,27 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                     isShared = invitedFriends.isNotEmpty()
                 )
                 viewModel.addCustomEvent(newEvent)
-                
+
                 currentUser?.let { user ->
                     invitedFriends.forEach { friend ->
-                        SocialRepository.sendEventInvite(user, friend.uid, newEvent, {}, {})
+                        SocialRepository.sendEventInvite(
+                            currentUser = user,
+                            targetUserId = friend.uid,
+                            event = newEvent,
+                            onSuccess = {
+                                // EVENT INVITE NOTIFICATION:
+                                // Send a push notification after the Firestore invite is created successfully.
+                                EventInviteNotificationSender.sendEventInviteNotification(
+                                    targetUserId = friend.uid,
+                                    inviterDisplayName = user.displayName ?: user.email ?: "Someone",
+                                    eventTitle = newEvent.title,
+                                    eventId = newEvent.id
+                                )
+                            },
+                            onError = { errorMessage ->
+                                Toast.makeText(context, "Invite error: $errorMessage", Toast.LENGTH_SHORT).show()
+                            }
+                        )
                     }
                 }
                 
@@ -268,11 +286,20 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                         currentUser = user,
                         targetUserId = friend.uid,
                         event = event,
-                        onSuccess = { 
+                        onSuccess = {
+                            // EVENT INVITE NOTIFICATION:
+                            // Send a push notification after the Firestore invite is created successfully.
+                            EventInviteNotificationSender.sendEventInviteNotification(
+                                targetUserId = friend.uid,
+                                inviterDisplayName = user.displayName ?: user.email ?: "Someone",
+                                eventTitle = event.title,
+                                eventId = event.id
+                            )
+
                             eventToInvite = null
                             Toast.makeText(context, "Invite sent to ${friend.displayName}!", Toast.LENGTH_SHORT).show()
                         },
-                        onError = { 
+                        onError = {
                             Toast.makeText(context, "Error: $it", Toast.LENGTH_SHORT).show()
                         }
                     )
