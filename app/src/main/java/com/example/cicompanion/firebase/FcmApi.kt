@@ -25,4 +25,10 @@ interface FcmApi {
     suspend fun sendDirectMessagePush(
         @Body body: Map<String, String>
     )
+    // EVENT INVITE NOTIFICATION:
+    // Sends a push notification when someone invites a user to a shared calendar event.
+    @POST("/send-event-invite")
+    suspend fun sendEventInvitePush(
+        @Body body: Map<String, String>
+    )
 }

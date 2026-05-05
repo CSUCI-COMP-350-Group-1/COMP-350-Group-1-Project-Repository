@@ -99,7 +99,6 @@ class PushNotificationService : FirebaseMessagingService() {
             description = "Friend request notifications"
         }
 
-        // MESSAGING new high-importance direct message channel
         val directMessageChannel = NotificationChannel(
             DIRECT_MESSAGE_CHANNEL_ID,
             DIRECT_MESSAGE_CHANNEL_NAME,
@@ -108,18 +107,49 @@ class PushNotificationService : FirebaseMessagingService() {
             description = "Direct message notifications"
         }
 
+        // EVENT NOTIFICATION:
+        // Calendar event reminder notification channel.
+        val eventReminderChannel = NotificationChannel(
+            EVENT_REMINDER_CHANNEL_ID,
+            EVENT_REMINDER_CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Calendar event reminder notifications"
+        }
+
+        // EVENT INVITE NOTIFICATION:
+        // Shared calendar event invite notification channel.
+        val eventInviteChannel = NotificationChannel(
+            EVENT_INVITE_CHANNEL_ID,
+            EVENT_INVITE_CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Shared calendar event invite notifications"
+        }
+
         val manager = getSystemService(NotificationManager::class.java)
+
         manager.createNotificationChannel(friendRequestChannel)
         manager.createNotificationChannel(directMessageChannel)
+        manager.createNotificationChannel(eventReminderChannel)
+
+        // EVENT INVITE NOTIFICATION:
+        manager.createNotificationChannel(eventInviteChannel)
     }
 
     companion object {
         private const val FRIEND_REQUEST_CHANNEL_ID = "friend_request_notifications"
         private const val FRIEND_REQUEST_CHANNEL_NAME = "Friend Requests"
 
-        // MESSAGING CHANGE
         const val DIRECT_MESSAGE_CHANNEL_ID = "direct_message_notifications"
         private const val DIRECT_MESSAGE_CHANNEL_NAME = "Direct Messages"
+
+        const val EVENT_REMINDER_CHANNEL_ID = "event_reminder_notifications"
+        private const val EVENT_REMINDER_CHANNEL_NAME = "Event Reminders"
+
+        // EVENT INVITE NOTIFICATION:
+        const val EVENT_INVITE_CHANNEL_ID = "event_invite_notifications"
+        private const val EVENT_INVITE_CHANNEL_NAME = "Event Invites"
 
         const val EXTRA_DESTINATION_ROUTE = "destination_route"
     }
