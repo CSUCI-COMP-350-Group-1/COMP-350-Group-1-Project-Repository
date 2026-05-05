@@ -154,15 +154,50 @@ class CalendarViewModel(
 
     fun addCustomEvent(event: CalendarEvent) {
         viewModelScope.launch {
-            FirestoreManager.saveCustomEvent(event)
-            loadCustomEvents()
+            val success = FirestoreManager.saveCustomEvent(event)
+            if (success) {
+                customEvents = FirestoreManager.fetchCustomEvents()
+            }
         }
     }
 
-    fun deleteCustomEvent(eventId: String) {
+    // EVENT NOTIFICATION FIX:
+    // Editing a custom event creates a new notification version.
+    // The old opt-in is removed, so the user must opt into the edited event again.
+    fun updateCustomEvent(
+        originalEvent: CalendarEvent,
+        updatedEvent: CalendarEvent
+    ) {
         viewModelScope.launch {
-            FirestoreManager.deleteCustomEvent(eventId)
-            loadCustomEvents()
+            FirestoreManager.saveEventNotificationPreference(
+                event = originalEvent,
+                enabled = false
+            )
+
+            val success = FirestoreManager.saveCustomEvent(updatedEvent)
+            if (success) {
+                customEvents = FirestoreManager.fetchCustomEvents()
+                enabledEventNotificationPreferenceIds =
+                    FirestoreManager.fetchEnabledEventNotificationPreferenceIds()
+            }
+        }
+    }
+
+    // EVENT NOTIFICATION FIX:
+    // Deleting a custom event also deletes its notification preference.
+    fun deleteCustomEvent(event: CalendarEvent) {
+        viewModelScope.launch {
+            FirestoreManager.saveEventNotificationPreference(
+                event = event,
+                enabled = false
+            )
+
+            val success = FirestoreManager.deleteCustomEvent(event.id)
+            if (success) {
+                customEvents = FirestoreManager.fetchCustomEvents()
+                enabledEventNotificationPreferenceIds =
+                    FirestoreManager.fetchEnabledEventNotificationPreferenceIds()
+            }
         }
     }
 

@@ -202,7 +202,9 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                     start = startZdt,
                     endExclusive = endZdt
                 )
-                viewModel.addCustomEvent(updatedEvent) // saveCustomEvent works for updates too
+                // EVENT NOTIFICATION FIX:
+// Editing creates a new single-event notification version.
+                viewModel.updateCustomEvent(event, updatedEvent)
                 eventToEdit = null
             }
         )
@@ -216,7 +218,9 @@ fun CalendarApp(viewModel: CalendarViewModel) {
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.deleteCustomEvent(event.id)
+                        // EVENT NOTIFICATION FIX:
+                        // Delete the custom event and its notification opt-in together.
+                        viewModel.deleteCustomEvent(event)
                         eventToDelete = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = CoralRed)

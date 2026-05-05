@@ -86,59 +86,29 @@ object FirestoreManager {
                 Log.e(TAG, "Failed to save FCM token for uid=$userId", exception)
             }
     }
-    // EVENT NOTIFICATION:
-    // Build a stable Firestore-safe document ID from the event ID.
-    fun buildEventNotificationPreferenceId(eventId: String): String {
+    // EVENT NOTIFICATION FIX:
+    // Classes opt in once by saved SelectedClass.id.
+    // Custom/campus events opt in per event version by event.id + event.start.
+    private const val TARGET_TYPE_RECURRING_CLASS = "recurring_class"
+    private const val TARGET_TYPE_SINGLE_EVENT = "single_event"
+    private const val SINGLE_EVENT_TARGET_SEPARATOR = "::"
+
+    private val recurringClassOccurrenceRegex = Regex("^(.*)-\\d{4}-\\d{2}-\\d{2}$")
+
+    private data class EventNotificationTarget(
+        val targetType: String,
+        val targetId: String
+    )
+
+    private fun sha256(value: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
-        val bytes = digest.digest(eventId.toByteArray(Charsets.UTF_8))
+        val bytes = digest.digest(value.toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { byte -> "%02x".format(byte) }
     }
 
-    // EVENT NOTIFICATION:
-    // Save or remove one event notification opt-in for the current user.
-    // For class events, this saves a recurring class preference.
-    // For one-time events, this saves a single-event preference.
-    suspend fun saveEventNotificationPreference(event: CalendarEvent, enabled: Boolean): Boolean {
-        val user = FirebaseAuth.getInstance().currentUser ?: return false
-        val db = FirebaseFirestore.getInstance()
-        val target = deriveEventNotificationTarget(event)
-        val preferenceId = buildEventNotificationPreferenceId(
-            targetType = target.targetType,
-            targetId = target.targetId
-        )
-
-        return try {
-            val docRef = db.collection("users")
-                .document(user.uid)
-                .collection("eventNotificationPreferences")
-                .document(preferenceId)
-
-            if (enabled) {
-                val payload = hashMapOf(
-                    "preferenceId" to preferenceId,
-                    "targetType" to target.targetType,
-                    "targetId" to target.targetId,
-                    "title" to event.title,
-                    "calendarId" to event.calendarId,
-                    "start" to event.start.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
-                    "enabled" to true,
-                    "updatedAt" to System.currentTimeMillis()
-                )
-
-                docRef.set(payload).await()
-            } else {
-                docRef.delete().await()
-            }
-
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Error saving event notification preference: ${e.message}", e)
-            false
-        }
-    }
-
-    // EVENT NOTIFICATION:
-    // Load all enabled preference IDs for the current signed-in user.
+    // EVENT NOTIFICATION FIX:
+    // Loads all enabled notification preference document IDs for the signed-in user.
+    // CalendarViewModel uses this set to decide whether each event's toggle is on or off.
     suspend fun fetchEnabledEventNotificationPreferenceIds(): Set<String> {
         val user = FirebaseAuth.getInstance().currentUser ?: return emptySet()
         val db = FirebaseFirestore.getInstance()
@@ -160,19 +130,33 @@ object FirestoreManager {
         }
     }
 
-    // EVENT NOTIFICATION:
-    // Classes should opt in once for all future occurrences.
-    // One-time events should stay tied to the exact event occurrence.
-    private const val TARGET_TYPE_RECURRING_CLASS = "recurring_class"
-    private const val TARGET_TYPE_SINGLE_EVENT = "single_event"
+    // EVENT NOTIFICATION FIX:
+    // This is the one stable preference-id builder used by the app.
+    fun buildEventNotificationPreferenceId(
+        targetType: String,
+        targetId: String
+    ): String {
+        return sha256("$targetType::$targetId")
+    }
 
-    private val recurringClassOccurrenceRegex = Regex("^(.*)-\\d{4}-\\d{2}-\\d{2}$")
+    // EVENT NOTIFICATION FIX:
+    // Older code may have created docs using SHA-256(event.id) only.
+    // Keep this only so disabling/deleting can clean up stale test docs.
+    private fun buildLegacyRawEventPreferenceId(eventId: String): String {
+        return sha256(eventId)
+    }
 
-    private data class EventNotificationTarget(
-        val targetType: String,
-        val targetId: String
-    )
+    // EVENT NOTIFICATION FIX:
+    // A single event version is identified by both its event id and start time.
+    // If the event time changes, the opt-in key changes, so the user must opt in again.
+    private fun buildSingleEventVersionTargetId(event: CalendarEvent): String {
+        val startKey = event.start.format(DateTimeFormatter.ISO_ZONED_DATE_TIME)
+        return "${event.id}$SINGLE_EVENT_TARGET_SEPARATOR$startKey"
+    }
 
+    // EVENT NOTIFICATION FIX:
+    // Schedule/class events use the original SelectedClass.id.
+    // Single events use event.id + event.start.
     private fun deriveEventNotificationTarget(event: CalendarEvent): EventNotificationTarget {
         return if (event.calendarId == "schedule") {
             val recurringClassId = recurringClassOccurrenceRegex
@@ -189,20 +173,9 @@ object FirestoreManager {
         } else {
             EventNotificationTarget(
                 targetType = TARGET_TYPE_SINGLE_EVENT,
-                targetId = event.id
+                targetId = buildSingleEventVersionTargetId(event)
             )
         }
-    }
-
-    // EVENT NOTIFICATION
-    // Build stable Firestore-safe document ID from targetType + targetId.
-    fun buildEventNotificationPreferenceId(
-        targetType: String,
-        targetId: String
-    ): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val bytes = digest.digest("$targetType::$targetId".toByteArray(Charsets.UTF_8))
-        return bytes.joinToString("") { byte -> "%02x".format(byte) }
     }
 
     fun buildEventNotificationPreferenceIdForEvent(event: CalendarEvent): String {
@@ -211,6 +184,58 @@ object FirestoreManager {
             targetType = target.targetType,
             targetId = target.targetId
         )
+    }
+
+    // EVENT NOTIFICATION FIX:
+    // Save or remove one event notification opt-in for the current user.
+    // Classes remain one-time opt-in.
+    // Custom/campus events are opt-in per event version.
+    suspend fun saveEventNotificationPreference(event: CalendarEvent, enabled: Boolean): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        val db = FirebaseFirestore.getInstance()
+        val target = deriveEventNotificationTarget(event)
+        val preferenceId = buildEventNotificationPreferenceId(
+            targetType = target.targetType,
+            targetId = target.targetId
+        )
+
+        val preferencesRef = db.collection("users")
+            .document(user.uid)
+            .collection("eventNotificationPreferences")
+
+        return try {
+            if (enabled) {
+                val payload = hashMapOf(
+                    "preferenceId" to preferenceId,
+                    "targetType" to target.targetType,
+                    "targetId" to target.targetId,
+                    "title" to event.title,
+                    "calendarId" to event.calendarId,
+                    "start" to event.start.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
+                    "enabled" to true,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+
+                preferencesRef.document(preferenceId).set(payload).await()
+            } else {
+                // EVENT NOTIFICATION FIX:
+                // Delete the current preference id and older legacy ids from previous test versions.
+                val preferenceIdsToDelete = mutableSetOf(
+                    preferenceId,
+                    buildEventNotificationPreferenceId(target.targetType, event.id),
+                    buildLegacyRawEventPreferenceId(event.id)
+                )
+
+                preferenceIdsToDelete.forEach { id ->
+                    preferencesRef.document(id).delete().await()
+                }
+            }
+
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving event notification preference: ${e.message}", e)
+            false
+        }
     }
 
     // CALENDAR SCHEDULE CHANGE:
