@@ -112,16 +112,34 @@ object MessagingRepository {
             }
     }
 
+    fun deleteMessage(
+        conversationId: String,
+        messageId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        FirebaseFirestore.getInstance()
+            .collection(CONVERSATIONS_COLLECTION)
+            .document(conversationId)
+            .collection(MESSAGES_SUBCOLLECTION)
+            .document(messageId)
+            .delete()
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onError(e.message ?: "Could not delete message.") }
+    }
+
     fun sendMessage(
         currentUser: FirebaseUser,
         friend: UserProfile,
         messageText: String,
+        type: String = "text",
+        metadata: Map<String, String> = emptyMap(),
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
         val trimmedText = messageText.trim()
 
-        if (trimmedText.isBlank()) {
+        if (trimmedText.isBlank() && type == "text") {
             onError("Message cannot be empty.")
             return
         }
@@ -137,7 +155,7 @@ object MessagingRepository {
         val summary = hashMapOf(
             "id" to conversationId,
             "participantIds" to participantIds, // stable order
-            "lastMessageText" to trimmedText,
+            "lastMessageText" to if (type == "text") trimmedText else "[$type]",
             "lastMessageSenderId" to currentUser.uid,
             "lastMessageAt" to sentAt
         )
@@ -148,7 +166,9 @@ object MessagingRepository {
             senderId = currentUser.uid,
             receiverId = friend.uid,
             text = trimmedText,
-            sentAt = sentAt
+            sentAt = sentAt,
+            type = type,
+            metadata = metadata
         )
 
         // MESSAGING batch keeps summary + first/new message together
@@ -164,7 +184,7 @@ object MessagingRepository {
                     ?: currentUser.email
                     ?: "Someone",
                 conversationId = conversationId,
-                messagePreview = trimmedText.take(120)
+                messagePreview = if (type == "text") trimmedText.take(120) else "[$type]"
             )
             onSuccess()
         }.addOnFailureListener { exception ->

@@ -4,6 +4,7 @@ import android.util.Log
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.maps.CampusLocation
 import com.example.cicompanion.maps.LocationType
+import com.example.cicompanion.maps.CustomPin
 import com.google.android.gms.maps.model.LatLng
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
@@ -42,22 +43,15 @@ object FirestoreManager {
         userRef.set(userProfile, SetOptions.merge())
             .addOnSuccessListener {
                 Log.d(TAG, "User profile saved to Firestore for uid=${user.uid}")
-
-                // PUSH NOTIFICATIONS
-                // store this device's FCM token on the user document
                 onSuccess?.invoke()
             }
             .addOnFailureListener { exception ->
                 Log.e(TAG, "Failed to save user profile to Firestore.", exception)
             }
     }
-    // PUSH NOTIFICATIONS
-    // store this device's FCM token on the user document
+
     fun saveFcmToken(userId: String, token: String) {
         val db = FirebaseFirestore.getInstance()
-
-        // PUSH NOTIFICATIONS CHANGE:
-        // Store token in the existing owner-only subcollection allowed by your rules.
         val tokenRef = db.collection("users")
             .document(userId)
             .collection("fcmTokens")
@@ -77,12 +71,58 @@ object FirestoreManager {
             }
     }
 
-    // CALENDAR SCHEDULE CHANGE:
-    // Save one selected class entry for the signed-in user.
+    /**
+     * Encodes 2nd range fields into the 'notes' string to comply with strict Firestore rules
+     * that only allow a fixed set of keys in SelectedClass documents.
+     */
+    private fun encodeNotesWithSecondRange(selectedClass: SelectedClass): String {
+        if (!selectedClass.hasSecondTimeRange) return selectedClass.notes
+        val data = "||2ND_RANGE||${selectedClass.daysOfWeek2.joinToString(",")}|${selectedClass.startTime2}|${selectedClass.endTime2}|${selectedClass.location2}|${selectedClass.notes2}"
+        return if (selectedClass.notes.isBlank()) data else "${selectedClass.notes}\n$data"
+    }
+
+    /**
+     * Decodes the structure in 'notes' back into SelectedClass fields.
+     */
+    private fun decodeNotesWithSecondRange(encoded: String, base: SelectedClass): SelectedClass {
+        val delimiter = "||2ND_RANGE||"
+        if (!encoded.contains(delimiter)) return base.copy(notes = encoded, hasSecondTimeRange = false)
+        
+        val parts = encoded.split(delimiter)
+        val userNotes = parts[0].trim()
+        val rangeData = parts.getOrNull(1)?.split("|", limit = 5) ?: return base.copy(notes = encoded)
+        
+        return if (rangeData.size >= 5) {
+            base.copy(
+                notes = userNotes,
+                hasSecondTimeRange = true,
+                daysOfWeek2 = rangeData[0].split(",").mapNotNull { it.toIntOrNull() },
+                startTime2 = rangeData[1],
+                endTime2 = rangeData[2],
+                location2 = rangeData[3],
+                notes2 = rangeData[4]
+            )
+        } else if (rangeData.size == 4) {
+            // Old format: days|start|end|notes2
+            base.copy(
+                notes = userNotes,
+                hasSecondTimeRange = true,
+                daysOfWeek2 = rangeData[0].split(",").mapNotNull { it.toIntOrNull() },
+                startTime2 = rangeData[1],
+                endTime2 = rangeData[2],
+                location2 = "",
+                notes2 = rangeData[3]
+            )
+        } else {
+            base.copy(notes = encoded)
+        }
+    }
+
     suspend fun saveSelectedClass(selectedClass: SelectedClass): Boolean {
         val user = FirebaseAuth.getInstance().currentUser ?: return false
         val db = FirebaseFirestore.getInstance()
 
+        // We only include keys allowed by the user's Firestore rules
         val classData = hashMapOf(
             "id" to selectedClass.id,
             "majorCode" to selectedClass.majorCode,
@@ -96,7 +136,7 @@ object FirestoreManager {
             "startDate" to selectedClass.startDate,
             "endDate" to selectedClass.endDate,
             "location" to selectedClass.location,
-            "notes" to selectedClass.notes,
+            "notes" to encodeNotesWithSecondRange(selectedClass),
             "termLabel" to selectedClass.termLabel,
             "colorArgb" to selectedClass.colorArgb,
             "reminderEnabled" to selectedClass.reminderEnabled,
@@ -110,32 +150,22 @@ object FirestoreManager {
                 .document(user.uid)
                 .collection("selectedClasses")
                 .document(selectedClass.id)
-                .set(classData)
+                .set(classData) // Using full set because we provided all allowed keys
                 .await()
-
             true
-            // CALENDAR SCHEDULE CHANGE:
-            // Log the exact Firestore error so schedule save failures are easier to debug.
         } catch (e: Exception) {
             Log.e(TAG, "Error saving selected class: ${e.message}", e)
             false
         }
     }
 
-    // CALENDAR SCHEDULE CHANGE:
-    // Delete one selected class entry for the signed-in user.
     suspend fun deleteSelectedClass(selectedClassId: String): Boolean {
         val user = FirebaseAuth.getInstance().currentUser ?: return false
         val db = FirebaseFirestore.getInstance()
-
         return try {
-            db.collection("users")
-                .document(user.uid)
-                .collection("selectedClasses")
-                .document(selectedClassId)
-                .delete()
-                .await()
-
+            db.collection("users").document(user.uid)
+                .collection("selectedClasses").document(selectedClassId)
+                .delete().await()
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error deleting selected class", e)
@@ -143,8 +173,6 @@ object FirestoreManager {
         }
     }
 
-    // CALENDAR SCHEDULE CHANGE
-    // Fetch all selected class entries for the signed-in user.
     suspend fun fetchSelectedClasses(): List<SelectedClass> {
         val user = FirebaseAuth.getInstance().currentUser ?: return emptyList()
         val db = FirebaseFirestore.getInstance()
@@ -157,22 +185,21 @@ object FirestoreManager {
                 .await()
 
             snapshot.documents.mapNotNull { document ->
-                SelectedClass(
+                val rawNotes = document.getString("notes") ?: ""
+                val base = SelectedClass(
                     id = document.getString("id") ?: return@mapNotNull null,
                     majorCode = document.getString("majorCode") ?: "",
                     majorName = document.getString("majorName") ?: "",
                     courseCode = document.getString("courseCode") ?: "",
                     courseTitle = document.getString("courseTitle") ?: "",
                     typicallyOffered = document.getString("typicallyOffered") ?: "",
-                    daysOfWeek = (document.get("daysOfWeek") as? List<*>)?.mapNotNull {
-                        (it as? Number)?.toInt()
-                    } ?: emptyList(),
+                    daysOfWeek = (document.get("daysOfWeek") as? List<*>)?.mapNotNull { (it as? Number)?.toInt() } ?: emptyList(),
                     startTime = document.getString("startTime") ?: "",
                     endTime = document.getString("endTime") ?: "",
                     startDate = document.getString("startDate") ?: "",
                     endDate = document.getString("endDate") ?: "",
                     location = document.getString("location") ?: "",
-                    notes = document.getString("notes") ?: "",
+                    notes = rawNotes,
                     termLabel = document.getString("termLabel") ?: "",
                     colorArgb = (document.getLong("colorArgb") ?: 0xFFEF3347).toInt(),
                     reminderEnabled = document.getBoolean("reminderEnabled") ?: false,
@@ -180,6 +207,7 @@ object FirestoreManager {
                     createdAt = document.getLong("createdAt") ?: 0L,
                     updatedAt = document.getLong("updatedAt") ?: 0L
                 )
+                decodeNotesWithSecondRange(rawNotes, base)
             }.sortedWith(
                 compareBy<SelectedClass>(
                     { it.daysOfWeek.minOrNull() ?: Int.MAX_VALUE },
@@ -204,8 +232,12 @@ object FirestoreManager {
             "start" to event.start.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
             "end" to event.endExclusive.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
             "isAllDay" to event.isAllDay,
-            "calendarId" to "custom",
-            "isPinned" to event.isPinned
+            "calendarId" to event.calendarId,
+            "isPinned" to event.isPinned,
+            "ownerId" to (event.ownerId ?: user.uid),
+            "maxMembers" to event.maxMembers,
+            "isPinnedByLeader" to event.isPinnedByLeader,
+            "isBookmarked" to event.isBookmarked
         )
 
         return try {
@@ -226,11 +258,24 @@ object FirestoreManager {
         return try {
             db.collection("users").document(user.uid)
                 .collection("customEvents").document(eventId)
-                .update("isPinned", isPinned)
-                .await()
+                .update("isPinned", isPinned).await()
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error updating pin status", e)
+            false
+        }
+    }
+
+    suspend fun updateEventBookmarkStatus(eventId: String, isBookmarked: Boolean): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        val db = FirebaseFirestore.getInstance()
+        return try {
+            db.collection("users").document(user.uid)
+                .collection("customEvents").document(eventId)
+                .update("isBookmarked", isBookmarked).await()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating bookmark status", e)
             false
         }
     }
@@ -241,8 +286,7 @@ object FirestoreManager {
         return try {
             db.collection("users").document(user.uid)
                 .collection("customEvents").document(eventId)
-                .delete()
-                .await()
+                .delete().await()
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error deleting custom event", e)
@@ -261,26 +305,24 @@ object FirestoreManager {
                 .await()
 
             snapshot.documents.mapNotNull { doc ->
-                val id = doc.getString("id") ?: ""
-                val title = doc.getString("title") ?: ""
-                val description = doc.getString("description")
-                val location = doc.getString("location")
                 val startStr = doc.getString("start") ?: return@mapNotNull null
                 val endStr = doc.getString("end") ?: return@mapNotNull null
-                val isAllDay = doc.getBoolean("isAllDay") ?: false
-                val isPinned = doc.getBoolean("isPinned") ?: false
-
                 CalendarEvent(
-                    id = id,
-                    calendarId = "custom",
-                    title = title,
-                    description = description,
-                    location = location,
+                    id = doc.getString("id") ?: "",
+                    calendarId = doc.getString("calendarId") ?: "custom",
+                    title = doc.getString("title") ?: "",
+                    description = doc.getString("description"),
+                    location = doc.getString("location"),
                     htmlLink = null,
                     start = ZonedDateTime.parse(startStr),
                     endExclusive = ZonedDateTime.parse(endStr),
-                    isAllDay = isAllDay,
-                    isPinned = isPinned
+                    isAllDay = doc.getBoolean("isAllDay") ?: false,
+                    isPinned = doc.getBoolean("isPinned") ?: false,
+                    ownerId = doc.getString("ownerId"),
+                    maxMembers = doc.getLong("maxMembers")?.toInt(),
+                    isPinnedByLeader = doc.getBoolean("isPinnedByLeader") ?: false,
+                    isBookmarked = doc.getBoolean("isBookmarked") ?: false,
+                    isShared = false
                 )
             }
         } catch (e: Exception) {
@@ -289,21 +331,108 @@ object FirestoreManager {
         }
     }
 
+    suspend fun saveCustomPin(pin: CustomPin): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        val db = FirebaseFirestore.getInstance()
+        val pinData = hashMapOf(
+            "id" to pin.id,
+            "userId" to user.uid,
+            "name" to pin.name,
+            "latitude" to pin.latitude,
+            "longitude" to pin.longitude,
+            "description" to pin.description,
+            "colorArgb" to pin.colorArgb,
+            "isFavorited" to pin.isFavorited,
+            "associatedEventId" to pin.associatedEventId
+        )
+
+        return try {
+            db.collection("users").document(user.uid)
+                .collection("customPins").document(pin.id)
+                .set(pinData).await()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving custom pin", e)
+            false
+        }
+    }
+
+    suspend fun fetchCustomPins(): List<CustomPin> {
+        val user = FirebaseAuth.getInstance().currentUser ?: return emptyList()
+        val db = FirebaseFirestore.getInstance()
+
+        return try {
+            val snapshot = db.collection("users").document(user.uid)
+                .collection("customPins")
+                .get()
+                .await()
+
+            snapshot.documents.mapNotNull { doc ->
+                CustomPin(
+                    id = doc.getString("id") ?: "",
+                    userId = doc.getString("userId") ?: "",
+                    name = doc.getString("name") ?: "",
+                    latitude = doc.getDouble("latitude") ?: 0.0,
+                    longitude = doc.getDouble("longitude") ?: 0.0,
+                    description = doc.getString("description") ?: "",
+                    colorArgb = doc.getLong("colorArgb")?.toInt() ?: 0,
+                    isFavorited = doc.getBoolean("isFavorited") ?: false,
+                    associatedEventId = doc.getString("associatedEventId")
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching custom pins", e)
+            emptyList()
+        }
+    }
+
+    suspend fun deleteCustomPin(pinId: String): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        val db = FirebaseFirestore.getInstance()
+        return try {
+            db.collection("users").document(user.uid)
+                .collection("customPins").document(pinId)
+                .delete().await()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting custom pin", e)
+            false
+        }
+    }
+
+    suspend fun updateCustomPin(pin: CustomPin): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        val db = FirebaseFirestore.getInstance()
+        val pinData = hashMapOf(
+            "id" to pin.id,
+            "userId" to user.uid,
+            "name" to pin.name,
+            "latitude" to pin.latitude,
+            "longitude" to pin.longitude,
+            "description" to pin.description,
+            "colorArgb" to pin.colorArgb,
+            "isFavorited" to pin.isFavorited,
+            "associatedEventId" to pin.associatedEventId
+        )
+        return try {
+            db.collection("users").document(user.uid)
+                .collection("customPins").document(pin.id)
+                .set(pinData, SetOptions.merge()).await()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating custom pin", e)
+            false
+        }
+    }
+
     suspend fun fetchCampusLocations(): List<CampusLocation> {
         val db = FirebaseFirestore.getInstance()
         return try {
             val snapshot = db.collection("campusLocations").get().await()
-            if (snapshot.isEmpty) return emptyList()
-
             snapshot.documents.mapNotNull { doc ->
-                val name = doc.getString("name") ?: ""
-                val lat = doc.getDouble("latitude") ?: 0.0
-                val lng = doc.getDouble("longitude") ?: 0.0
-                val description = doc.getString("description") ?: ""
                 val typeStr = doc.getString("type") ?: "BUILDING"
-                val colorHex = doc.getString("color") ?: "#D32F2F"
-
                 val type = try { LocationType.valueOf(typeStr) } catch(e: Exception) { LocationType.BUILDING }
+                val colorHex = doc.getString("color") ?: "#D32F2F"
                 val color = Color(android.graphics.Color.parseColor(colorHex))
                 val icon = when (type) {
                     LocationType.BUILDING -> Icons.Default.Business
@@ -311,9 +440,17 @@ object FirestoreManager {
                     LocationType.AREA -> Icons.Default.People
                     LocationType.HOUSING -> Icons.Default.Home
                     LocationType.PARKING -> Icons.Default.LocalParking
+                    LocationType.CUSTOM -> Icons.Default.PushPin
                 }
-
-                CampusLocation(name, LatLng(lat, lng), description, type, icon, color)
+                CampusLocation(
+                    id = doc.id,
+                    name = doc.getString("name") ?: "",
+                    position = LatLng(doc.getDouble("latitude") ?: 0.0, doc.getDouble("longitude") ?: 0.0),
+                    description = doc.getString("description") ?: "",
+                    type = type,
+                    icon = icon,
+                    color = color
+                )
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching campus locations", e)
@@ -327,8 +464,7 @@ object FirestoreManager {
         return try {
             val data = hashMapOf("quickAccessButtons" to buttonRoutes)
             db.collection("users").document(user.uid)
-                .set(data, SetOptions.merge())
-                .await()
+                .set(data, SetOptions.merge()).await()
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error saving quick access buttons", e)
@@ -342,7 +478,6 @@ object FirestoreManager {
         return try {
             val doc = db.collection("users").document(user.uid).get().await()
             if (!doc.exists()) return null
-            
             val rawList = doc.get("quickAccessButtons") as? List<*>
             rawList?.mapNotNull { it as? String }
         } catch (e: Exception) {
@@ -351,8 +486,6 @@ object FirestoreManager {
         }
     }
 
-
-    // Parse stored HH:mm class times so saved classes can be sorted by time.
     private fun parseClassTimeForSort(timeText: String): java.time.LocalTime {
         return runCatching {
             java.time.LocalTime.parse(timeText)

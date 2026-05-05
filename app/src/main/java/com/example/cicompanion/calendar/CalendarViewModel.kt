@@ -7,13 +7,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.cicompanion.calendar.data.repository.CalendarRepository
 import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.social.EventInvite
 import com.example.cicompanion.calendar.model.SelectedClass
 import com.example.cicompanion.social.FirestoreManager
+import com.example.cicompanion.social.SocialRepository
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
-import java.util.UUID
 
 class CalendarViewModel(
     private val repository: CalendarRepository = CalendarRepository()
@@ -34,17 +36,23 @@ class CalendarViewModel(
     private var csuciEvents: List<CalendarEvent> by mutableStateOf(emptyList())
     private var customEvents: List<CalendarEvent> by mutableStateOf(emptyList())
 
-    // CALENDAR SCHEDULE CHANGE:
-    // Store the user's saved classes separately from custom events.
-    // These are converted to CalendarEvent items only when building the UI list.
     var selectedClasses: List<SelectedClass> by mutableStateOf(emptyList())
         private set
+
+    var incomingInvites by mutableStateOf<List<EventInvite>>(emptyList())
+        private set
+
+    private var acceptedInvites by mutableStateOf<List<EventInvite>>(emptyList())
 
     var filterCsuci by mutableStateOf(true)
         private set
     var filterCustom by mutableStateOf(true)
         private set
     var filterPinned by mutableStateOf(true)
+        private set
+    var filterBookmarked by mutableStateOf(true)
+        private set
+    var filterShared by mutableStateOf(true)
         private set
 
     var highlightedEventId: String? by mutableStateOf(null)
@@ -56,38 +64,92 @@ class CalendarViewModel(
     var errorMessage: String? by mutableStateOf(null)
         private set
 
+    private var customEventsListener: ListenerRegistration? = null
+    private var incomingInvitesListener: ListenerRegistration? = null
+    private var acceptedInvitesListener: ListenerRegistration? = null
+
     init {
         loadOnlineCalendar()
 
-        // CALENDAR SCHEDULE CHANGE:
-        // Reload both custom events and selected classes whenever auth changes.
         val auth = FirebaseAuth.getInstance()
         auth.addAuthStateListener { firebaseAuth ->
-            if (firebaseAuth.currentUser != null) {
+            val user = firebaseAuth.currentUser
+            customEventsListener?.remove()
+            incomingInvitesListener?.remove()
+            acceptedInvitesListener?.remove()
+
+            if (user != null) {
+                customEventsListener = SocialRepository.listenToCustomEvents(user.uid,
+                    onEventsChanged = { customEvents = it },
+                    onError = { errorMessage = it }
+                )
+
+                incomingInvitesListener = SocialRepository.listenToIncomingEventInvites(user.uid,
+                    onInvitesChanged = { incomingInvites = it },
+                    onError = { errorMessage = it }
+                )
+
+                acceptedInvitesListener = SocialRepository.listenToAcceptedEventInvites(user.uid,
+                    onInvitesChanged = { acceptedInvites = it },
+                    onError = { errorMessage = it }
+                )
                 loadCustomEvents()
                 loadSelectedClasses()
             } else {
                 customEvents = emptyList()
                 selectedClasses = emptyList()
+                incomingInvites = emptyList()
+                acceptedInvites = emptyList()
             }
         }
     }
 
+    override fun onCleared() {
+        super.onCleared()
+        customEventsListener?.remove()
+        incomingInvitesListener?.remove()
+        acceptedInvitesListener?.remove()
+    }
+
     val events: List<CalendarEvent>
-        get() = (customEvents + buildSelectedClassEvents() + csuciEvents).filter { event ->
-            if (event.isPinned) {
-                filterPinned
-            } else if (event.calendarId == "custom" || event.calendarId == "schedule") {
-                filterCustom
-            } else {
-                filterCsuci
+        get() {
+            val user = FirebaseAuth.getInstance().currentUser
+            val merged = (customEvents + buildSelectedClassEvents() + csuciEvents)
+            val distinctEvents = merged.groupBy { it.id }.map { (_, events) ->
+                if (events.size > 1) {
+                    events.find { it.isBookmarked || it.isPinned }
+                        ?: events.find { it.calendarId == "custom" }
+                        ?: events.first()
+                } else {
+                    events.first()
+                }
+            }
+
+            return distinctEvents.filter { event ->
+                if (event.isPinned) {
+                    filterPinned
+                } else if (event.isBookmarked) {
+                    filterBookmarked
+                } else if (event.calendarId == "custom") {
+                    val isShared = event.ownerId != null && event.ownerId != user?.uid
+                    if (isShared) {
+                        val hasActiveInvite = acceptedInvites.any { it.eventId == event.id }
+                        filterShared && hasActiveInvite
+                    } else {
+                        filterCustom
+                    }
+                } else if (event.calendarId == "schedule") {
+                    filterCustom
+                } else {
+                    filterCsuci
+                }
             }
         }
 
     fun updateMode(newMode: CalendarMode) {
         mode = newMode
     }
-
+    
     fun toggleFilterCsuci() {
         filterCsuci = !filterCsuci
     }
@@ -100,10 +162,20 @@ class CalendarViewModel(
         filterPinned = !filterPinned
     }
 
+    fun toggleFilterBookmarked() {
+        filterBookmarked = !filterBookmarked
+    }
+
+    fun toggleFilterShared() {
+        filterShared = !filterShared
+    }
+
     fun resetFilters() {
         filterCsuci = true
         filterCustom = true
         filterPinned = true
+        filterBookmarked = true
+        filterShared = true
     }
 
     fun setHighlightedEvent(eventId: String?) {
@@ -139,8 +211,6 @@ class CalendarViewModel(
         }
     }
 
-    // CALENDAR SCHEDULE CHANGE:
-    // Load the user's saved class schedule entries from Firestore.
     fun loadSelectedClasses() {
         viewModelScope.launch {
             selectedClasses = FirestoreManager.fetchSelectedClasses()
@@ -150,27 +220,78 @@ class CalendarViewModel(
     fun addCustomEvent(event: CalendarEvent) {
         viewModelScope.launch {
             FirestoreManager.saveCustomEvent(event)
-            loadCustomEvents()
         }
     }
 
-    fun deleteCustomEvent(eventId: String) {
+    fun deleteEvent(event: CalendarEvent) {
+        val user = FirebaseAuth.getInstance().currentUser ?: return
         viewModelScope.launch {
-            FirestoreManager.deleteCustomEvent(eventId)
-            loadCustomEvents()
+            if (event.ownerId == user.uid) {
+                SocialRepository.deleteEventForAll(user.uid, event.id,
+                    onSuccess = { },
+                    onError = { errorMessage = it }
+                )
+            } else {
+                SocialRepository.leaveEvent(user.uid, event.id,
+                    onSuccess = { },
+                    onError = { errorMessage = it }
+                )
+            }
         }
     }
 
     fun togglePinEvent(event: CalendarEvent) {
         viewModelScope.launch {
             val targetStatus = !event.isPinned
-            FirestoreManager.updateEventPinStatus(event.id, targetStatus)
-            loadCustomEvents()
+            if (event.calendarId != "custom") {
+                FirestoreManager.saveCustomEvent(event.copy(isPinned = targetStatus))
+            } else {
+                FirestoreManager.updateEventPinStatus(event.id, targetStatus)
+            }
         }
     }
 
-    // CALENDAR SCHEDULE CHANGE:
-    // Save one class entry, then refresh the schedule list.
+    fun toggleBookmarkEvent(event: CalendarEvent) {
+        viewModelScope.launch {
+            val targetStatus = !event.isBookmarked
+            if (event.calendarId != "custom") {
+                FirestoreManager.saveCustomEvent(event.copy(isBookmarked = targetStatus))
+            } else {
+                FirestoreManager.updateEventBookmarkStatus(event.id, targetStatus)
+            }
+        }
+    }
+
+    fun acceptInvite(invite: EventInvite) {
+        SocialRepository.acceptEventInvite(invite,
+            onSuccess = { },
+            onError = { errorMessage = it }
+        )
+    }
+
+    fun declineInvite(invite: EventInvite) {
+        SocialRepository.declineEventInvite(invite,
+            onSuccess = { },
+            onError = { errorMessage = it }
+        )
+    }
+
+    fun kickUser(eventId: String, targetUserId: String, onSuccess: () -> Unit = {}) {
+        val ownerId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        SocialRepository.kickFromEvent(ownerId, targetUserId, eventId,
+            onSuccess = onSuccess,
+            onError = { errorMessage = it }
+        )
+    }
+
+    fun kickUsers(eventId: String, targetUserIds: List<String>, onSuccess: () -> Unit = {}) {
+        val ownerId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        SocialRepository.kickMultipleFromEvent(ownerId, targetUserIds, eventId,
+            onSuccess = onSuccess,
+            onError = { errorMessage = it }
+        )
+    }
+
     fun saveSelectedClass(
         selectedClass: SelectedClass,
         onComplete: (Boolean) -> Unit = {}
@@ -184,8 +305,6 @@ class CalendarViewModel(
         }
     }
 
-    // CALENDAR SCHEDULE CHANGE:
-    // Delete one class entry, then refresh the schedule list.
     fun deleteSelectedClass(
         selectedClassId: String,
         onComplete: (Boolean) -> Unit = {}
@@ -234,13 +353,8 @@ class CalendarViewModel(
         errorMessage = null
     }
 
-    // CALENDAR SCHEDULE CHANGE:
-    // Convert saved classes into normal calendar events so the existing calendar
-    // UI can display them without needing a separate event renderer.
     private fun buildSelectedClassEvents(): List<CalendarEvent> {
-        return selectedClasses.flatMap { selectedClass ->
-            selectedClass.toCalendarEvents()
-        }
+        return selectedClasses.flatMap { it.toCalendarEvents() }
     }
 
     private fun clampSelectedDateToVisibleMonth(date: LocalDate, month: YearMonth): LocalDate {
@@ -248,7 +362,7 @@ class CalendarViewModel(
         return month.atDay(safeDay)
     }
 
-    private companion object {
+    companion object {
         const val CSUCI_CALENDAR_SUBSCRIBE_URL: String =
             "webcal://25livepub.collegenet.com/calendars/csuci-calendar-of-events.ics"
     }

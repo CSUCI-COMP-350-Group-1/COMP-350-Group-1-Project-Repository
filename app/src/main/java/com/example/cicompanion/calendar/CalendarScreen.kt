@@ -15,7 +15,8 @@ import androidx.compose.ui.Modifier
 @Composable
 fun CalendarScreen(
     navController: androidx.navigation.NavHostController,
-    calendarViewModel: CalendarViewModel
+    calendarViewModel: CalendarViewModel,
+    initialTab: Int = 0
 ) {
     // CALENDAR SCHEDULE CHANGE:
     // The calendar screen now has two tabs:
@@ -23,7 +24,7 @@ fun CalendarScreen(
     // 2) the new schedule UI
     // We keep the shared CalendarViewModel passed from MainActivity so the
     // schedule data and calendar data stay in sync across screens.
-    var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
+    var selectedTabIndex by rememberSaveable { mutableIntStateOf(initialTab) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = selectedTabIndex) {
