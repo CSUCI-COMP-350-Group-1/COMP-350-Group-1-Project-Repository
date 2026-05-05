@@ -14,7 +14,12 @@ data class CalendarEvent(
     val start: ZonedDateTime,
     val endExclusive: ZonedDateTime,
     val isAllDay: Boolean,
-    val isPinned: Boolean = false
+    val isPinned: Boolean = false,
+    val ownerId: String? = null,
+    val maxMembers: Int? = null,
+    val isPinnedByLeader: Boolean = false,
+    val isBookmarked: Boolean = false,
+    val isShared: Boolean = false
 ) {
     fun lastDateInclusive(): LocalDate {
         return if (isAllDay) {

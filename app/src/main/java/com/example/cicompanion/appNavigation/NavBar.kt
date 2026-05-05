@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -29,36 +30,12 @@ import com.example.cicompanion.ui.theme.NavBackground
 import kotlin.math.min
 import androidx.navigation.NavGraph.Companion.findStartDestination
 
-//For easy mapping in other files
-object Routes {
-    const val HOME = "home"
-    const val SOCIAL = "social" 
-    const val MAP = "map"
-    const val CALENDAR = "calendar"
-    const val STUDY_ROOM = "studyRoom"
-    const val PROFILE = "profile"
-    const val NOTIFICATIONS = "notifications"
-    const val USER_SEARCH = "user_search"
-    const val FRIEND_REQUESTS = "friendRequests"
-    const val SEARCH = "search"
-    const val FRIENDS_AND_REQUESTS = "friends_and_requests"
-
-    // MESSAGING: new thread route
-    const val MESSAGE_THREAD_BASE = "message_thread"
-    const val MESSAGE_THREAD = "$MESSAGE_THREAD_BASE/{conversationId}/{friendUserId}"
-
-    // MESSAGING: helper to build a concrete route
-    fun messageThread(conversationId: String, friendUserId: String): String {
-        return "$MESSAGE_THREAD_BASE/$conversationId/$friendUserId"
-    }
-}
-
 @Composable
 fun NavBar(navController: NavHostController) {
     val items = listOf(
         NavBarItem("Home", Routes.HOME, Icons.Filled.Home),
         NavBarItem("Social", Routes.SOCIAL, Icons.Filled.People),
-        NavBarItem("Calendar", Routes.CALENDAR, Icons.Filled.CalendarMonth),
+        NavBarItem("Calendar", Routes.CALENDAR, Icons.AutoMirrored.Filled.EventNote),
         NavBarItem("Map", Routes.MAP, Icons.Filled.LocationOn)
     )
     val navBarBackground = NavBackground
@@ -83,7 +60,7 @@ fun NavBar(navController: NavHostController) {
         val currentRoute = navBackStackEntry?.destination?.route
 
         items.forEach { item ->
-            val isSelected = currentRoute == item.route
+            val isSelected = currentRoute?.substringBefore('?') == item.route
 
             NavigationBarItem(
                 icon = { Icon(
@@ -95,7 +72,8 @@ fun NavBar(navController: NavHostController) {
                 label = { 
                     Text(
                         text = item.title,
-                        color = if(isSelected) BrandRedLight else GrayIcon
+                        color = if(isSelected) BrandRedLight else GrayIcon,
+                        maxLines = 1
                     )
                 },
                 selected = isSelected,
