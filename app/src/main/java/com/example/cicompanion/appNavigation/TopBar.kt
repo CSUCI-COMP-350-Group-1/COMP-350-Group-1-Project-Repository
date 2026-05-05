@@ -34,7 +34,6 @@ fun screenTitleForRoute(route: String?): String {
         route == Routes.SOCIAL -> "Messages" //Changed to messages from Social
         route == Routes.MAP -> "Map"
         route == Routes.CALENDAR -> "Calendar"
-        route == Routes.SCHEDULE -> "Schedule"
         route == Routes.STUDY_ROOM -> "Study Room"
         route == Routes.PROFILE || route?.startsWith("${Routes.PROFILE}/") == true -> "Profile"
         route == Routes.NOTIFICATIONS -> "Notifications"

@@ -7,7 +7,5 @@ data class DirectMessage(
     val senderId: String = "",
     val receiverId: String = "",
     val text: String = "",
-    val sentAt: Long = 0L,
-    val type: String = "text", // "text", "location", "pin", "event_invite"
-    val metadata: Map<String, String> = emptyMap()
+    val sentAt: Long = 0L
 )

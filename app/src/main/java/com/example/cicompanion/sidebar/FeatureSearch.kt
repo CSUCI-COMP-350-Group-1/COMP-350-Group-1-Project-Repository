@@ -50,7 +50,6 @@ fun SearchScreen(navController: NavHostController) {
             Routes.HOME,
             Routes.MAP,
             Routes.CALENDAR,
-            Routes.SCHEDULE,
             Routes.STUDY_ROOM,
             Routes.PROFILE,
             Routes.USER_SEARCH,
@@ -66,7 +65,6 @@ fun SearchScreen(navController: NavHostController) {
                 Routes.FRIENDS_AND_REQUESTS -> listOf("friends", "requests", "add friends", "pending")
                 Routes.USER_SEARCH -> listOf("find users", "search people", "discover")
                 Routes.STUDY_ROOM -> listOf("rooms", "study", "booking")
-                Routes.SCHEDULE -> listOf("my schedule", "class schedule", "timetable")
                 else -> emptyList()
             }
             
