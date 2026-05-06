@@ -108,9 +108,34 @@ fun WheelTimePicker(
     initialTime: LocalTime,
     onTimeChange: (LocalTime) -> Unit
 ) {
-    var hour by remember { mutableIntStateOf(if (initialTime.hour == 0) 12 else if (initialTime.hour > 12) initialTime.hour - 12 else initialTime.hour) }
+    // EDIT CLASS TIME FIX:
+    // These values must update when initialTime changes.
+    // Without this, editing a saved class can keep the default 9:00 AM / 10:15 AM wheel state.
+    var hour by remember {
+        mutableIntStateOf(
+            if (initialTime.hour == 0) 12
+            else if (initialTime.hour > 12) initialTime.hour - 12
+            else initialTime.hour
+        )
+    }
     var minute by remember { mutableIntStateOf(initialTime.minute) }
     var amPm by remember { mutableStateOf(if (initialTime.hour < 12) "AM" else "PM") }
+
+    // EDIT CLASS TIME FIX:
+    // When AddClassDialog loads an existing class, initialTime changes from the default
+    // to the saved value. Sync the picker state to that saved value.
+    LaunchedEffect(initialTime) {
+        hour = if (initialTime.hour == 0) {
+            12
+        } else if (initialTime.hour > 12) {
+            initialTime.hour - 12
+        } else {
+            initialTime.hour
+        }
+
+        minute = initialTime.minute
+        amPm = if (initialTime.hour < 12) "AM" else "PM"
+    }
 
     LaunchedEffect(hour, minute, amPm) {
         val h = when (amPm) {
@@ -118,11 +143,20 @@ fun WheelTimePicker(
             "PM" -> if (hour == 12) 12 else hour + 12
             else -> hour
         }
-        onTimeChange(LocalTime.of(h, minute))
+
+        val newTime = LocalTime.of(h, minute)
+
+        // EDIT CLASS TIME FIX:
+        // Avoid re-sending the same value repeatedly while syncing picker state.
+        if (newTime != initialTime) {
+            onTimeChange(newTime)
+        }
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth().height(120.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
@@ -132,7 +166,9 @@ fun WheelTimePicker(
             onItemSelected = { selectedHour -> hour = selectedHour },
             modifier = Modifier.weight(1f)
         )
+
         Text(":", style = MaterialTheme.typography.headlineMedium)
+
         WheelPicker(
             items = (0..59).toList(),
             initialIndex = minute,
@@ -140,6 +176,7 @@ fun WheelTimePicker(
             format = { value -> String.format(Locale.US, "%02d", value) },
             modifier = Modifier.weight(1f)
         )
+
         WheelPicker(
             items = listOf("AM", "PM"),
             initialIndex = if (amPm == "AM") 0 else 1,
@@ -157,11 +194,24 @@ fun <T> WheelPicker(
     modifier: Modifier = Modifier,
     format: (T) -> String = { it.toString() }
 ) {
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
+    val safeInitialIndex = initialIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0))
+
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = safeInitialIndex)
     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
     val itemHeight = 40.dp
 
-    val selectedIndex by remember { derivedStateOf { listState.firstVisibleItemIndex } }
+    val selectedIndex by remember {
+        derivedStateOf { listState.firstVisibleItemIndex }
+    }
+
+    // EDIT CLASS TIME FIX:
+    // If the parent changes initialIndex while editing an existing class,
+    // move the wheel to the saved value instead of leaving it at the old default.
+    LaunchedEffect(safeInitialIndex, items.size) {
+        if (items.isNotEmpty() && listState.firstVisibleItemIndex != safeInitialIndex) {
+            listState.scrollToItem(safeInitialIndex)
+        }
+    }
 
     LaunchedEffect(listState.isScrollInProgress) {
         if (!listState.isScrollInProgress) {
@@ -171,7 +221,10 @@ fun <T> WheelPicker(
         }
     }
 
-    Box(modifier = modifier.height(itemHeight * 3), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = modifier.height(itemHeight * 3),
+        contentAlignment = Alignment.Center
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -189,7 +242,9 @@ fun <T> WheelPicker(
         ) {
             items(items.size) { index ->
                 Box(
-                    modifier = Modifier.height(itemHeight).fillMaxWidth(),
+                    modifier = Modifier
+                        .height(itemHeight)
+                        .fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(

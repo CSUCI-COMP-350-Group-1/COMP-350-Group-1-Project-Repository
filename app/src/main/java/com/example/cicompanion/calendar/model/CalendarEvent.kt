@@ -15,6 +15,9 @@ data class CalendarEvent(
     val endExclusive: ZonedDateTime,
     val isAllDay: Boolean,
     val isPinned: Boolean = false,
+
+    // DEV MERGE:
+    // Shared-event ownership/member fields from dev.
     val ownerId: String? = null,
     val maxMembers: Int? = null,
     val isPinnedByLeader: Boolean = false,
