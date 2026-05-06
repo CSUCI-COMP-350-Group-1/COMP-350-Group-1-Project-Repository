@@ -1,12 +1,7 @@
 package com.example.cicompanion.social
 
-import android.Manifest
 import android.annotation.SuppressLint
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,36 +14,24 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
-import com.example.cicompanion.calendar.model.CalendarEvent
-import com.example.cicompanion.maps.CustomPin
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
 
 @Composable
 private fun rememberAuthUser(): FirebaseUser? {
@@ -124,7 +107,7 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
 
     val activeConversations = remember(rawConversations, friendsById) {
         rawConversations.filter { conversation ->
-            val otherId = MessagingRepository.findOtherParticipantId(conversation, currentUser.uid)
+            val otherId = MessagingRepository.findOtherParticipantId(conversation, currentUser!!.uid)
             otherId != null && friendsById.containsKey(otherId)
         }
     }
@@ -194,16 +177,7 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                                 user = friend,
                                 nickname = nicknames[friend.uid],
                                 onClick = {
-                                    navController.navigate(
-                                        Routes.messageThread(
-                                            MessagingRepository.createConversationId(
-                                                currentUser?.uid ?: "",
-                                                friend.uid
-                                            ),
-                                            friend.uid
-                                        )
-                                    )
-                                    val conversationId = MessagingRepository.createConversationId(currentUser.uid, friend.uid)
+                                    val conversationId = MessagingRepository.createConversationId(currentUser?.uid ?: "", friend.uid)
                                     val initialMsg = if (sharedLocation != null) "Check out this custom pin: $sharedLocation" else null
                                     navController.navigate(Routes.messageThread(conversationId, friend.uid, initialMsg))
                                 }
@@ -236,12 +210,7 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(activeConversations, key = { it.id }) { conversation ->
-                        /*val friendUserId = MessagingRepository.findOtherParticipantId(
-                            conversation = conversation,
-                            currentUserId = currentUser?.uid ?: ""
-                        ).orEmpty()*/
-
-                        val friendUserId = MessagingRepository.findOtherParticipantId(conversation, currentUser.uid).orEmpty()
+                        val friendUserId = MessagingRepository.findOtherParticipantId(conversation, currentUser?.uid ?: "").orEmpty()
                         val friend = friendsById[friendUserId]
 
                         ConversationCard(
@@ -263,14 +232,12 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
 @SuppressLint("MissingPermission")
 @Composable
 fun MessageThreadScreen(
-    navController: NavHostController, // warning about unused param is wrong
+    navController: NavHostController,
     conversationId: String,
     friendUserId: String,
     initialMessage: String? = null
 ) {
     val currentUser = rememberAuthUser()
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
     var friend by remember { mutableStateOf<UserProfile?>(null) }
     var nickname by remember { mutableStateOf<String?>(null) }
@@ -281,51 +248,7 @@ fun MessageThreadScreen(
     var conversationExists by remember { mutableStateOf(false) }
     var isFriend by remember { mutableStateOf(true) }
 
-    var userPins by remember { mutableStateOf<List<CustomPin>>(emptyList()) }
-    var userEvents by remember { mutableStateOf<List<CalendarEvent>>(emptyList()) }
-    var showPinPicker by remember { mutableStateOf(false) }
-    var showEventPicker by remember { mutableStateOf(false) }
-    var showAttachmentMenu by remember { mutableStateOf(false) }
-
     val listState = rememberLazyListState()
-    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
-
-    LaunchedEffect(currentUser?.uid, friendUserId) {
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
-                .addOnSuccessListener { location ->
-                    if (location != null && friend != null && currentUser != null) {
-                        MessagingRepository.sendMessage(
-                            currentUser = currentUser,
-                            friend = friend!!,
-                            messageText = "My current location",
-                            type = "location",
-                            metadata = mapOf(
-                                "lat" to location.latitude.toString(),
-                                "lng" to location.longitude.toString()
-                            ),
-                            onSuccess = { conversationExists = true },
-                            onError = { errorMessage = it }
-                        )
-                    }
-                }
-        }
-    }
-
-    LaunchedEffect(currentUser?.uid) {
-        if (currentUser == null) {
-            friend = null
-            nickname = null
-            messages = emptyList()
-            messageText = ""
-            errorMessage = null
-            isSending = false
-            conversationExists = false
-            return@LaunchedEffect
-        }
 
     if (currentUser == null) {
         SignedOutMessagingMessage()
@@ -359,23 +282,17 @@ fun MessageThreadScreen(
         )
     }
 
-    // For a brand-new chat, the conversation doc may not exist yet.
     LaunchedEffect(conversationId) {
         MessagingRepository.checkConversationExists(
             conversationId = conversationId,
             onResult = { exists ->
                 conversationExists = exists
-
-
-                // If the check succeeds, clear any stale permission error.
                 errorMessage = null
             },
             onError = { errorMessage = it }
         )
     }
 
-
-    // Do not start listening to /messages until the parent conversation exists.
     DisposableEffect(conversationId, conversationExists) {
         if (!conversationExists) {
             onDispose { }
@@ -384,13 +301,10 @@ fun MessageThreadScreen(
                 conversationId = conversationId,
                 onUpdate = {
                     messages = it
-
-                    // If messages are loading successfully, clear stale errors.
                     errorMessage = null
                 },
                 onError = { errorMessage = it }
             )
-
             onDispose {
                 registration.remove()
             }
@@ -401,74 +315,6 @@ fun MessageThreadScreen(
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.lastIndex)
         }
-    }
-
-    if (currentUser == null) {
-        SignedOutMessagingMessage()
-        return
-    }
-
-    if (showPinPicker) {
-        ItemPickerDialog(
-            title = "Select a Pin",
-            items = userPins,
-            itemName = { it.name },
-            onItemSelected = { pin ->
-                val targetFriend = friend ?: return@ItemPickerDialog
-                MessagingRepository.sendMessage(
-                    currentUser = currentUser,
-                    friend = targetFriend,
-                    messageText = "Pin: ${pin.name}",
-                    type = "pin",
-                    metadata = mapOf(
-                        "pinId" to pin.id,
-                        "pinName" to pin.name,
-                        "lat" to pin.latitude.toString(),
-                        "lng" to pin.longitude.toString(),
-                        "description" to pin.description,
-                        "colorArgb" to pin.colorArgb.toString(),
-                        "associatedEventId" to (pin.associatedEventId ?: "")
-                    ),
-                    onSuccess = { conversationExists = true },
-                    onError = { errorMessage = it }
-                )
-                showPinPicker = false
-            },
-            onDismiss = { showPinPicker = false }
-        )
-    }
-
-    if (showEventPicker) {
-        ItemPickerDialog(
-            title = "Select an Event",
-            items = userEvents.filter { it.ownerId == currentUser.uid },
-            itemName = { it.title },
-            onItemSelected = { event ->
-                val targetFriend = friend ?: return@ItemPickerDialog
-                SocialRepository.sendEventInvite(
-                    currentUser = currentUser,
-                    targetUserId = friendUserId,
-                    event = event,
-                    onSuccess = {
-                        MessagingRepository.sendMessage(
-                            currentUser = currentUser,
-                            friend = targetFriend,
-                            messageText = "Sent you an invite for: ${event.title}",
-                            type = "event_invite",
-                            metadata = mapOf(
-                                "eventId" to event.id,
-                                "eventTitle" to event.title
-                            ),
-                            onSuccess = { conversationExists = true },
-                            onError = { errorMessage = it }
-                        )
-                    },
-                    onError = { errorMessage = it }
-                )
-                showEventPicker = false
-            },
-            onDismiss = { showEventPicker = false }
-        )
     }
 
     Scaffold(
@@ -505,9 +351,6 @@ fun MessageThreadScreen(
                                 onSuccess = {
                                     messageText = ""
                                     isSending = false
-
-                                    // The first sent message creates the conversation doc,
-                                    // so start listening immediately after send succeeds.
                                     conversationExists = true
                                     errorMessage = null
                                 },
@@ -548,29 +391,65 @@ fun MessageThreadScreen(
         ) {
             val currentFriend = friend
             val displayName = nickname ?: currentFriend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Chat"
-            Text(
-                text = displayName,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
 
-            if (!nickname.isNullOrBlank() && currentFriend != null) {
-                Text(
-                    text = "(${SocialRepository.displayNameOrEmail(currentFriend)})",
-                    color = Color.Gray,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            } else if (currentFriend != null && currentFriend.email.isNotBlank()) {
-                Text(
-                    text = currentFriend.email,
-                    color = Color.Gray,
-                    style = MaterialTheme.typography.bodySmall
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                UserAvatar(photoUrl = currentFriend?.photoUrl ?: "")
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = displayName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    if (!nickname.isNullOrBlank() && currentFriend != null) {
+                        Text(
+                            text = "(${SocialRepository.displayNameOrEmail(currentFriend)})",
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    } else if (currentFriend != null && currentFriend.email.isNotBlank()) {
+                        Text(
+                            text = currentFriend.email,
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        navController.navigate("${Routes.PROFILE}/$friendUserId")
+                    },
+                    modifier = Modifier
+                        .height(36.dp)
+                        .padding(start = 8.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFEF3347),
+                        contentColor = Color.White
+                    ),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        text = "View Profile",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
-
-            // Only show errors for existing conversations.
-            // A brand-new conversation should not show a scary red permission message.
             if (errorMessage != null && conversationExists) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -613,37 +492,30 @@ private fun FriendPickerCard(
     nickname: String?,
     onClick: () -> Unit
 ) {
-    ElevatedButton(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier = Modifier
+            .width(80.dp)
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        UserAvatar(photoUrl = user.photoUrl)
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = nickname ?: SocialRepository.displayNameOrEmail(user),
+            style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
         )
-                            message = message,
-                            isMine = message.senderId == currentUser.uid,
-                            navController = navController,
-                            ownedPins = userPins,
-                            onPinSaved = {
-                                // already handled by listener
-                            }
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 
 @Composable
-private fun <T> ItemPickerDialog(
-    title: String,
-    items: List<T>,
-    itemName: (T) -> String,
-    onItemSelected: (T) -> Unit,
-    onDismiss: () -> Unit
+private fun ConversationCard(
+    friendName: String,
+    friendEmail: String,
+    preview: String,
+    onClick: () -> Unit
 ) {
     Card(
         onClick = onClick,
@@ -708,6 +580,18 @@ private fun MessageBubble(
 }
 
 @Composable
+private fun SignedOutMessagingMessage() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AppBackground),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("Please sign in to view your messages.")
+    }
+}
+
+@Composable
 private fun EmptyCard(text: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -722,17 +606,5 @@ private fun EmptyCard(text: String) {
             Spacer(modifier = Modifier.width(8.dp))
             Text(text = text, color = Color.Gray)
         }
-    }
-}
-
-@Composable
-private fun SignedOutMessagingMessage() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppBackground),
-        contentAlignment = Alignment.Center
-    ) {
-        Text("Please sign in to view your messages.")
     }
 }

@@ -60,6 +60,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
     var nickname by remember { mutableStateOf<String?>(null) }
     var requestStatus by remember { mutableStateOf<String?>(null) }
     var targetUserProfile by remember { mutableStateOf<UserProfile?>(null) }
+    var showNicknameDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
@@ -211,12 +212,65 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                         navController = navController,
                         targetUser = targetUserProfile,
                         requestStatus = requestStatus,
-                        onStatusChange = { newStatus -> requestStatus = newStatus }
+                        onStatusChange = { newStatus -> requestStatus = newStatus },
+                        nickname = nickname,
+                        onNicknameClick = { showNicknameDialog = true }
                     )
                 }
             }
         }
     }
+
+    if (showNicknameDialog && !isOwnProfile && currentUser != null && userId != null) {
+        NicknameDialog(
+            initialNickname = nickname,
+            onDismiss = { showNicknameDialog = false },
+            onConfirm = { newNickname ->
+                SocialRepository.setNickname(
+                    currentUserId = currentUser!!.uid,
+                    friendUid = userId,
+                    nickname = newNickname,
+                    onSuccess = {
+                        nickname = newNickname.ifBlank { null }
+                        showNicknameDialog = false
+                    },
+                    onError = { showNicknameDialog = false }
+                )
+            }
+        )
+    }
+}
+
+@Composable
+fun NicknameDialog(
+    initialNickname: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var text by remember { mutableStateOf(initialNickname ?: "") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (initialNickname == null) "Set Nickname" else "Change Nickname") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Nickname") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(text) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -246,7 +300,9 @@ fun ViewOnlyProfileActions(
     navController: NavHostController,
     targetUser: UserProfile?,
     requestStatus: String?,
-    onStatusChange: (String?) -> Unit
+    onStatusChange: (String?) -> Unit,
+    nickname: String? = null,
+    onNicknameClick: () -> Unit = {}
 ) {
     val currentUser = FirebaseAuth.getInstance().currentUser
     var showRemoveDialog by remember { mutableStateOf(false) }
@@ -336,6 +392,20 @@ fun ViewOnlyProfileActions(
                 }
             }
             "accepted" -> {
+                OutlinedButton(
+                    onClick = onNicknameClick,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, Color.Gray),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text(if (nickname == null) "Set Nickname" else "Change Nickname", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 OutlinedButton(
                     onClick = { showRemoveDialog = true },
                     modifier = Modifier.fillMaxWidth().height(56.dp),

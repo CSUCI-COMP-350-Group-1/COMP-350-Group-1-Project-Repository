@@ -16,6 +16,7 @@ import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -719,10 +720,18 @@ fun UserAvatar(photoUrl: String) {
         AsyncImage(
             model = photoUrl,
             contentDescription = null,
-            modifier = Modifier.size(48.dp).background(Color.LightGray, CircleShape)
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(Color.LightGray)
         )
     } else {
-        Box(modifier = Modifier.size(48.dp).background(Color(0xFFEF3347).copy(alpha = 0.1f), CircleShape), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(Color(0xFFEF3347).copy(alpha = 0.1f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
             Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFFEF3347))
         }
     }
