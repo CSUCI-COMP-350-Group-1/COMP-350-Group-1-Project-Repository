@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.cicompanion.appNavigation.FeatureCard
@@ -31,7 +32,6 @@ import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.BrandRedDark
 import com.google.firebase.auth.FirebaseAuth
 import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,12 +53,24 @@ fun HomeScreen(
         }
     }
 
-    val widgetEvents = remember(calendarViewModel.events) {
-        upcomingHomeWidgetEvents(calendarViewModel.events)
+    val allEvents = calendarViewModel.events
+    val now = ZonedDateTime.now()
+
+    val upcomingEvents = remember(allEvents) {
+        allEvents
+            .filter { it.endExclusive.isAfter(now) }
+            .sortedBy { it.start }
+            .take(5)
+    }
+
+    val bookmarkedEvents = remember(allEvents) {
+        allEvents
+            .filter { it.isBookmarked }
+            .sortedBy { it.start }
     }
     
-    val pinnedEvents = remember(calendarViewModel.events) {
-        calendarViewModel.events.filter { it.isPinned }
+    val pinnedEvents = remember(allEvents) {
+        allEvents.filter { it.isPinned }
     }
 
     var showCustomizer by remember { mutableStateOf(false) }
@@ -76,21 +88,30 @@ fun HomeScreen(
     ) {
         item {
             CalendarWidget(
-                events = widgetEvents,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                upcomingEvents = upcomingEvents,
+                bookmarkedEvents = bookmarkedEvents,
+                modifier = Modifier.padding(horizontal = 16.dp),
+                onInfoClick = { event ->
+                    calendarViewModel.resetFilters()
+                    calendarViewModel.onDateSelected(event.start.toLocalDate())
+                    calendarViewModel.setHighlightedEvent(event.id)
+                    navController.navigate(Routes.CALENDAR)
+                }
             )
         }
 
         if (pinnedEvents.isNotEmpty()) {
             item {
                 Text(
-                    text = "Pinned Reminders",
+                    text = "Pinned",
                     modifier = Modifier.padding(start = 16.dp, top = 24.dp),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
                 )
             }
+            
+            // Pinned Events
             items(pinnedEvents) { event ->
                 PinnedEventItem(
                     event = event,
@@ -258,6 +279,7 @@ fun QuickAccessCustomizerDialog(
             }
         },
         dismissButton = {
+            @Suppress("DEPRECATION")
             TextButton(
                 onClick = onDismiss,
                 colors = ButtonDefaults.textButtonColors(contentColor = BrandRedDark)
@@ -289,7 +311,7 @@ fun PinnedEventItem(event: CalendarEvent, onNavigateToEvent: () -> Unit) {
             Icon(
                 Icons.Default.PushPin,
                 contentDescription = null,
-                tint = Color(0xFF9C27B0), // Pinned purple
+                tint = Color(0xFF9C27B0),
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
@@ -302,12 +324,13 @@ fun PinnedEventItem(event: CalendarEvent, onNavigateToEvent: () -> Unit) {
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "${event.start.format(DateTimeFormatter.ofPattern("MMM d"))} • ${event.timeLabel()}",
+                    text = event.location ?: "No Location",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray
+                    color = Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -318,20 +341,11 @@ fun PinnedEventItem(event: CalendarEvent, onNavigateToEvent: () -> Unit) {
             ) {
                 Icon(
                     imageVector = Icons.Default.CalendarMonth,
-                    contentDescription = "View in Calendar",
+                    contentDescription = "View Event",
                     tint = BrandRedDark,
                     modifier = Modifier.size(20.dp)
                 )
             }
         }
     }
-}
-
-private fun upcomingHomeWidgetEvents(events: List<CalendarEvent>): List<CalendarEvent> {
-    val now = ZonedDateTime.now()
-
-    return events
-        .filter { event -> event.endExclusive.isAfter(now) }
-        .sortedBy { event -> event.start }
-        .take(3)
 }

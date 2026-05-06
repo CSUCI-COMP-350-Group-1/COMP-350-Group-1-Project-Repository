@@ -1,6 +1,13 @@
 package com.example.cicompanion.social
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -12,19 +19,32 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
+import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.maps.CustomPin
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -35,7 +55,6 @@ private fun rememberAuthUser(): FirebaseUser? {
     val auth = FirebaseAuth.getInstance()
     var currentUser by remember { mutableStateOf(auth.currentUser) }
 
-    // React to sign-in/sign-out immediately while already on the messaging UI.
     DisposableEffect(auth) {
         val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
             currentUser = firebaseAuth.currentUser
@@ -45,13 +64,11 @@ private fun rememberAuthUser(): FirebaseUser? {
             auth.removeAuthStateListener(listener)
         }
     }
-
     return currentUser
 }
 
 @Composable
-fun MessagesScreen(navController: NavHostController) {
-    // This now updates immediately when the user signs out.
+fun MessagesScreen(navController: NavHostController, sharedLocation: String? = null) {
     val currentUser = rememberAuthUser()
 
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
@@ -60,7 +77,6 @@ fun MessagesScreen(navController: NavHostController) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoadingFriends by remember { mutableStateOf(currentUser != null) }
 
-    // Clear stale messaging UI state when the user signs out.
     LaunchedEffect(currentUser?.uid) {
         if (currentUser == null) {
             friends = emptyList()
@@ -93,24 +109,22 @@ fun MessagesScreen(navController: NavHostController) {
 
     DisposableEffect(currentUser?.uid) {
         if (currentUser == null) return@DisposableEffect onDispose {}
-        
+
         val registration = MessagingRepository.listenToConversations(
             currentUserId = currentUser.uid,
             onUpdate = { rawConversations = it },
             onError = { errorMessage = it }
         )
-
         onDispose {
             registration.remove()
         }
     }
 
     val friendsById = remember(friends) { friends.associateBy { it.uid } }
-    
-    // Only show conversations if the other participant is still a friend
+
     val activeConversations = remember(rawConversations, friendsById) {
         rawConversations.filter { conversation ->
-            val otherId = MessagingRepository.findOtherParticipantId(conversation, currentUser?.uid ?: "")
+            val otherId = MessagingRepository.findOtherParticipantId(conversation, currentUser.uid)
             otherId != null && friendsById.containsKey(otherId)
         }
     }
@@ -125,12 +139,26 @@ fun MessagesScreen(navController: NavHostController) {
                 .background(AppBackground)
                 .padding(16.dp)
         ) {
-            // keep friend-management reachable
+            if (sharedLocation != null) {
+                Surface(
+                    color = Color(0xFFFFF9C4),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                ) {
+                    Text(
+                        text = "Sharing location: $sharedLocation. Pick a friend to send to.",
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
             Button(
                 onClick = { navController.navigate(Routes.FRIENDS_AND_REQUESTS) },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFEF3347), // same red
+                    containerColor = Color(0xFFEF3347),
                     contentColor = Color.White
                 )
             ) {
@@ -149,20 +177,13 @@ fun MessagesScreen(navController: NavHostController) {
 
             when {
                 isLoadingFriends -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(96.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(modifier = Modifier.fillMaxWidth().height(96.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = Color(0xFFEF3347))
                     }
                 }
-
                 friends.isEmpty() -> {
                     EmptyCard("Add a friend first to start messaging.")
                 }
-
                 else -> {
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -182,6 +203,9 @@ fun MessagesScreen(navController: NavHostController) {
                                             friend.uid
                                         )
                                     )
+                                    val conversationId = MessagingRepository.createConversationId(currentUser.uid, friend.uid)
+                                    val initialMsg = if (sharedLocation != null) "Check out this custom pin: $sharedLocation" else null
+                                    navController.navigate(Routes.messageThread(conversationId, friend.uid, initialMsg))
                                 }
                             )
                         }
@@ -199,10 +223,7 @@ fun MessagesScreen(navController: NavHostController) {
 
             if (errorMessage != null) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = errorMessage!!,
-                    color = MaterialTheme.colorScheme.error
-                )
+                Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error)
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -215,11 +236,12 @@ fun MessagesScreen(navController: NavHostController) {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(activeConversations, key = { it.id }) { conversation ->
-                        val friendUserId = MessagingRepository.findOtherParticipantId(
+                        /*val friendUserId = MessagingRepository.findOtherParticipantId(
                             conversation = conversation,
                             currentUserId = currentUser?.uid ?: ""
-                        ).orEmpty()
+                        ).orEmpty()*/
 
+                        val friendUserId = MessagingRepository.findOtherParticipantId(conversation, currentUser.uid).orEmpty()
                         val friend = friendsById[friendUserId]
 
                         ConversationCard(
@@ -227,9 +249,8 @@ fun MessagesScreen(navController: NavHostController) {
                             friendEmail = friend?.email ?: "",
                             preview = conversation.lastMessageText,
                             onClick = {
-                                navController.navigate(
-                                    Routes.messageThread(conversation.id, friendUserId)
-                                )
+                                val initialMsg = if (sharedLocation != null) "Check out this custom pin: $sharedLocation" else null
+                                navController.navigate(Routes.messageThread(conversation.id, friendUserId, initialMsg))
                             }
                         )
                     }
@@ -239,28 +260,62 @@ fun MessagesScreen(navController: NavHostController) {
     }
 }
 
+@SuppressLint("MissingPermission")
 @Composable
 fun MessageThreadScreen(
     navController: NavHostController, // warning about unused param is wrong
     conversationId: String,
-    friendUserId: String
+    friendUserId: String,
+    initialMessage: String? = null
 ) {
-    // MESSAGING CHANGE:
-    // React immediately to sign-out while already inside a thread.
     val currentUser = rememberAuthUser()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     var friend by remember { mutableStateOf<UserProfile?>(null) }
     var nickname by remember { mutableStateOf<String?>(null) }
     var messages by remember { mutableStateOf<List<DirectMessage>>(emptyList()) }
-    var messageText by rememberSaveable { mutableStateOf("") }
+    var messageText by rememberSaveable { mutableStateOf(initialMessage ?: "") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSending by remember { mutableStateOf(false) }
     var conversationExists by remember { mutableStateOf(false) }
     var isFriend by remember { mutableStateOf(true) }
 
+    var userPins by remember { mutableStateOf<List<CustomPin>>(emptyList()) }
+    var userEvents by remember { mutableStateOf<List<CalendarEvent>>(emptyList()) }
+    var showPinPicker by remember { mutableStateOf(false) }
+    var showEventPicker by remember { mutableStateOf(false) }
+    var showAttachmentMenu by remember { mutableStateOf(false) }
+
     val listState = rememberLazyListState()
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
     LaunchedEffect(currentUser?.uid, friendUserId) {
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                .addOnSuccessListener { location ->
+                    if (location != null && friend != null && currentUser != null) {
+                        MessagingRepository.sendMessage(
+                            currentUser = currentUser,
+                            friend = friend!!,
+                            messageText = "My current location",
+                            type = "location",
+                            metadata = mapOf(
+                                "lat" to location.latitude.toString(),
+                                "lng" to location.longitude.toString()
+                            ),
+                            onSuccess = { conversationExists = true },
+                            onError = { errorMessage = it }
+                        )
+                    }
+                }
+        }
+    }
+
+    LaunchedEffect(currentUser?.uid) {
         if (currentUser == null) {
             friend = null
             nickname = null
@@ -272,6 +327,12 @@ fun MessageThreadScreen(
             return@LaunchedEffect
         }
 
+    if (currentUser == null) {
+        SignedOutMessagingMessage()
+        return
+    }
+
+    LaunchedEffect(currentUser.uid, friendUserId) {
         SocialRepository.fetchAllFriendRequestStatuses(
             currentUserId = currentUser.uid,
             onSuccess = { statuses ->
@@ -284,7 +345,6 @@ fun MessageThreadScreen(
             userId = friendUserId,
             onSuccess = {
                 friend = it
-                // Clear any old/stale error once profile loading succeeds.
                 errorMessage = null
             },
             onError = { errorMessage = it }
@@ -330,6 +390,7 @@ fun MessageThreadScreen(
                 },
                 onError = { errorMessage = it }
             )
+
             onDispose {
                 registration.remove()
             }
@@ -345,6 +406,69 @@ fun MessageThreadScreen(
     if (currentUser == null) {
         SignedOutMessagingMessage()
         return
+    }
+
+    if (showPinPicker) {
+        ItemPickerDialog(
+            title = "Select a Pin",
+            items = userPins,
+            itemName = { it.name },
+            onItemSelected = { pin ->
+                val targetFriend = friend ?: return@ItemPickerDialog
+                MessagingRepository.sendMessage(
+                    currentUser = currentUser,
+                    friend = targetFriend,
+                    messageText = "Pin: ${pin.name}",
+                    type = "pin",
+                    metadata = mapOf(
+                        "pinId" to pin.id,
+                        "pinName" to pin.name,
+                        "lat" to pin.latitude.toString(),
+                        "lng" to pin.longitude.toString(),
+                        "description" to pin.description,
+                        "colorArgb" to pin.colorArgb.toString(),
+                        "associatedEventId" to (pin.associatedEventId ?: "")
+                    ),
+                    onSuccess = { conversationExists = true },
+                    onError = { errorMessage = it }
+                )
+                showPinPicker = false
+            },
+            onDismiss = { showPinPicker = false }
+        )
+    }
+
+    if (showEventPicker) {
+        ItemPickerDialog(
+            title = "Select an Event",
+            items = userEvents.filter { it.ownerId == currentUser.uid },
+            itemName = { it.title },
+            onItemSelected = { event ->
+                val targetFriend = friend ?: return@ItemPickerDialog
+                SocialRepository.sendEventInvite(
+                    currentUser = currentUser,
+                    targetUserId = friendUserId,
+                    event = event,
+                    onSuccess = {
+                        MessagingRepository.sendMessage(
+                            currentUser = currentUser,
+                            friend = targetFriend,
+                            messageText = "Sent you an invite for: ${event.title}",
+                            type = "event_invite",
+                            metadata = mapOf(
+                                "eventId" to event.id,
+                                "eventTitle" to event.title
+                            ),
+                            onSuccess = { conversationExists = true },
+                            onError = { errorMessage = it }
+                        )
+                    },
+                    onError = { errorMessage = it }
+                )
+                showEventPicker = false
+            },
+            onDismiss = { showEventPicker = false }
+        )
     }
 
     Scaffold(
@@ -395,11 +519,7 @@ fun MessageThreadScreen(
                         },
                         enabled = messageText.isNotBlank() && !isSending && friend != null
                     ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Send",
-                            tint = Color(0xFFEF3347)
-                        )
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = Color(0xFFEF3347))
                     }
                 }
             } else {
@@ -502,15 +622,28 @@ private fun FriendPickerCard(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+                            message = message,
+                            isMine = message.senderId == currentUser.uid,
+                            navController = navController,
+                            ownedPins = userPins,
+                            onPinSaved = {
+                                // already handled by listener
+                            }
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-fun ConversationCard(
-    friendName: String,
-    friendEmail: String,
-    preview: String,
-    onClick: () -> Unit
+private fun <T> ItemPickerDialog(
+    title: String,
+    items: List<T>,
+    itemName: (T) -> String,
+    onItemSelected: (T) -> Unit,
+    onDismiss: () -> Unit
 ) {
     Card(
         onClick = onClick,

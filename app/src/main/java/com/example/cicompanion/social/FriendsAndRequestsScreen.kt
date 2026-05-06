@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -36,8 +37,6 @@ fun FriendsAndRequestsScreen(
     initialTab: Int = 1
 ) {
     val currentUser = FirebaseAuth.getInstance().currentUser
-    // PUSH NOTIFICATIONS CHANGE:
-    // Allow callers to choose which tab opens first.
     var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab) }
 
     if (currentUser == null) {
@@ -115,13 +114,13 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
                     },
                     onError = {
                         nicknames = emptyMap()
-                        isLoading = false 
+                        isLoading = false
                     }
                 )
             },
-            onError = { err -> 
+            onError = { err ->
                 errorMessage = err
-                isLoading = false 
+                isLoading = false
             }
         )
     }
@@ -227,7 +226,7 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
 
     friendToNickname?.let { friend ->
         var currentNickname by remember { mutableStateOf(nicknames[friend.uid] ?: "") }
-        
+
         AlertDialog(
             onDismissRequest = { friendToNickname = null },
             title = { Text("Set Nickname") },
@@ -411,11 +410,12 @@ fun AddFriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
 fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
     var incomingRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
     var outgoingRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
+    var incomingEventInvites by remember { mutableStateOf<List<EventInvite>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val refreshRequests = {
+    val refreshData = {
         isLoading = true
         SocialRepository.fetchIncomingFriendRequests(
             currentUserId = currentUser.uid,
@@ -425,7 +425,14 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
                     currentUserId = currentUser.uid,
                     onSuccess = { outgoing ->
                         outgoingRequests = outgoing
-                        isLoading = false
+                        SocialRepository.fetchIncomingEventInvites(
+                            currentUserId = currentUser.uid,
+                            onSuccess = { invites ->
+                                incomingEventInvites = invites
+                                isLoading = false
+                            },
+                            onError = { errorMessage = it; isLoading = false }
+                        )
                     },
                     onError = { errorMessage = it; isLoading = false }
                 )
@@ -435,7 +442,7 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
     }
 
     LaunchedEffect(Unit) {
-        refreshRequests()
+        refreshData()
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -451,7 +458,7 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
                 CircularProgressIndicator(color = Color(0xFFEF3347))
             }
         } else {
-            if (incomingRequests.isEmpty() && outgoingRequests.isEmpty()) {
+            if (incomingRequests.isEmpty() && outgoingRequests.isEmpty() && incomingEventInvites.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("No pending requests.", color = Color.Gray)
                 }
@@ -459,7 +466,7 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (incomingRequests.isNotEmpty()) {
                         item {
-                            Text("Incoming Requests", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
+                            Text("Incoming Friend Requests", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
                         }
                         items(incomingRequests, key = { it.id }) { request ->
                             IncomingRequestCard(
@@ -468,14 +475,40 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
                                 onAccept = {
                                     SocialRepository.acceptFriendRequest(
                                         request = request,
-                                        onSuccess = { statusMessage = "Accepted request."; refreshRequests() },
+                                        onSuccess = { statusMessage = "Accepted request."; refreshData() },
                                         onError = { errorMessage = it }
                                     )
                                 },
                                 onDecline = {
                                     SocialRepository.declineFriendRequest(
                                         request = request,
-                                        onSuccess = { statusMessage = "Declined request."; refreshRequests() },
+                                        onSuccess = { statusMessage = "Declined request."; refreshData() },
+                                        onError = { errorMessage = it }
+                                    )
+                                }
+                            )
+                        }
+                    }
+
+                    if (incomingEventInvites.isNotEmpty()) {
+                        item {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Event Invites", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
+                        }
+                        items(incomingEventInvites, key = { it.id }) { invite ->
+                            EventInviteCard(
+                                invite = invite,
+                                onAccept = {
+                                    SocialRepository.acceptEventInvite(
+                                        invite = invite,
+                                        onSuccess = { statusMessage = "Accepted invite to ${invite.eventTitle}."; refreshData() },
+                                        onError = { errorMessage = it }
+                                    )
+                                },
+                                onDecline = {
+                                    SocialRepository.declineEventInvite(
+                                        invite = invite,
+                                        onSuccess = { statusMessage = "Declined invite."; refreshData() },
                                         onError = { errorMessage = it }
                                     )
                                 }
@@ -486,16 +519,16 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
                     if (outgoingRequests.isNotEmpty()) {
                         item {
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text("Outgoing Requests", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
+                            Text("Outgoing Friend Requests", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
                         }
                         items(outgoingRequests, key = { it.id }) { request ->
                             OutgoingRequestCard(
                                 request = request,
                                 onCardClick = { navController.navigate("${Routes.PROFILE}/${request.toUserId}") },
                                 onCancel = {
-                                    SocialRepository.declineFriendRequest( // Reuse decline logic to delete outgoing too
+                                    SocialRepository.declineFriendRequest(
                                         request = request,
-                                        onSuccess = { statusMessage = "Cancelled request."; refreshRequests() },
+                                        onSuccess = { statusMessage = "Cancelled request."; refreshData() },
                                         onError = { errorMessage = it }
                                     )
                                 }
@@ -509,10 +542,49 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
 }
 
 @Composable
+fun EventInviteCard(invite: EventInvite, onAccept: () -> Unit, onDecline: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(40.dp).background(Color(0xFFEF3347).copy(alpha = 0.1f), CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Event, contentDescription = null, tint = Color(0xFFEF3347))
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = invite.eventTitle, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(text = "Invited by ${invite.fromDisplayName}", fontSize = 12.sp, color = Color.Gray)
+                }
+                Row {
+                    IconButton(onClick = onAccept) {
+                        Icon(Icons.Default.Check, contentDescription = "Accept", tint = Color(0xFF4CAF50))
+                    }
+                    IconButton(onClick = onDecline) {
+                        Icon(Icons.Default.Close, contentDescription = "Decline", tint = Color.Red)
+                    }
+                }
+            }
+            if (invite.isPinnedByLeader) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.PushPin, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFF9C27B0))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "The leader has this event pinned", fontSize = 11.sp, color = Color(0xFF9C27B0), fontWeight = FontWeight.Medium)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun FriendCard(
-    user: UserProfile, 
+    user: UserProfile,
     nickname: String?,
-    onCardClick: () -> Unit, 
+    onCardClick: () -> Unit,
     onNickname: () -> Unit,
     onRemove: () -> Unit
 ) {
@@ -628,7 +700,7 @@ fun OutgoingRequestCard(request: FriendRequest, onCardClick: () -> Unit, onCance
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            UserAvatar(photoUrl = "") // recipient photoUrl removed from schema
+            UserAvatar(photoUrl = "")
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = request.toDisplayName.ifBlank { request.toEmail }, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
