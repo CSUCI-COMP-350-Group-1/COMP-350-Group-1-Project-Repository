@@ -769,15 +769,19 @@ fun LocationDetailsContent(
     onSaveSharedPin: () -> Unit = {}
 ) {
     val isTemp = location.id == "shared_temp"
+    val detailsContentModifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 24.dp)
 
     @Suppress("DEPRECATION")
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp)
+            .padding(top = 24.dp, bottom = 32.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row( modifier = detailsContentModifier,
+            verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -828,7 +832,8 @@ fun LocationDetailsContent(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        if (location.description.isNotEmpty()) {
+    if (location.description.isNotEmpty()) {
+        Column(modifier = detailsContentModifier) {
             @Suppress("DEPRECATION")
             Text(
                 text = "About",
@@ -836,7 +841,9 @@ fun LocationDetailsContent(
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
             )
+
             Spacer(modifier = Modifier.height(8.dp))
+
             @Suppress("DEPRECATION")
             Text(
                 text = location.description,
@@ -844,11 +851,13 @@ fun LocationDetailsContent(
                 color = Color.DarkGray,
                 lineHeight = 24.sp
             )
-            Spacer(modifier = Modifier.height(24.dp))
         }
 
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = detailsContentModifier,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (isTemp) {
@@ -896,7 +905,7 @@ fun LocationDetailsContent(
             Button(
                 onClick = onAssociateEvent,
                 colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = detailsContentModifier,
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -917,19 +926,31 @@ fun LocationDetailsContent(
             }
 
             if (visibleEvents.isNotEmpty()) {
-                @Suppress("DEPRECATION")
-                Text(
-                    text = if (location.isCustom && location.associatedEventId != null) "Linked Event" else "Events at this Location",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                visibleEvents.forEach { event ->
-                    MapEventItem(
-                        event = event,
-                        onMoreClick = { onGoToEvent(event) }
+
+                Column(modifier = detailsContentModifier) {
+                    @Suppress("DEPRECATION")
+                    Text(
+                        text = if (location.isCustom && location.associatedEventId != null) {
+                            "Linked Event"
+                        } else {
+                            "Events at this Location"
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
                     )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                visibleEvents.forEach { event ->
+                    Box(modifier = detailsContentModifier) {
+                        MapEventItem(
+                            event = event,
+                            onMoreClick = { onGoToEvent(event) }
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
@@ -939,12 +960,13 @@ fun LocationDetailsContent(
                 text = "No upcoming events here.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray,
-                modifier = Modifier.padding(vertical = 8.dp)
+                modifier = detailsContentModifier.padding(vertical = 8.dp)
             )
         }
-        
-        Spacer(modifier = Modifier.height(32.dp))
-    }
+
+    Spacer(modifier = Modifier.height(32.dp))
+}
+
 
 
 @Composable
