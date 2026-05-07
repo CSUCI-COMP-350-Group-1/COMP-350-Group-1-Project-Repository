@@ -45,8 +45,8 @@ fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
         // Smallest tail circle
         Surface(
             modifier = Modifier
-                .size(10.dp)
-                .offset(x = (12).dp, y = (48).dp),
+                .size(12.dp)
+                .offset(x = 14.dp, y = 26.dp),
             shape = CircleShape,
             color = Color.White,
             shadowElevation = 2.dp,
@@ -56,8 +56,8 @@ fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
         // Medium tail circle
         Surface(
             modifier = Modifier
-                .size(16.dp)
-                .offset(x = (6).dp, y = (36).dp),
+                .size(18.dp)
+                .offset(x = (-3).dp, y = 15.dp),
             shape = CircleShape,
             color = Color.White,
             shadowElevation = 3.dp,
@@ -76,12 +76,12 @@ fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
                     Text(
                         text = note.content,
                         modifier = Modifier
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
-                            .widthIn(max = 70.dp),
-                        fontSize = 13.sp,
-                        lineHeight = 16.sp,
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .widthIn(min = 40.dp, max = 100.dp),
+                        fontSize = 14.sp,
+                        lineHeight = 18.sp,
                         color = Color.Black,
-                        maxLines = 2,
+                        maxLines = 3,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center
                     )
@@ -91,17 +91,15 @@ fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
             val placeable = measurables.first().measure(constraints)
             layout(0, 0) {
                 placeable.place(
-                    x = 4.dp.roundToPx(),
-                    y = 42.dp.roundToPx() - placeable.height
+                    // Centered horizontally above the anchor, but constrained to not go too far left
+                    x = (13.dp.roundToPx() - placeable.width / 2).coerceAtLeast((-16).dp.roundToPx()),
+                    y = 16.dp.roundToPx() - placeable.height
                 )
             }
         }
     }
 }
 
-/**
- * Dialog for adding or editing a profile status note.
- */
 @Composable
 fun StatusDialog(
     currentNote: UserNote?,

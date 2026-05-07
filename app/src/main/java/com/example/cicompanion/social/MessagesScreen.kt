@@ -548,31 +548,113 @@ fun MessageThreadScreen(
                     }
                 }
             } else {
-                Box(modifier = Modifier.fillMaxWidth().background(Color.White).padding(16.dp), contentAlignment = Alignment.Center) {
-                    Text("You must be friends to send messages.", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "You must be friends to send messages.",
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
             }
         }
     ) { innerPadding ->
-        Column(modifier = Modifier.padding(innerPadding).fillMaxSize().background(AppBackground).padding(16.dp)) {
-            Text(friend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Chat", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            if (!friend?.email.isNullOrBlank()) {
-                Text(text = friend!!.email, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .background(AppBackground)
+                .padding(16.dp)
+        ) {
+            val currentFriend = friend
+            val displayName = nickname ?: currentFriend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Chat"
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                UserAvatar(photoUrl = currentFriend?.photoUrl ?: "")
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = displayName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    if (!nickname.isNullOrBlank() && currentFriend != null) {
+                        Text(
+                            text = "(${SocialRepository.displayNameOrEmail(currentFriend)})",
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    } else if (currentFriend != null && currentFriend.email.isNotBlank()) {
+                        Text(
+                            text = currentFriend.email,
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        navController.navigate("${Routes.PROFILE}/$friendUserId")
+                    },
+                    modifier = Modifier
+                        .height(36.dp)
+                        .padding(start = 8.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFEF3347),
+                        contentColor = Color.White
+                    ),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        text = "View Profile",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             if (errorMessage != null && conversationExists) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error)
+                Text(
+                    text = errorMessage!!,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
             if (messages.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text("No messages yet. Say hello!", color = Color.Gray)
                 }
             } else {
-                LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     items(messages, key = { it.id }) { message ->
                         MessageBubble(
                             message = message,

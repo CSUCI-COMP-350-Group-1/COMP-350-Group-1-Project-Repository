@@ -184,6 +184,9 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                 .fillMaxSize()
                 .background(Color.White)
         ) {
+            // Increased space for the status bubble to breathe and avoid top screen elements
+            Spacer(modifier = Modifier.height(24.dp))
+
             ProfileHeader(
                 userDisplayName = displayName,
                 userEmail = email,
@@ -199,8 +202,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(NavBackground.copy(alpha = 0.5f))
+                    .background(NavBackground.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
                     .padding(20.dp)
             )
 
