@@ -41,6 +41,7 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 
+
 private val BrandRed = Color(0xFFEF3347)
 
 @OptIn(ExperimentalMaterial3Api::class)
