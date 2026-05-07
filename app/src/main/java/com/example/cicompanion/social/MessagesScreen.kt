@@ -44,7 +44,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-
 @Composable
 private fun rememberAuthUser(): FirebaseUser? {
     val auth = FirebaseAuth.getInstance()
@@ -67,6 +66,7 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
     val currentUser = rememberAuthUser()
 
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
+    var nicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var rawConversations by remember { mutableStateOf<List<ConversationSummary>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoadingFriends by remember { mutableStateOf(currentUser != null) }
@@ -74,34 +74,36 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
     LaunchedEffect(currentUser?.uid) {
         if (currentUser == null) {
             friends = emptyList()
+            nicknames = emptyMap()
             rawConversations = emptyList()
             errorMessage = null
             isLoadingFriends = false
         } else {
             isLoadingFriends = true
+            SocialRepository.fetchAcceptedFriends(
+                currentUserId = currentUser.uid,
+                onSuccess = {
+                    friends = it
+                    SocialRepository.fetchNicknames(
+                        currentUserId = currentUser.uid,
+                        onSuccess = { map ->
+                            nicknames = map
+                            isLoadingFriends = false
+                        },
+                        onError = { err -> errorMessage = err; isLoadingFriends = false }
+                    )
+                },
+                onError = {
+                    errorMessage = it
+                    isLoadingFriends = false
+                }
+            )
         }
     }
 
-    if (currentUser == null) {
-        SignedOutMessagingMessage()
-        return
-    }
+    DisposableEffect(currentUser?.uid) {
+        if (currentUser == null) return@DisposableEffect onDispose {}
 
-    LaunchedEffect(currentUser.uid) {
-        SocialRepository.fetchAcceptedFriends(
-            currentUserId = currentUser.uid,
-            onSuccess = {
-                friends = it
-                isLoadingFriends = false
-            },
-            onError = {
-                errorMessage = it
-                isLoadingFriends = false
-            }
-        )
-    }
-
-    DisposableEffect(currentUser.uid) {
         val registration = MessagingRepository.listenToConversations(
             currentUserId = currentUser.uid,
             onUpdate = { rawConversations = it },
@@ -113,10 +115,10 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
     }
 
     val friendsById = remember(friends) { friends.associateBy { it.uid } }
-    
+
     val activeConversations = remember(rawConversations, friendsById) {
         rawConversations.filter { conversation ->
-            val otherId = MessagingRepository.findOtherParticipantId(conversation, currentUser.uid)
+            val otherId = MessagingRepository.findOtherParticipantId(conversation, currentUser!!.uid)
             otherId != null && friendsById.containsKey(otherId)
         }
     }
@@ -184,8 +186,9 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                         items(friends, key = { it.uid }) { friend ->
                             FriendPickerCard(
                                 user = friend,
+                                nickname = nicknames[friend.uid],
                                 onClick = {
-                                    val conversationId = MessagingRepository.createConversationId(currentUser.uid, friend.uid)
+                                    val conversationId = MessagingRepository.createConversationId(currentUser?.uid ?: "", friend.uid)
                                     val initialMsg = if (sharedLocation != null) "Check out this custom pin: $sharedLocation" else null
                                     navController.navigate(Routes.messageThread(conversationId, friend.uid, initialMsg))
                                 }
@@ -218,11 +221,11 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(activeConversations, key = { it.id }) { conversation ->
-                        val friendUserId = MessagingRepository.findOtherParticipantId(conversation, currentUser.uid).orEmpty()
+                        val friendUserId = MessagingRepository.findOtherParticipantId(conversation, currentUser?.uid ?: "").orEmpty()
                         val friend = friendsById[friendUserId]
 
                         ConversationCard(
-                            friendName = friend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Friend",
+                            friendName = nicknames[friendUserId] ?: friend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Friend",
                             friendEmail = friend?.email ?: "",
                             preview = conversation.lastMessageText,
                             onClick = {
@@ -250,6 +253,7 @@ fun MessageThreadScreen(
     val scope = rememberCoroutineScope()
 
     var friend by remember { mutableStateOf<UserProfile?>(null) }
+    var nickname by remember { mutableStateOf<String?>(null) }
     var messages by remember { mutableStateOf<List<DirectMessage>>(emptyList()) }
     var messageText by rememberSaveable { mutableStateOf(initialMessage ?: "") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -322,6 +326,14 @@ fun MessageThreadScreen(
                 errorMessage = null
             },
             onError = { errorMessage = it }
+        )
+
+        SocialRepository.fetchNicknames(
+            currentUserId = currentUser.uid,
+            onSuccess = { map ->
+                nickname = map[friendUserId]
+            },
+            onError = { /* ignore nickname load error */ }
         )
     }
 
@@ -437,7 +449,10 @@ fun MessageThreadScreen(
         bottomBar = {
             if (isFriend) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().background(Color.White).padding(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box {
@@ -503,11 +518,14 @@ fun MessageThreadScreen(
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp)
                     )
+
                     Spacer(modifier = Modifier.width(8.dp))
+
                     IconButton(
                         onClick = {
                             val targetFriend = friend ?: return@IconButton
                             isSending = true
+
                             MessagingRepository.sendMessage(
                                 currentUser = currentUser,
                                 friend = targetFriend,
@@ -541,11 +559,14 @@ fun MessageThreadScreen(
             if (!friend?.email.isNullOrBlank()) {
                 Text(text = friend!!.email, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
             }
+
             if (errorMessage != null && conversationExists) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error)
             }
+
             Spacer(modifier = Modifier.height(12.dp))
+
             if (messages.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("No messages yet. Say hello!", color = Color.Gray)
@@ -558,7 +579,7 @@ fun MessageThreadScreen(
                             isMine = message.senderId == currentUser.uid,
                             navController = navController,
                             ownedPins = userPins,
-                            onPinSaved = { 
+                            onPinSaved = {
                                 // already handled by listener
                             }
                         )
@@ -566,6 +587,30 @@ fun MessageThreadScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FriendPickerCard(
+    user: UserProfile,
+    nickname: String?,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(80.dp)
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        UserAvatar(photoUrl = user.photoUrl)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = nickname ?: SocialRepository.displayNameOrEmail(user),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -592,7 +637,7 @@ private fun <T> ItemPickerDialog(
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color(0xFFEF3347))
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
@@ -606,9 +651,9 @@ private fun <T> ItemPickerDialog(
                     ),
                     singleLine = true
                 )
-                
+
                 Spacer(modifier = Modifier.height(12.dp))
-                
+
                 if (filteredItems.isEmpty()) {
                     Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
                         Text("No items found.", textAlign = TextAlign.Center, color = Color.Gray)
@@ -649,10 +694,19 @@ private fun ConversationCard(friendName: String, friendEmail: String, preview: S
         Column(modifier = Modifier.padding(16.dp)) {
             Text(friendName, fontWeight = FontWeight.Bold)
             if (friendEmail.isNotBlank()) {
-                Text(text = friendEmail, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    text = friendEmail,
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
             Spacer(modifier = Modifier.height(6.dp))
-            Text(text = preview, color = Color.DarkGray, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(
+                text = preview,
+                color = Color.DarkGray,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -670,10 +724,10 @@ private fun MessageBubble(
         sdf.format(Date(message.sentAt))
     }
     val scope = rememberCoroutineScope()
-    
+
     var invite by remember { mutableStateOf<EventInvite?>(null) }
     var inviteError by remember { mutableStateOf<String?>(null) }
-    var isPinAlreadySaved by remember(message.id, ownedPins) { 
+    var isPinAlreadySaved by remember(message.id, ownedPins) {
         mutableStateOf(message.type == "pin" && ownedPins.any { it.latitude == message.metadata["lat"]?.toDoubleOrNull() && it.longitude == message.metadata["lng"]?.toDoubleOrNull() })
     }
 
@@ -705,7 +759,7 @@ private fun MessageBubble(
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        
+
                         if (message.type == "pin" && !isMine && isPinAlreadySaved) {
                             Text("Saved to Map", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                         }
@@ -769,7 +823,7 @@ private fun MessageBubble(
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        
+
                         if (!isMine && invite?.status == "pending") {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(
@@ -800,7 +854,7 @@ private fun MessageBubble(
                         } else if (!isMine && invite?.status == "accepted") {
                             Text("Accepted", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
-                        
+
                         Spacer(modifier = Modifier.height(4.dp))
                         Button(
                             onClick = { navController.navigate(Routes.CALENDAR) },

@@ -47,7 +47,7 @@ class SocialViewModel : ViewModel() {
             isLoading = true
             SocialRepository.fetchSearchableUsers(
                 currentUserId = user.uid,
-                onSuccess = { users -> allUsers = users },
+                onSuccess = { users, _ -> allUsers = users },
                 onError = { errorMessage = it }
             )
 

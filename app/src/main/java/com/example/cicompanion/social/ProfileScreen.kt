@@ -57,8 +57,10 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
     var email by remember { mutableStateOf("") }
     var photoUrl by remember { mutableStateOf<String?>(null) }
     var friendCount by remember { mutableIntStateOf(0) }
+    var nickname by remember { mutableStateOf<String?>(null) }
     var requestStatus by remember { mutableStateOf<String?>(null) }
     var targetUserProfile by remember { mutableStateOf<UserProfile?>(null) }
+    var showNicknameDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
@@ -78,6 +80,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             email = "Sign in to sync your data"
             photoUrl = null
             friendCount = 0
+            nickname = null
             requestStatus = null
             targetUserProfile = null
             return@LaunchedEffect
@@ -116,12 +119,24 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                     },
                     onError = { /* Handle error */ }
                 )
+
+                SocialRepository.fetchNicknames(
+                    currentUserId = currentUser!!.uid,
+                    onSuccess = { map ->
+                        nickname = map[targetUid]
+                    },
+                    onError = { /* Ignore */ }
+                )
+            } else {
+                nickname = null
+                requestStatus = null
             }
         } else {
             displayName = "Guest User"
             email = "Sign in to sync your data"
             photoUrl = null
             friendCount = 0
+            nickname = null
             requestStatus = null
             targetUserProfile = null
         }
@@ -147,6 +162,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                 userEmail = email,
                 photoUrl = photoUrl,
                 friendCount = friendCount,
+                nickname = nickname,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
@@ -196,12 +212,65 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                         navController = navController,
                         targetUser = targetUserProfile,
                         requestStatus = requestStatus,
-                        onStatusChange = { newStatus -> requestStatus = newStatus }
+                        onStatusChange = { newStatus -> requestStatus = newStatus },
+                        nickname = nickname,
+                        onNicknameClick = { showNicknameDialog = true }
                     )
                 }
             }
         }
     }
+
+    if (showNicknameDialog && !isOwnProfile && currentUser != null && userId != null) {
+        NicknameDialog(
+            initialNickname = nickname,
+            onDismiss = { showNicknameDialog = false },
+            onConfirm = { newNickname ->
+                SocialRepository.setNickname(
+                    currentUserId = currentUser!!.uid,
+                    friendUid = userId,
+                    nickname = newNickname,
+                    onSuccess = {
+                        nickname = newNickname.ifBlank { null }
+                        showNicknameDialog = false
+                    },
+                    onError = { showNicknameDialog = false }
+                )
+            }
+        )
+    }
+}
+
+@Composable
+fun NicknameDialog(
+    initialNickname: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var text by remember { mutableStateOf(initialNickname ?: "") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (initialNickname == null) "Set Nickname" else "Change Nickname") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Nickname") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(text) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -231,7 +300,9 @@ fun ViewOnlyProfileActions(
     navController: NavHostController,
     targetUser: UserProfile?,
     requestStatus: String?,
-    onStatusChange: (String?) -> Unit
+    onStatusChange: (String?) -> Unit,
+    nickname: String? = null,
+    onNicknameClick: () -> Unit = {}
 ) {
     val currentUser = FirebaseAuth.getInstance().currentUser
     var showRemoveDialog by remember { mutableStateOf(false) }
@@ -321,6 +392,20 @@ fun ViewOnlyProfileActions(
                 }
             }
             "accepted" -> {
+                OutlinedButton(
+                    onClick = onNicknameClick,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, Color.Gray),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text(if (nickname == null) "Set Nickname" else "Change Nickname", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 OutlinedButton(
                     onClick = { showRemoveDialog = true },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -633,7 +718,8 @@ fun ProfileHeader(
     userEmail: String,
     photoUrl: String?,
     friendCount: Int,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    nickname: String? = null
 ) {
     Row(
         modifier = modifier,
@@ -662,11 +748,18 @@ fun ProfileHeader(
 
         Column {
             Text(
-                text = userDisplayName,
+                text = nickname ?: userDisplayName,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 22.sp,
                 color = Color.Black
             )
+            if (nickname != null) {
+                Text(
+                    text = "($userDisplayName)",
+                    color = Color.Gray,
+                    fontSize = 14.sp
+                )
+            }
             Text(
                 text = userEmail,
                 color = Color.DarkGray,

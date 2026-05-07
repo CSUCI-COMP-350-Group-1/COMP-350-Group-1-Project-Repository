@@ -1465,12 +1465,17 @@ fun EventMembersDialog(
     onKick: (List<String>) -> Unit
 ) {
     var members by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
+    var nicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
     var selectedUsers by remember { mutableStateOf(setOf<String>()) }
     val isOwner = event.ownerId == currentUserId
 
     val otherMembers = remember(members, event.ownerId) {
         members.filter { it.uid != event.ownerId }
+    }
+
+    LaunchedEffect(currentUserId) {
+        SocialRepository.fetchNicknames(currentUserId, { nicknames = it }, {})
     }
 
     DisposableEffect(event.id) {
@@ -1552,7 +1557,8 @@ fun EventMembersDialog(
                                 userId = event.ownerId ?: "",
                                 isOwner = true,
                                 currentUserId = currentUserId,
-                                eventId = event.id
+                                eventId = event.id,
+                                nickname = nicknames[event.ownerId]
                             )
                         }
                         
@@ -1585,7 +1591,8 @@ fun EventMembersDialog(
                                         }
                                     },
                                     currentUserId = currentUserId,
-                                    eventId = event.id
+                                    eventId = event.id,
+                                    nickname = nicknames[member.uid]
                                 )
                             }
                         }
@@ -1673,7 +1680,8 @@ fun PremiumMemberRow(
     isSelected: Boolean = false,
     onToggleSelect: () -> Unit = {},
     currentUserId: String,
-    eventId: String
+    eventId: String,
+    nickname: String? = null
 ) {
     var profile by remember { mutableStateOf<UserProfile?>(null) }
     
@@ -1683,7 +1691,8 @@ fun PremiumMemberRow(
         }
     }
 
-    val name = profile?.let { SocialRepository.displayNameOrEmail(it) } ?: displayName
+    val baseName = profile?.let { SocialRepository.displayNameOrEmail(it) } ?: displayName
+    val displayLabel = nickname ?: baseName
     val photo = profile?.photoUrl ?: photoUrl
     val isSelectable = canKick && !isOwner && userId != currentUserId
     val isMe = userId == currentUserId
@@ -1725,11 +1734,18 @@ fun PremiumMemberRow(
             
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (isMe) "$name (You)" else name,
+                    text = if (isMe) "$displayLabel (You)" else displayLabel,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = if (isOwner || isMe) FontWeight.Bold else FontWeight.Medium,
                     color = if (isMe) BrandRedDark else Color.DarkGray
                 )
+                if (nickname != null && baseName != "Loading...") {
+                    Text(
+                        text = "($baseName)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                }
                 if (isOwner) {
                     Text("Event Host", style = MaterialTheme.typography.bodySmall, color = CustomEventOrange)
                 } else if (isMe) {
@@ -1990,12 +2006,15 @@ fun FriendPickerDialog(
     onInvite: (UserProfile) -> Unit
 ) {
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
+    var nicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
     var searchQuery by remember { mutableStateOf("") }
     val currentUser = FirebaseAuth.getInstance().currentUser
 
     LaunchedEffect(eventId) {
         if (currentUser != null) {
+            SocialRepository.fetchNicknames(currentUser.uid, { nicknames = it }, {})
+            
             SocialRepository.fetchAcceptedFriends(
                 currentUserId = currentUser.uid,
                 onSuccess = { allFriends ->
@@ -2020,11 +2039,13 @@ fun FriendPickerDialog(
         }
     }
 
-    val filteredFriends = remember(friends, searchQuery) {
+    val filteredFriends = remember(friends, nicknames, searchQuery) {
         if (searchQuery.isBlank()) friends
-        else friends.filter {
-            it.displayName.contains(searchQuery, ignoreCase = true) ||
-            it.email.contains(searchQuery, ignoreCase = true)
+        else friends.filter { friend ->
+            val nickname = nicknames[friend.uid] ?: ""
+            friend.displayName.contains(searchQuery, ignoreCase = true) ||
+            friend.email.contains(searchQuery, ignoreCase = true) ||
+            nickname.contains(searchQuery, ignoreCase = true)
         }
     }
 
@@ -2055,6 +2076,10 @@ fun FriendPickerDialog(
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                         items(filteredFriends, key = { it.uid }) { friend ->
+                            val nickname = nicknames[friend.uid]
+                            val baseName = SocialRepository.displayNameOrEmail(friend)
+                            val displayLabel = nickname ?: baseName
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -2067,10 +2092,17 @@ fun FriendPickerDialog(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
-                                        text = SocialRepository.displayNameOrEmail(friend),
+                                        text = displayLabel,
                                         style = MaterialTheme.typography.bodyLarge,
                                         fontWeight = FontWeight.Bold
                                     )
+                                    if (nickname != null) {
+                                        Text(
+                                            text = "($baseName)",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color.Gray
+                                        )
+                                    }
                                     Text(
                                         text = friend.email,
                                         style = MaterialTheme.typography.bodySmall,
