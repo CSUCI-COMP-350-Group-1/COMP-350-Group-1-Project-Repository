@@ -6,11 +6,14 @@ import com.example.cicompanion.maps.CustomPin
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.QuerySnapshot
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.SetOptions
 import java.time.format.DateTimeFormatter
 import java.time.ZonedDateTime
+import com.example.cicompanion.maps.CustomPin
 
 object SocialRepository {
 
@@ -20,9 +23,12 @@ object SocialRepository {
         onSuccess: (List<UserProfile>) -> Unit,
         onError: (String) -> Unit
     ) {
-        fetchSearchableUsers(
-            currentUserId = currentUserId,
-            onSuccess = { allUsers ->
+        usersCollection().get()
+            .addOnSuccessListener { snapshot ->
+                val allUsers = snapshot.documents
+                    .mapNotNull { it.toObject(UserProfile::class.java) }
+                    .filter { it.uid.isNotBlank() && it.uid != currentUserId }
+
                 fetchAllFriendRequestStatuses(
                     currentUserId = currentUserId,
                     onSuccess = { statuses ->
@@ -32,27 +38,43 @@ object SocialRepository {
                     },
                     onError = onError
                 )
-            },
-            onError = onError
-        )
+            }
+            .addOnFailureListener { exception ->
+                onError(exception.message ?: "Could not load friends.")
+            }
     }
 
     fun fetchSearchableUsers(
         currentUserId: String,
-        onSuccess: (List<UserProfile>) -> Unit,
+        searchQuery: String = "",
+        lastDocument: DocumentSnapshot? = null,
+        onSuccess: (List<UserProfile>, DocumentSnapshot?) -> Unit,
         onError: (String) -> Unit
     ) {
-        usersCollection()
-            .get()
+        var query: Query = usersCollection()
+            .orderBy("displayName")
+            .limit(20)
+
+        if (searchQuery.isNotBlank()) {
+            query = query.whereGreaterThanOrEqualTo("displayName", searchQuery)
+                .whereLessThanOrEqualTo("displayName", searchQuery + "\uf8ff")
+        }
+
+        if (lastDocument != null) {
+            query = query.startAfter(lastDocument)
+        }
+
+        query.get()
             .addOnSuccessListener { snapshot ->
-                handleSearchableUsersSuccess(
-                    snapshot = snapshot,
-                    currentUserId = currentUserId,
-                    onSuccess = onSuccess
-                )
+                val users = snapshot.documents
+                    .mapNotNull { it.toObject(UserProfile::class.java) }
+                    .filter { it.uid.isNotBlank() && it.uid != currentUserId }
+
+                val nextDoc = snapshot.documents.lastOrNull()
+                onSuccess(users, nextDoc)
             }
             .addOnFailureListener { exception ->
-                onError(searchableUsersErrorMessage(exception))
+                onError(exception.message ?: "Could not load users.")
             }
     }
 
@@ -169,42 +191,16 @@ object SocialRepository {
         checkIfRequestExists(
             requestId = requestId,
             onComplete = { exists ->
-                handleExistingRequestCheck(
-                    exists = exists,
-                    currentUser = currentUser,
-                    targetUser = targetUser,
-                    requestId = requestId,
-                    onSuccess = onSuccess,
-                    onError = onError
-                )
+                if (exists) {
+                    onError("You already sent a friend request to this user.")
+                } else {
+                    val request = buildFriendRequest(currentUser, targetUser, requestId)
+                    saveFriendRequest(request, currentUser, targetUser, onSuccess, onError)
+                }
             },
             onError = onError
         )
     }
-
-    private fun handleExistingRequestCheck(
-        exists: Boolean,
-        currentUser: FirebaseUser,
-        targetUser: UserProfile,
-        requestId: String,
-        onSuccess: () -> Unit,
-        onError: (String) -> Unit
-    ) {
-        if (exists) {
-            onError("You already sent a friend request to this user.")
-            return
-        }
-
-        val request = buildFriendRequest(currentUser, targetUser, requestId)
-        saveFriendRequest(
-            request = request,
-            currentUser = currentUser,
-            targetUser = targetUser,
-            onSuccess = onSuccess,
-            onError = onError
-        )
-    }
-
 
     fun createFriendRequestId(fromUserId: String, toUserId: String): String {
         return "${fromUserId}_$toUserId"
@@ -241,12 +237,8 @@ object SocialRepository {
                 onComplete(document.exists())
             }
             .addOnFailureListener { exception ->
-                onError(existingRequestErrorMessage(exception))
+                onError(exception.message ?: "Could not verify the existing friend request.")
             }
-    }
-
-    private fun existingRequestErrorMessage(exception: Exception): String {
-        return exception.message ?: "Could not verify the existing friend request."
     }
 
     private fun saveFriendRequest(
@@ -267,12 +259,8 @@ object SocialRepository {
                 onSuccess()
             }
             .addOnFailureListener { exception ->
-                onError(sendFriendRequestErrorMessage(exception))
+                onError(exception.message ?: "Could not send the friend request.")
             }
-    }
-
-    private fun sendFriendRequestErrorMessage(exception: Exception): String {
-        return exception.message ?: "Could not send the friend request."
     }
 
     fun fetchIncomingFriendRequests(
@@ -299,7 +287,8 @@ object SocialRepository {
     ) {
         friendRequestsCollection()
             .whereEqualTo("fromUserId", currentUserId)
-            .get() 
+            .whereEqualTo("status", "pending")
+            .get()
             .addOnSuccessListener { snapshot ->
                 onSuccess(snapshot.documents.mapNotNull { it.toObject(FriendRequest::class.java) })
             }
@@ -400,12 +389,8 @@ object SocialRepository {
                 onSuccess()
             }
             .addOnFailureListener { exception ->
-                onError(updateFriendRequestStatusErrorMessage(exception))
+                onError(exception.message ?: "Could not update the friend request.")
             }
-    }
-
-    private fun updateFriendRequestStatusErrorMessage(exception: Exception): String {
-        return exception.message ?: "Could not update the friend request."
     }
 
     fun fetchAllFriendRequestStatuses(
@@ -509,7 +494,7 @@ object SocialRepository {
         onError: (String) -> Unit
     ) {
         val friendIds = mutableSetOf<String>()
-        
+
         friendRequestsCollection()
             .whereEqualTo("status", "accepted")
             .get()
@@ -558,48 +543,40 @@ object SocialRepository {
 
     fun displayNameOrEmail(user: UserProfile): String {
         return user.displayName.ifBlank { user.email }
+    fun fetchNicknames(
+        currentUserId: String,
+        onSuccess: (Map<String, String>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        nicknamesCollection(currentUserId).get()
+            .addOnSuccessListener { snapshot ->
+                val map = snapshot.documents.associate {
+                    it.id to (it.getString("nickname") ?: "")
+                }
+                onSuccess(map)
+            }
+            .addOnFailureListener { e ->
+                onError(e.message ?: "Could not load nicknames.")
+            }
     }
 
-    // --- EVENT INVITES ---
-
-    fun sendEventInvite(
-        currentUser: FirebaseUser,
-        targetUserId: String,
-        event: CalendarEvent,
+    fun setNickname(
+        currentUserId: String,
+        friendUid: String,
+        nickname: String,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        val inviteId = "${currentUser.uid}_${targetUserId}_${event.id}"
-        
-        val invite = EventInvite(
-            id = inviteId,
-            fromUserId = currentUser.uid,
-            toUserId = targetUserId,
-            fromDisplayName = currentUser.displayName ?: currentUser.email ?: "Friend",
-            eventId = event.id,
-            eventTitle = event.title,
-            eventDescription = event.description,
-            eventLocation = event.location,
-            eventStart = event.start.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
-            eventEnd = event.endExclusive.format(DateTimeFormatter.ISO_ZONED_DATE_TIME),
-            isAllDay = event.isAllDay,
-            isPinnedByLeader = event.isPinned,
-            status = "pending",
-            sentAt = System.currentTimeMillis()
-        )
-
-        val db = FirebaseFirestore.getInstance()
-        val batch = db.batch()
-        
-        val inviteRef = eventInvitesCollection().document(inviteId)
-        batch.set(inviteRef, invite)
-        
-        // Removed isShared update to comply with security rules.
-        // Visibility logic moved to ViewModel using ownerId != currentUserId.
-
-        batch.commit()
-            .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { onError(it.message ?: "Could not send event invite.") }
+        if (nickname.isBlank()) {
+            nicknamesCollection(currentUserId).document(friendUid).delete()
+                .addOnSuccessListener { onSuccess() }
+                .addOnFailureListener { e -> onError(e.message ?: "Could not remove nickname.") }
+        } else {
+            nicknamesCollection(currentUserId).document(friendUid)
+                .set(mapOf("nickname" to nickname))
+                .addOnSuccessListener { onSuccess() }
+                .addOnFailureListener { e -> onError(e.message ?: "Could not set nickname.") }
+        }
     }
 
     fun fetchIncomingEventInvites(
@@ -615,7 +592,8 @@ object SocialRepository {
                 onSuccess(snapshot.documents.mapNotNull { it.toObject(EventInvite::class.java) })
             }
             .addOnFailureListener { exception ->
-                onError(exception.message ?: "Could not fetch event invites.") }
+                onError(exception.message ?: "Could not load event invites.")
+            }
     }
 
     fun fetchEventInvite(
@@ -626,6 +604,42 @@ object SocialRepository {
         eventInvitesCollection().document(inviteId).get()
             .addOnSuccessListener { doc -> onSuccess(doc.toObject(EventInvite::class.java)) }
             .addOnFailureListener { onError(it.message ?: "Could not fetch event invite.") }
+    }
+
+    fun sendEventInvite(
+        currentUser: FirebaseUser,
+        targetUserId: String,
+        event: CalendarEvent,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val inviteId = "${currentUser.uid}_${targetUserId}_${event.id}"
+        val invite = EventInvite(
+            id = inviteId,
+            fromUserId = currentUser.uid,
+            toUserId = targetUserId,
+            fromDisplayName = currentUser.displayName ?: currentUser.email ?: "Someone",
+            eventId = event.id,
+            eventTitle = event.title,
+            eventDescription = event.description,
+            eventLocation = event.location,
+            eventStart = event.start.toString(),
+            eventEnd = event.endExclusive.toString(),
+            isAllDay = event.isAllDay,
+            isPinnedByLeader = event.isPinnedByLeader,
+            status = "pending",
+            sentAt = System.currentTimeMillis()
+        )
+
+        val db = FirebaseFirestore.getInstance()
+        val batch = db.batch()
+        
+        val inviteRef = eventInvitesCollection().document(inviteId)
+        batch.set(inviteRef, invite)
+
+        batch.commit()
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { onError(it.message ?: "Could not send event invite.") }
     }
 
     fun listenToIncomingEventInvites(
@@ -698,7 +712,6 @@ object SocialRepository {
                 "isBookmarked" to false,
                 "ownerId" to invite.fromUserId,
                 "isPinnedByLeader" to invite.isPinnedByLeader
-                // isShared removed to comply with rules
             )
             
             val eventRef = db.collection("users").document(invite.toUserId)
@@ -713,9 +726,9 @@ object SocialRepository {
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        eventInvitesCollection().document(invite.id).delete()
+        eventInvitesCollection().document(invite.id).update("status", "declined")
             .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { onError(it.message ?: "Could not decline event invite.") }
+            .addOnFailureListener { e -> onError(e.message ?: "Could not decline invite.") }
     }
 
     /**
@@ -975,10 +988,17 @@ object SocialRepository {
             .addOnFailureListener { onError(it.message ?: "Failed to find invites for deletion.") }
     }
 
+    fun displayNameOrEmail(user: UserProfile): String {
+        return user.displayName.ifBlank { user.email }
+    }
+
     private fun usersCollection() = FirebaseFirestore.getInstance().collection("users")
 
     private fun friendRequestsCollection() =
         FirebaseFirestore.getInstance().collection("friend_requests")
+
+    private fun nicknamesCollection(currentUserId: String) =
+        usersCollection().document(currentUserId).collection("nicknames")
 
     private fun eventInvitesCollection() =
         FirebaseFirestore.getInstance().collection("event_invites")

@@ -41,7 +41,6 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 
-
 private val BrandRed = Color(0xFFEF3347)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,11 +60,13 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
     var major by remember { mutableStateOf("") }
     var userNote by remember { mutableStateOf<UserNote?>(null) }
     var friendCount by remember { mutableIntStateOf(0) }
+    var nickname by remember { mutableStateOf<String?>(null) }
     var requestStatus by remember { mutableStateOf<String?>(null) }
     var targetUserProfile by remember { mutableStateOf<UserProfile?>(null) }
     var mutualFriends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
 
     var showStatusDialog by remember { mutableStateOf(false) }
+    var showNicknameDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
@@ -88,6 +89,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             major = ""
             userNote = null
             friendCount = 0
+            nickname = null
             requestStatus = null
             targetUserProfile = null
             mutualFriends = emptyList()
@@ -143,6 +145,17 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                 )
             } else {
                 mutualFriends = emptyList()
+
+                SocialRepository.fetchNicknames(
+                    currentUserId = currentUser!!.uid,
+                    onSuccess = { map ->
+                        nickname = map[targetUid]
+                    },
+                    onError = { /* Ignore */ }
+                )
+            } else {
+                nickname = null
+                requestStatus = null
             }
         } else {
             displayName = "Guest User"
@@ -152,6 +165,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             major = ""
             userNote = null
             friendCount = 0
+            nickname = null
             requestStatus = null
             targetUserProfile = null
             mutualFriends = emptyList()
@@ -184,6 +198,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                 isSignedIn = currentUser != null,
                 onAddStatusClick = { showStatusDialog = true },
                 showFriendCount = currentUser != null,
+                nickname = nickname,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
@@ -191,6 +206,8 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                     .background(NavBackground.copy(alpha = 0.5f))
                     .padding(20.dp)
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             Column(
                 modifier = Modifier
@@ -251,10 +268,65 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                         navController = navController,
                         targetUser = targetUserProfile,
                         requestStatus = requestStatus,
-                        onStatusChange = { newStatus -> requestStatus = newStatus }
+                        onStatusChange = { newStatus -> requestStatus = newStatus },
+                        nickname = nickname,
+                        onNicknameClick = { showNicknameDialog = true }
                     )
                 }
             }
+        }
+    }
+
+    if (showNicknameDialog && !isOwnProfile && currentUser != null && userId != null) {
+        NicknameDialog(
+            initialNickname = nickname,
+            onDismiss = { showNicknameDialog = false },
+            onConfirm = { newNickname ->
+                SocialRepository.setNickname(
+                    currentUserId = currentUser!!.uid,
+                    friendUid = userId,
+                    nickname = newNickname,
+                    onSuccess = {
+                        nickname = newNickname.ifBlank { null }
+                        showNicknameDialog = false
+                    },
+                    onError = { showNicknameDialog = false }
+                )
+            }
+        )
+    }
+}
+
+@Composable
+fun NicknameDialog(
+    initialNickname: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var text by remember { mutableStateOf(initialNickname ?: "") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (initialNickname == null) "Set Nickname" else "Change Nickname") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Nickname") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(text) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
         }
     }
 
@@ -382,7 +454,9 @@ fun ViewOnlyProfileActions(
     navController: NavHostController,
     targetUser: UserProfile?,
     requestStatus: String?,
-    onStatusChange: (String?) -> Unit
+    onStatusChange: (String?) -> Unit,
+    nickname: String? = null,
+    onNicknameClick: () -> Unit = {}
 ) {
     val currentUser = FirebaseAuth.getInstance().currentUser
     var showRemoveDialog by remember { mutableStateOf(false) }
@@ -472,6 +546,20 @@ fun ViewOnlyProfileActions(
                 }
             }
             "accepted" -> {
+                OutlinedButton(
+                    onClick = onNicknameClick,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, Color.Gray),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text(if (nickname == null) "Set Nickname" else "Change Nickname", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 OutlinedButton(
                     onClick = { showRemoveDialog = true },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -609,7 +697,7 @@ private fun ColumnScope.ProfileActionArea(
             Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
         if (showSettings) {
 
@@ -666,7 +754,8 @@ fun ProfileHeader(
     isSignedIn: Boolean = false,
     onAddStatusClick: () -> Unit = {},
     showFriendCount: Boolean = true,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    nickname: String? = null
 ) {
     Row(
         modifier = modifier,
@@ -719,11 +808,18 @@ fun ProfileHeader(
 
         Column {
             Text(
-                text = userDisplayName,
+                text = nickname ?: userDisplayName,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 22.sp,
                 color = Color.Black
             )
+            if (nickname != null) {
+                Text(
+                    text = "($userDisplayName)",
+                    color = Color.Gray,
+                    fontSize = 14.sp
+                )
+            }
             Text(
                 text = userEmail,
                 color = Color.DarkGray,
