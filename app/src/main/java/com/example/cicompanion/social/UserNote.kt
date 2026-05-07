@@ -42,31 +42,29 @@ fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
     // The base Box is positioned by the caller (anchor point on the profile picture)
     Box(modifier = modifier) {
         
-        // 1. Smallest tail circle - stays pinned to the anchor point
+        // Smallest tail circle
         Surface(
             modifier = Modifier
                 .size(10.dp)
-                .offset(x = (-4).dp, y = (-4).dp),
+                .offset(x = (12).dp, y = (48).dp),
             shape = CircleShape,
             color = Color.White,
             shadowElevation = 2.dp,
             border = BorderStroke(1.dp, Color(0xFFEEEEEE))
         ) {}
 
-        // 2. Medium tail circle - stays pinned slightly further top-left
+        // Medium tail circle
         Surface(
             modifier = Modifier
                 .size(16.dp)
-                .offset(x = (-16).dp, y = (-16).dp),
+                .offset(x = (6).dp, y = (36).dp),
             shape = CircleShape,
             color = Color.White,
             shadowElevation = 3.dp,
             border = BorderStroke(1.dp, Color(0xFFEEEEEE))
         ) {}
 
-        // 3. Main Bubble Surface
-        // We use Layout to manually position the bubble so it grows Up and Left 
-        // starting from a point relative to the tail circles.
+        // Main Bubble Surface
         Layout(
             content = {
                 Surface(
@@ -79,11 +77,12 @@ fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
                         text = note.content,
                         modifier = Modifier
                             .padding(horizontal = 14.dp, vertical = 10.dp)
-                            .widthIn(max = 120.dp),
+                            .widthIn(max = 70.dp),
                         fontSize = 13.sp,
                         lineHeight = 16.sp,
                         color = Color.Black,
                         maxLines = 4,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -91,10 +90,9 @@ fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
         ) { measurables, constraints ->
             val placeable = measurables.first().measure(constraints)
             layout(0, 0) {
-                // Pin the bottom-right corner of the bubble relative to the anchor
                 placeable.place(
-                    x = -placeable.width - 12.dp.roundToPx(),
-                    y = -placeable.height - 12.dp.roundToPx()
+                    x = 4.dp.roundToPx(),
+                    y = 42.dp.roundToPx() - placeable.height
                 )
             }
         }
@@ -113,7 +111,7 @@ fun StatusDialog(
 ) {
     var text by remember { mutableStateOf(currentNote?.content ?: "") }
     var selectedDuration by remember { mutableLongStateOf(3600000L) } // Default to 1 hour
-    val charLimit = 50
+    val charLimit = 30
 
     val durations = listOf(
         "15 minutes" to 15 * 60 * 1000L,
