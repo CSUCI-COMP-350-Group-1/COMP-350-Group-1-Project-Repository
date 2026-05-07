@@ -181,6 +181,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                 friendCount = friendCount,
                 userNote = userNote,
                 isOwnProfile = isOwnProfile,
+                isSignedIn = currentUser != null,
                 onAddStatusClick = { showStatusDialog = true },
                 showFriendCount = currentUser != null,
                 modifier = Modifier
@@ -662,6 +663,7 @@ fun ProfileHeader(
     friendCount: Int,
     userNote: UserNote? = null,
     isOwnProfile: Boolean = false,
+    isSignedIn: Boolean = false,
     onAddStatusClick: () -> Unit = {},
     showFriendCount: Boolean = true,
     modifier: Modifier = Modifier
@@ -697,7 +699,7 @@ fun ProfileHeader(
                 )
             }
 
-            if (isOwnProfile) {
+            if (isOwnProfile && isSignedIn) {
                 TextButton(
                     onClick = onAddStatusClick,
                     contentPadding = PaddingValues(0.dp),
