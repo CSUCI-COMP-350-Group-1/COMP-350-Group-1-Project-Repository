@@ -81,7 +81,7 @@ fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
                         fontSize = 13.sp,
                         lineHeight = 16.sp,
                         color = Color.Black,
-                        maxLines = 4,
+                        maxLines = 2,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center
                     )
