@@ -6,6 +6,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -15,19 +17,30 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/**
- * Represents a short status note that a user can set on their profile.
- */
 data class UserNote(
     val content: String = "",
-    val expiresAt: Long = 0,
+    val expiresAt: Long = 0, // -1 will now represent "Never"
     val createdAt: Long = System.currentTimeMillis()
 ) {
-    /**
-     * Checks if the note has reached its expiration time.
-     */
     fun isExpired(): Boolean {
+        // If expiresAt is -1, it never expires
+        if (expiresAt == -1L) return false
         return System.currentTimeMillis() > expiresAt
+    }
+}
+
+private fun getTimeAgo(time: Long): String {
+    val now = System.currentTimeMillis()
+    val diff = now - time
+    val minutes = diff / (1000 * 60)
+    val hours = minutes / 60
+    val days = hours / 24
+
+    return when {
+        minutes < 1 -> "Just now"
+        minutes < 60 -> "$minutes min ago"
+        hours < 24 -> "$hours hours ago"
+        else -> "$days days ago"
     }
 }
 
@@ -35,11 +48,20 @@ data class UserNote(
  * A floating bubble that displays the user's current status note.
  * Tail circles are anchored to a fixed point, and the bubble grows up/left from it.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
-    if (note == null || note.isExpired()) return
+fun UserNoteBubble(
+    note: UserNote?,
+    userName: String?,
+    modifier: Modifier = Modifier
+) {
 
+    var showFullNote by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
     // The base Box is positioned by the caller (anchor point on the profile picture)
+    if (note == null || note.isExpired()) return
+    val labelText = if (!userName.isNullOrBlank()) "$userName's Note" else "User's Note"
+
     Box(modifier = modifier) {
         
         // Smallest tail circle
@@ -68,6 +90,7 @@ fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
         Layout(
             content = {
                 Surface(
+                    onClick = { showFullNote = true },
                     shape = RoundedCornerShape(20.dp),
                     color = Color.White,
                     shadowElevation = 6.dp,
@@ -97,6 +120,52 @@ fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
                 )
             }
         }
+
+        if (showFullNote) {
+            ModalBottomSheet(
+                onDismissRequest = { showFullNote = false },
+                sheetState = sheetState,
+                containerColor = Color.White
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .padding(bottom = 48.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = labelText,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.Gray
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = note.content,
+                        style = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    HorizontalDivider(thickness = 0.5.dp, color = Color.LightGray)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = if (note.expiresAt == -1L)
+                            "Posted ${getTimeAgo(note.createdAt)} • Permanent"
+                        else
+                            "Posted ${getTimeAgo(note.createdAt)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -108,14 +177,17 @@ fun StatusDialog(
     onClear: () -> Unit
 ) {
     var text by remember { mutableStateOf(currentNote?.content ?: "") }
-    var selectedDuration by remember { mutableLongStateOf(3600000L) } // Default to 1 hour
-    val charLimit = 30
+    var selectedDuration by remember {
+        mutableLongStateOf(if (currentNote?.expiresAt == -1L) -1L else 60 * 60 * 1000L)
+    }
+    val charLimit = 100
 
     val durations = listOf(
         "15 minutes" to 15 * 60 * 1000L,
         "1 hour" to 60 * 60 * 1000L,
         "5 hours" to 5 * 60 * 60 * 1000L,
-        "24 hours" to 24 * 60 * 60 * 1000L
+        "24 hours" to 24 * 60 * 60 * 1000L,
+        "Forever" to -1L
     )
 
     AlertDialog(

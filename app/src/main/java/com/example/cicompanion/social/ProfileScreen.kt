@@ -302,7 +302,11 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             onConfirm = { content, durationMs ->
                 val newNote = UserNote(
                     content = content,
-                    expiresAt = System.currentTimeMillis() + durationMs
+                    expiresAt = if (durationMs == -1L) {
+                        -1L
+                    } else {
+                        System.currentTimeMillis() + durationMs
+                    }
                 )
                 SocialRepository.updateUserNote(
                     userId = currentUser!!.uid,
@@ -782,6 +786,7 @@ fun ProfileHeader(
 
                 UserNoteBubble(
                     note = userNote,
+                    userName = userDisplayName,
                     modifier = Modifier.offset(x = (-12).dp, y = (-16).dp)
                 )
             }
