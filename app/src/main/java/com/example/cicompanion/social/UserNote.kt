@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -45,7 +46,7 @@ fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
         Surface(
             modifier = Modifier
                 .size(10.dp)
-                .offset(x = (12).dp, y = (44).dp),
+                .offset(x = (-4).dp, y = (-4).dp),
             shape = CircleShape,
             color = Color.White,
             shadowElevation = 2.dp,
@@ -56,7 +57,7 @@ fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
         Surface(
             modifier = Modifier
                 .size(16.dp)
-                .offset(x = (2).dp, y = (28).dp),
+                .offset(x = (-16).dp, y = (-16).dp),
             shape = CircleShape,
             color = Color.White,
             shadowElevation = 3.dp,
@@ -64,29 +65,36 @@ fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
         ) {}
 
         // 3. Main Bubble Surface
-        // wrapContentSize with Alignment.BottomEnd makes the bubble grow UP and LEFT
-        // as the text length increases, keeping the bottom-right corner fixed near the tails.
-        Box(
-            modifier = Modifier
-                .offset(x = (0).dp, y = (0).dp) // Position of the bubble's bottom-right corner
-                .wrapContentSize(unbounded = true, align = Alignment.BottomEnd)
-        ) {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Color.White,
-                shadowElevation = 3.dp,
-                border = BorderStroke(1.dp, Color(0xFFEEEEEE))
-            ) {
-                Text(
-                    text = note.content,
-                    modifier = Modifier
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
-                        .widthIn(max = 120.dp),
-                    fontSize = 13.sp,
-                    lineHeight = 16.sp,
-                    color = Color.Black,
-                    maxLines = 4,
-                    textAlign = TextAlign.Center
+        // We use Layout to manually position the bubble so it grows Up and Left 
+        // starting from a point relative to the tail circles.
+        Layout(
+            content = {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White,
+                    shadowElevation = 6.dp,
+                    border = BorderStroke(1.dp, Color(0xFFEEEEEE))
+                ) {
+                    Text(
+                        text = note.content,
+                        modifier = Modifier
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .widthIn(max = 120.dp),
+                        fontSize = 13.sp,
+                        lineHeight = 16.sp,
+                        color = Color.Black,
+                        maxLines = 4,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        ) { measurables, constraints ->
+            val placeable = measurables.first().measure(constraints)
+            layout(0, 0) {
+                // Pin the bottom-right corner of the bubble relative to the anchor
+                placeable.place(
+                    x = -placeable.width - 12.dp.roundToPx(),
+                    y = -placeable.height - 12.dp.roundToPx()
                 )
             }
         }
@@ -100,7 +108,8 @@ fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
 fun StatusDialog(
     currentNote: UserNote?,
     onDismiss: () -> Unit,
-    onConfirm: (String, Long) -> Unit
+    onConfirm: (String, Long) -> Unit,
+    onClear: () -> Unit
 ) {
     var text by remember { mutableStateOf(currentNote?.content ?: "") }
     var selectedDuration by remember { mutableLongStateOf(3600000L) } // Default to 1 hour
@@ -151,6 +160,17 @@ fun StatusDialog(
                             onClick = { selectedDuration = durationMs }
                         )
                         Text(label, fontSize = 14.sp)
+                    }
+                }
+                
+                if (currentNote != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(
+                        onClick = onClear,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFEF3347))
+                    ) {
+                        Text("Clear Current Status")
                     }
                 }
             }

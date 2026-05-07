@@ -485,6 +485,77 @@ object SocialRepository {
         return friendIds.size
     }
 
+    fun fetchMutualFriends(
+        currentUserId: String,
+        targetUserId: String,
+        onSuccess: (List<UserProfile>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        fetchAcceptedFriendIds(currentUserId, onSuccess = { currentUserFriends ->
+            fetchAcceptedFriendIds(targetUserId, onSuccess = { targetUserFriends ->
+                val mutualIds = currentUserFriends.intersect(targetUserFriends)
+                if (mutualIds.isEmpty()) {
+                    onSuccess(emptyList())
+                } else {
+                    fetchUserProfiles(mutualIds.toList(), onSuccess, onError)
+                }
+            }, onError)
+        }, onError)
+    }
+
+    private fun fetchAcceptedFriendIds(
+        userId: String,
+        onSuccess: (Set<String>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val friendIds = mutableSetOf<String>()
+        
+        friendRequestsCollection()
+            .whereEqualTo("status", "accepted")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                snapshot.documents.forEach { doc ->
+                    val from = doc.getString("fromUserId") ?: ""
+                    val to = doc.getString("toUserId") ?: ""
+                    if (from == userId) friendIds.add(to)
+                    else if (to == userId) friendIds.add(from)
+                }
+                onSuccess(friendIds)
+            }
+            .addOnFailureListener { onError(it.message ?: "Error fetching friends") }
+    }
+
+    private fun fetchUserProfiles(
+        userIds: List<String>,
+        onSuccess: (List<UserProfile>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        if (userIds.isEmpty()) {
+            onSuccess(emptyList())
+            return
+        }
+
+        // Firestore 'in' query supports up to 10 elements. If more, we'd need to chunk.
+        // For mutual friends preview, 10 is usually enough or we can chunk.
+        val chunks = userIds.chunked(10)
+        val allProfiles = mutableListOf<UserProfile>()
+        var chunksLoaded = 0
+
+        chunks.forEach { chunk ->
+            usersCollection()
+                .whereIn("uid", chunk)
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    allProfiles.addAll(snapshot.documents.mapNotNull { it.toObject(UserProfile::class.java) })
+                    chunksLoaded++
+                    if (chunksLoaded == chunks.size) {
+                        onSuccess(allProfiles)
+                    }
+                }
+                .addOnFailureListener { onError(it.message ?: "Error fetching profiles") }
+        }
+    }
+
     fun displayNameOrEmail(user: UserProfile): String {
         return user.displayName.ifBlank { user.email }
     }

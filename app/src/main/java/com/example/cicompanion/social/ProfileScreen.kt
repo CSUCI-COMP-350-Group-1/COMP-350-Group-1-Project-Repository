@@ -63,6 +63,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
     var friendCount by remember { mutableIntStateOf(0) }
     var requestStatus by remember { mutableStateOf<String?>(null) }
     var targetUserProfile by remember { mutableStateOf<UserProfile?>(null) }
+    var mutualFriends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
 
     var showStatusDialog by remember { mutableStateOf(false) }
 
@@ -89,6 +90,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             friendCount = 0
             requestStatus = null
             targetUserProfile = null
+            mutualFriends = emptyList()
             return@LaunchedEffect
         }
 
@@ -113,6 +115,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                         bio = ""
                         major = ""
                         userNote = null
+                        mutualFriends = emptyList()
                     }
                 }
             )
@@ -131,6 +134,15 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                     },
                     onError = { /* Handle error */ }
                 )
+
+                SocialRepository.fetchMutualFriends(
+                    currentUserId = currentUser!!.uid,
+                    targetUserId = targetUid,
+                    onSuccess = { mutualFriends = it },
+                    onError = { mutualFriends = emptyList() }
+                )
+            } else {
+                mutualFriends = emptyList()
             }
         } else {
             displayName = "Guest User"
@@ -142,6 +154,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             friendCount = 0
             requestStatus = null
             targetUserProfile = null
+            mutualFriends = emptyList()
         }
     }
 
@@ -186,6 +199,12 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Top
             ) {
+                // Mutual Friends Section
+                if (!isOwnProfile && mutualFriends.isNotEmpty()) {
+                    MutualFriendsSection(mutualFriends = mutualFriends)
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
                 // Bio displayed between user info and actions
                 if (bio.isNotBlank()) {
                     Text(
@@ -238,27 +257,101 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
         }
     }
 
-//    if (showStatusDialog && currentUser != null) {
-//        StatusDialog(
-//            currentNote = userNote,
-//            onDismiss = { showStatusDialog = false },
-//            onConfirm = { content, durationMs ->
-//                val newNote = UserNote(
-//                    content = content,
-//                    expiresAt = System.currentTimeMillis() + durationMs
-//                )
-//                SocialRepository.updateUserNote(
-//                    userId = currentUser!!.uid,
-//                    note = newNote,
-//                    onSuccess = {
-//                        userNote = newNote
-//                        showStatusDialog = false
-//                    },
-//                    onError = { /* Handle error */ }
-//                )
-//            }
-//        )
-//    }
+    if (showStatusDialog && currentUser != null) {
+        StatusDialog(
+            currentNote = userNote,
+            onDismiss = { showStatusDialog = false },
+            onConfirm = { content, durationMs ->
+                val newNote = UserNote(
+                    content = content,
+                    expiresAt = System.currentTimeMillis() + durationMs
+                )
+                SocialRepository.updateUserNote(
+                    userId = currentUser!!.uid,
+                    note = newNote,
+                    onSuccess = {
+                        userNote = newNote
+                        showStatusDialog = false
+                    },
+                    onError = { /* Handle error */ }
+                )
+            },
+            onClear = {
+                SocialRepository.updateUserNote(
+                    userId = currentUser!!.uid,
+                    note = null,
+                    onSuccess = {
+                        userNote = null
+                        showStatusDialog = false
+                    },
+                    onError = { /* Handle error */ }
+                )
+            }
+        )
+    }
+}
+
+@Composable
+fun MutualFriendsSection(mutualFriends: List<UserProfile>) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Overlapping Avatars
+        Box(
+            modifier = Modifier
+                .height(32.dp)
+                .width(((mutualFriends.take(3).size - 1) * 16 + 32).dp)
+        ) {
+            mutualFriends.take(3).forEachIndexed { index, friend ->
+                Surface(
+                    modifier = Modifier
+                        .offset(x = (index * 16).dp)
+                        .size(32.dp),
+                    shape = CircleShape,
+                    border = BorderStroke(2.dp, Color.White),
+                    color = Color.LightGray
+                ) {
+                    if (friend.photoUrl.isNotBlank()) {
+                        AsyncImage(
+                            model = friend.photoUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.padding(6.dp),
+                            tint = Color.Gray
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // Text description
+        val friendNames = mutualFriends.take(2).map { it.displayName.ifBlank { "A friend" } }
+        val remainingCount = mutualFriends.size - friendNames.size
+
+        val text = when {
+            mutualFriends.size == 1 -> "Mutual friend with ${friendNames[0]}"
+            mutualFriends.size == 2 -> "Mutual friends with ${friendNames[0]} and ${friendNames[1]}"
+            else -> "Mutual friends with ${friendNames[0]}, ${friendNames[1]} and $remainingCount others"
+        }
+
+        Text(
+            text = text,
+            fontSize = 13.sp,
+            color = Color.Gray,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 16.sp
+        )
+    }
 }
 
 @Composable
@@ -468,7 +561,7 @@ private fun ColumnScope.ProfileActionArea(
     onSignOut: () -> Unit,
     navController: NavHostController
 ) {
-    val showEditAndSettings = true // Toggle for edit profile and settings buttons
+    val showSettings = false // Toggle for edit profile and settings buttons
 
     if (currentUser == null) {
         Button(
@@ -499,24 +592,25 @@ private fun ColumnScope.ProfileActionArea(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        if (showEditAndSettings) {
-            SectionLabel("Account Settings")
+        SectionLabel("Account Settings")
 
-            OutlinedButton(
-                onClick = { navController.navigate(Routes.EDIT_PROFILE) },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, Color.LightGray),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
-            ) {
-                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(12.dp))
-                Text("Edit Profile", fontSize = 14.sp)
-                Spacer(Modifier.weight(1f))
-                Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
-            }
+        OutlinedButton(
+            onClick = { navController.navigate(Routes.EDIT_PROFILE) },
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, Color.LightGray),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
+        ) {
+            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(12.dp))
+            Text("Edit Profile", fontSize = 14.sp)
+            Spacer(Modifier.weight(1f))
+            Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
+        }
 
-            Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (showSettings) {
 
             OutlinedButton(
                 onClick = { /* Mockup Settings */ },
@@ -597,26 +691,26 @@ fun ProfileHeader(
                     }
                 }
 
-//                UserNoteBubble(
-//                    note = userNote,
-//                    modifier = Modifier.offset(x = (-12).dp, y = (-16).dp)
-//                )
+                UserNoteBubble(
+                    note = userNote,
+                    modifier = Modifier.offset(x = (-12).dp, y = (-16).dp)
+                )
             }
 
-//            if (isOwnProfile) {
-//                TextButton(
-//                    onClick = onAddStatusClick,
-//                    contentPadding = PaddingValues(0.dp),
-//                    modifier = Modifier.height(24.dp)
-//                ) {
-//                    Text(
-//                        text = if (userNote != null && !userNote.isExpired()) "Edit Status" else "Add Status",
-//                        fontSize = 11.sp,
-//                        color = Color.Gray,
-//                        fontWeight = FontWeight.Medium
-//                    )
-//                }
-//            }
+            if (isOwnProfile) {
+                TextButton(
+                    onClick = onAddStatusClick,
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.height(24.dp)
+                ) {
+                    Text(
+                        text = if (userNote != null && !userNote.isExpired()) "Edit Status" else "Add Status",
+                        fontSize = 11.sp,
+                        color = Color.Gray,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.width(20.dp))
