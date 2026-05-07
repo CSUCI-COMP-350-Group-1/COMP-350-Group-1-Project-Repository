@@ -77,7 +77,7 @@ fun UserNoteBubble(note: UserNote?, modifier: Modifier = Modifier) {
                         text = note.content,
                         modifier = Modifier
                             .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .widthIn(min = 40.dp, max = 100.dp),
+                            .widthIn(min = 12.dp, max = 100.dp),
                         fontSize = 14.sp,
                         lineHeight = 18.sp,
                         color = Color.Black,
