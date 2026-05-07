@@ -22,6 +22,7 @@ data class FeatureItem(val route: String, val icon: ImageVector, val label: Stri
 
 // Premade Feature Definitions
 val CalendarFeature = FeatureItem(Routes.CALENDAR, Icons.Default.CalendarMonth, "Calendar")
+val ScheduleFeature = FeatureItem(Routes.SCHEDULE, Icons.Default.Schedule, "Schedule")
 val StudyRoomFeature = FeatureItem(Routes.STUDY_ROOM, Icons.AutoMirrored.Filled.MenuBook, "Study Room")
 val MapFeature = FeatureItem(Routes.MAP, Icons.Default.LocationOn, "Map")
 val ProfileFeature = FeatureItem(Routes.PROFILE, Icons.Default.Person, "Profile")
@@ -29,6 +30,7 @@ val FriendsAndRequestsFeature = FeatureItem(Routes.FRIENDS_AND_REQUESTS, Icons.D
 
 val allAvailableFeatures = listOf(
     CalendarFeature,
+    ScheduleFeature,
     StudyRoomFeature,
     MapFeature,
     ProfileFeature,
@@ -36,8 +38,8 @@ val allAvailableFeatures = listOf(
 )
 
 val defaultFeatureItems = listOf(
-    CalendarFeature,
-    StudyRoomFeature
+    StudyRoomFeature,
+    ScheduleFeature
 )
 
 @OptIn(ExperimentalMaterial3Api::class)

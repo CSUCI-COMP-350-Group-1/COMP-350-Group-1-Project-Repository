@@ -6,4 +6,3 @@ Names/Contributors:
 - Noah Collins
 - Adish Tripathi
 - Lorenzo Argueta
-- Maddi D

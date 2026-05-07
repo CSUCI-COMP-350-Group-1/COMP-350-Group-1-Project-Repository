@@ -44,7 +44,7 @@ fun UserSearchScreen(navController: NavHostController) {
 
         SocialRepository.fetchSearchableUsers(
             currentUserId = currentUser.uid,
-            onSuccess = { loadedUsers ->
+            onSuccess = { loadedUsers, _ ->
                 users = loadedUsers
                 isLoading = false
             },

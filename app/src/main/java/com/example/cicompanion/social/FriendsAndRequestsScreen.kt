@@ -5,15 +5,18 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -26,6 +29,8 @@ import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.firestore.DocumentSnapshot
+import kotlinx.coroutines.delay
 
 @Composable
 fun FriendsAndRequestsScreen(
@@ -33,8 +38,6 @@ fun FriendsAndRequestsScreen(
     initialTab: Int = 1
 ) {
     val currentUser = FirebaseAuth.getInstance().currentUser
-    // PUSH NOTIFICATIONS CHANGE:
-    // Allow callers to choose which tab opens first.
     var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab) }
 
     if (currentUser == null) {
@@ -88,26 +91,38 @@ fun FriendsAndRequestsScreen(
 
 @Composable
 fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
+    var searchQuery by remember { mutableStateOf("") }
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
+    var nicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
     var friendToRemove by remember { mutableStateOf<UserProfile?>(null) }
+    var friendToNickname by remember { mutableStateOf<UserProfile?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val refreshFriends = {
         isLoading = true
-        SocialRepository.fetchSearchableUsers(
+        // PERMISSION_DENIED fix: use fetchAcceptedFriends which avoids listing the /users collection
+        SocialRepository.fetchAcceptedFriends(
             currentUserId = currentUser.uid,
-            onSuccess = { allUsers ->
-                SocialRepository.fetchAllFriendRequestStatuses(
+            onSuccess = { loadedFriends ->
+                friends = loadedFriends
+                SocialRepository.fetchNicknames(
                     currentUserId = currentUser.uid,
-                    onSuccess = { statuses ->
-                        friends = allUsers.filter { statuses[it.uid] == "accepted" }
+                    onSuccess = { map ->
+                        nicknames = map
                         isLoading = false
+                        errorMessage = null // Clear any stale error on success
                     },
-                    onError = { errorMessage = it; isLoading = false }
+                    onError = {
+                        nicknames = emptyMap()
+                        isLoading = false
+                    }
                 )
             },
-            onError = { errorMessage = it; isLoading = false }
+            onError = { err ->
+                errorMessage = err
+                isLoading = false
+            }
         )
     }
 
@@ -115,7 +130,36 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
         refreshFriends()
     }
 
+    val displayFriends = remember(friends, searchQuery, nicknames) {
+        if (searchQuery.isBlank()) {
+            friends
+        } else {
+            friends.filter { friend ->
+                val nickname = nicknames[friend.uid] ?: ""
+                friend.displayName.contains(searchQuery, ignoreCase = true) ||
+                        friend.email.contains(searchQuery, ignoreCase = true) ||
+                        nickname.contains(searchQuery, ignoreCase = true)
+            }
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Search friends by name or email") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFFEF3347),
+                unfocusedBorderColor = Color.LightGray
+            )
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         if (errorMessage != null) {
             Text(text = errorMessage!!, color = Color.Red, modifier = Modifier.padding(bottom = 8.dp))
         }
@@ -128,12 +172,18 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("You don't have any friends yet.", textAlign = TextAlign.Center, color = Color.Gray)
             }
+        } else if (displayFriends.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No friends found matching \"$searchQuery\"", textAlign = TextAlign.Center, color = Color.Gray)
+            }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(friends, key = { it.uid }) { friend ->
+                items(displayFriends, key = { it.uid }) { friend ->
                     FriendCard(
                         user = friend,
+                        nickname = nicknames[friend.uid],
                         onCardClick = { navController.navigate("${Routes.PROFILE}/${friend.uid}") },
+                        onNickname = { friendToNickname = friend },
                         onRemove = { friendToRemove = friend }
                     )
                 }
@@ -174,27 +224,97 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
             }
         )
     }
+
+    friendToNickname?.let { friend ->
+        var currentNickname by remember { mutableStateOf(nicknames[friend.uid] ?: "") }
+
+        AlertDialog(
+            onDismissRequest = { friendToNickname = null },
+            title = { Text("Set Nickname") },
+            text = {
+                Column {
+                    Text("Nickname for ${SocialRepository.displayNameOrEmail(friend)}")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = currentNickname,
+                        onValueChange = { currentNickname = it },
+                        placeholder = { Text("Enter nickname") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        SocialRepository.setNickname(
+                            currentUserId = currentUser.uid,
+                            friendUid = friend.uid,
+                            nickname = currentNickname,
+                            onSuccess = {
+                                friendToNickname = null
+                                refreshFriends()
+                            },
+                            onError = { errorMessage = it; friendToNickname = null }
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF3347))
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { friendToNickname = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
 fun AddFriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
     var searchQuery by remember { mutableStateOf("") }
-    var users by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val users = remember { mutableStateListOf<UserProfile>() }
+    var lastDocument by remember { mutableStateOf<DocumentSnapshot?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    var canLoadMore by remember { mutableStateOf(true) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val requestStatuses = remember { mutableStateMapOf<String, String>() }
+    val listState = rememberLazyListState()
+
+    val fetchUsers = { isNextPage: Boolean ->
+        if (!isLoading && (isNextPage && canLoadMore || !isNextPage)) {
+            isLoading = true
+            if (!isNextPage) {
+                users.clear()
+                lastDocument = null
+            }
+            SocialRepository.fetchSearchableUsers(
+                currentUserId = currentUser.uid,
+                searchQuery = searchQuery,
+                lastDocument = lastDocument,
+                onSuccess = { newUsers, nextDoc ->
+                    users.addAll(newUsers)
+                    lastDocument = nextDoc
+                    canLoadMore = newUsers.size >= 20
+                    isLoading = false
+                    errorMessage = null
+                },
+                onError = {
+                    errorMessage = it
+                    isLoading = false
+                }
+            )
+        }
+    }
+
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotBlank()) delay(500)
+        fetchUsers(false)
+    }
 
     LaunchedEffect(Unit) {
-        SocialRepository.fetchSearchableUsers(
-            currentUserId = currentUser.uid,
-            onSuccess = { loadedUsers ->
-                users = loadedUsers
-                isLoading = false
-            },
-            onError = { errorMessage = it; isLoading = false }
-        )
-
         SocialRepository.fetchAllFriendRequestStatuses(
             currentUserId = currentUser.uid,
             onSuccess = { statuses ->
@@ -205,17 +325,7 @@ fun AddFriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
     }
 
     // Filter out users who are already friends to avoid the empty spaces
-    val displayUsers = remember(users, searchQuery, requestStatuses.toMap()) {
-        val filtered = if (searchQuery.isBlank()) {
-            users
-        } else {
-            users.filter { user ->
-                user.displayName.contains(searchQuery, ignoreCase = true) ||
-                        user.email.contains(searchQuery, ignoreCase = true)
-            }
-        }
-        filtered.filter { requestStatuses[it.uid] != "accepted" }
-    }
+    val displayUsers = users.filter { requestStatuses[it.uid] != "accepted" }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         OutlinedTextField(
@@ -239,11 +349,11 @@ fun AddFriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
             Text(text = errorMessage!!, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
         }
 
-        if (isLoading) {
+        if (isLoading && users.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Color(0xFFEF3347))
             }
-        } else if (displayUsers.isEmpty()) {
+        } else if (!isLoading && displayUsers.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
                     text = if (searchQuery.isBlank()) "No users left to add." else "No users found matching \"$searchQuery\"",
@@ -253,6 +363,7 @@ fun AddFriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize().padding(top = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -274,6 +385,23 @@ fun AddFriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
                         }
                     )
                 }
+
+                if (canLoadMore) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                            if (isLoading) {
+                                CircularProgressIndicator(color = Color(0xFFEF3347), modifier = Modifier.size(24.dp))
+                            } else {
+                                Button(
+                                    onClick = { fetchUsers(true) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray, contentColor = Color.Black)
+                                ) {
+                                    Text("Load More")
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -283,11 +411,12 @@ fun AddFriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
 fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
     var incomingRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
     var outgoingRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
+    var incomingEventInvites by remember { mutableStateOf<List<EventInvite>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val refreshRequests = {
+    val refreshData = {
         isLoading = true
         SocialRepository.fetchIncomingFriendRequests(
             currentUserId = currentUser.uid,
@@ -297,7 +426,14 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
                     currentUserId = currentUser.uid,
                     onSuccess = { outgoing ->
                         outgoingRequests = outgoing
-                        isLoading = false
+                        SocialRepository.fetchIncomingEventInvites(
+                            currentUserId = currentUser.uid,
+                            onSuccess = { invites ->
+                                incomingEventInvites = invites
+                                isLoading = false
+                            },
+                            onError = { errorMessage = it; isLoading = false }
+                        )
                     },
                     onError = { errorMessage = it; isLoading = false }
                 )
@@ -307,7 +443,7 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
     }
 
     LaunchedEffect(Unit) {
-        refreshRequests()
+        refreshData()
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -323,7 +459,7 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
                 CircularProgressIndicator(color = Color(0xFFEF3347))
             }
         } else {
-            if (incomingRequests.isEmpty() && outgoingRequests.isEmpty()) {
+            if (incomingRequests.isEmpty() && outgoingRequests.isEmpty() && incomingEventInvites.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("No pending requests.", color = Color.Gray)
                 }
@@ -331,7 +467,7 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (incomingRequests.isNotEmpty()) {
                         item {
-                            Text("Incoming Requests", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
+                            Text("Incoming Friend Requests", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
                         }
                         items(incomingRequests, key = { it.id }) { request ->
                             IncomingRequestCard(
@@ -340,14 +476,40 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
                                 onAccept = {
                                     SocialRepository.acceptFriendRequest(
                                         request = request,
-                                        onSuccess = { statusMessage = "Accepted request."; refreshRequests() },
+                                        onSuccess = { statusMessage = "Accepted request."; refreshData() },
                                         onError = { errorMessage = it }
                                     )
                                 },
                                 onDecline = {
                                     SocialRepository.declineFriendRequest(
                                         request = request,
-                                        onSuccess = { statusMessage = "Declined request."; refreshRequests() },
+                                        onSuccess = { statusMessage = "Declined request."; refreshData() },
+                                        onError = { errorMessage = it }
+                                    )
+                                }
+                            )
+                        }
+                    }
+
+                    if (incomingEventInvites.isNotEmpty()) {
+                        item {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Event Invites", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
+                        }
+                        items(incomingEventInvites, key = { it.id }) { invite ->
+                            EventInviteCard(
+                                invite = invite,
+                                onAccept = {
+                                    SocialRepository.acceptEventInvite(
+                                        invite = invite,
+                                        onSuccess = { statusMessage = "Accepted invite to ${invite.eventTitle}."; refreshData() },
+                                        onError = { errorMessage = it }
+                                    )
+                                },
+                                onDecline = {
+                                    SocialRepository.declineEventInvite(
+                                        invite = invite,
+                                        onSuccess = { statusMessage = "Declined invite."; refreshData() },
                                         onError = { errorMessage = it }
                                     )
                                 }
@@ -358,16 +520,16 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
                     if (outgoingRequests.isNotEmpty()) {
                         item {
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text("Outgoing Requests", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
+                            Text("Outgoing Friend Requests", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
                         }
                         items(outgoingRequests, key = { it.id }) { request ->
                             OutgoingRequestCard(
                                 request = request,
                                 onCardClick = { navController.navigate("${Routes.PROFILE}/${request.toUserId}") },
                                 onCancel = {
-                                    SocialRepository.declineFriendRequest( // Reuse decline logic to delete outgoing too
+                                    SocialRepository.declineFriendRequest(
                                         request = request,
-                                        onSuccess = { statusMessage = "Cancelled request."; refreshRequests() },
+                                        onSuccess = { statusMessage = "Cancelled request."; refreshData() },
                                         onError = { errorMessage = it }
                                     )
                                 }
@@ -381,7 +543,52 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
 }
 
 @Composable
-fun FriendCard(user: UserProfile, onCardClick: () -> Unit, onRemove: () -> Unit) {
+fun EventInviteCard(invite: EventInvite, onAccept: () -> Unit, onDecline: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(40.dp).background(Color(0xFFEF3347).copy(alpha = 0.1f), CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Event, contentDescription = null, tint = Color(0xFFEF3347))
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = invite.eventTitle, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(text = "Invited by ${invite.fromDisplayName}", fontSize = 12.sp, color = Color.Gray)
+                }
+                Row {
+                    IconButton(onClick = onAccept) {
+                        Icon(Icons.Default.Check, contentDescription = "Accept", tint = Color(0xFF4CAF50))
+                    }
+                    IconButton(onClick = onDecline) {
+                        Icon(Icons.Default.Close, contentDescription = "Decline", tint = Color.Red)
+                    }
+                }
+            }
+            if (invite.isPinnedByLeader) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.PushPin, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFF9C27B0))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "The leader has this event pinned", fontSize = 11.sp, color = Color(0xFF9C27B0), fontWeight = FontWeight.Medium)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FriendCard(
+    user: UserProfile,
+    nickname: String?,
+    onCardClick: () -> Unit,
+    onNickname: () -> Unit,
+    onRemove: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -397,11 +604,21 @@ fun FriendCard(user: UserProfile, onCardClick: () -> Unit, onRemove: () -> Unit)
             UserAvatar(photoUrl = user.photoUrl)
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = SocialRepository.displayNameOrEmail(user), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(text = user.email, fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (!nickname.isNullOrBlank()) {
+                    Text(text = nickname, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(text = "(${SocialRepository.displayNameOrEmail(user)})", fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                } else {
+                    Text(text = SocialRepository.displayNameOrEmail(user), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(text = user.email, fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Default.PersonRemove, contentDescription = "Unfriend", tint = Color.Red)
+            Row {
+                IconButton(onClick = onNickname) {
+                    Icon(Icons.Default.Edit, contentDescription = "Set Nickname", tint = Color.Gray)
+                }
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Default.PersonRemove, contentDescription = "Unfriend", tint = Color.Red)
+                }
             }
         }
     }
@@ -484,7 +701,7 @@ fun OutgoingRequestCard(request: FriendRequest, onCardClick: () -> Unit, onCance
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            UserAvatar(photoUrl = "") // recipient photoUrl removed from schema
+            UserAvatar(photoUrl = "")
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = request.toDisplayName.ifBlank { request.toEmail }, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -503,10 +720,18 @@ fun UserAvatar(photoUrl: String) {
         AsyncImage(
             model = photoUrl,
             contentDescription = null,
-            modifier = Modifier.size(48.dp).background(Color.LightGray, CircleShape)
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(Color.LightGray)
         )
     } else {
-        Box(modifier = Modifier.size(48.dp).background(Color(0xFFEF3347).copy(alpha = 0.1f), CircleShape), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(Color(0xFFEF3347).copy(alpha = 0.1f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
             Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFFEF3347))
         }
     }
