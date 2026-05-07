@@ -28,29 +28,39 @@ object FirestoreManager {
      * Saves the signed-in user's profile data to Firestore.
      * The document ID is the user's Firebase UID.
      */
-    fun saveUserToFirestore(user: FirebaseUser,onSuccess: (() -> Unit)? = null) {
+    fun saveUserToFirestore(user: FirebaseUser, onSuccess: (() -> Unit)? = null) {
         val db = FirebaseFirestore.getInstance()
         val userRef = db.collection("users").document(user.uid)
 
-        val userProfile = hashMapOf(
-            "uid" to user.uid,
-            "displayName" to (user.displayName ?: ""),
-            "email" to (user.email ?: ""),
-            "photoUrl" to (user.photoUrl?.toString() ?: ""),
-            "bio" to "",
-            "lastSignInAt" to System.currentTimeMillis()
-        )
+        userRef.get().addOnSuccessListener { document ->
+            val data = hashMapOf<String, Any>(
+                "uid" to user.uid,
+                "email" to (user.email ?: ""),
+                "photoUrl" to (user.photoUrl?.toString() ?: ""),
+                "lastSignInAt" to System.currentTimeMillis()
+            )
 
-        userRef.set(userProfile, SetOptions.merge())
-            .addOnSuccessListener {
-                Log.d(TAG, "User profile saved to Firestore for uid=${user.uid}")
-                onSuccess?.invoke()
+            // Initialize display names and bio only if this is a new user
+            if (!document.exists()) {
+                data["displayName"] = user.displayName ?: ""
+                data["bio"] = ""
             }
-            .addOnFailureListener { exception ->
-                Log.e(TAG, "Failed to save user profile to Firestore.", exception)
-            }
+
+            userRef.set(data, SetOptions.merge())
+                .addOnSuccessListener {
+                    Log.d(TAG, "User profile saved to Firestore for uid=${user.uid}")
+                    onSuccess?.invoke()
+                }
+                .addOnFailureListener { exception ->
+                    Log.e(TAG, "Failed to save user profile to Firestore.", exception)
+                }
+        }.addOnFailureListener { exception ->
+            Log.e(TAG, "Failed to fetch user document before saving.", exception)
+        }
     }
 
+    // PUSH NOTIFICATIONS
+    // store this device's FCM token on the user document
     fun saveFcmToken(userId: String, token: String) {
         val db = FirebaseFirestore.getInstance()
         val tokenRef = db.collection("users")
@@ -241,11 +251,11 @@ object FirestoreManager {
     private fun decodeNotesWithSecondRange(encoded: String, base: SelectedClass): SelectedClass {
         val delimiter = "||2ND_RANGE||"
         if (!encoded.contains(delimiter)) return base.copy(notes = encoded, hasSecondTimeRange = false)
-        
+
         val parts = encoded.split(delimiter)
         val userNotes = parts[0].trim()
         val rangeData = parts.getOrNull(1)?.split("|", limit = 5) ?: return base.copy(notes = encoded)
-        
+
         return if (rangeData.size >= 5) {
             base.copy(
                 notes = userNotes,

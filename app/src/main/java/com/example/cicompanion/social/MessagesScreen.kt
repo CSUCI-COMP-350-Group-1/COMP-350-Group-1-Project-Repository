@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -224,10 +225,25 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                         val friendUserId = MessagingRepository.findOtherParticipantId(conversation, currentUser?.uid ?: "").orEmpty()
                         val friend = friendsById[friendUserId]
 
+                        val messageDisplayPreview = when {
+                            conversation.lastMessageText.contains("[location]", ignoreCase = true) -> {
+                                if (conversation.lastMessageSenderId == currentUser?.uid) "You sent a location" else "Sent you a location"
+                            }
+                            conversation.lastMessageText.contains("[pin]", ignoreCase = true) || conversation.lastMessageText.contains("custom pin:", ignoreCase = true) -> {
+                                if (conversation.lastMessageSenderId == currentUser?.uid) "You shared a pin" else "Sent you a pin"
+                            }
+                            conversation.lastMessageText.contains("[event_invite]", ignoreCase = true) -> {
+                                if (conversation.lastMessageSenderId == currentUser?.uid) "You sent an event invitation" else "Sent you an event invitation"
+                            }
+                            else -> conversation.lastMessageText
+                        }
+
                         ConversationCard(
                             friendName = nicknames[friendUserId] ?: friend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Friend",
                             friendEmail = friend?.email ?: "",
-                            preview = conversation.lastMessageText,
+                            preview = messageDisplayPreview,
+                            photoUrl = friend?.photoUrl,
+                            timestamp = conversation.lastMessageAt,
                             onClick = {
                                 val initialMsg = if (sharedLocation != null) "Check out this custom pin: $sharedLocation" else null
                                 navController.navigate(Routes.messageThread(conversation.id, friendUserId, initialMsg))
@@ -548,31 +564,113 @@ fun MessageThreadScreen(
                     }
                 }
             } else {
-                Box(modifier = Modifier.fillMaxWidth().background(Color.White).padding(16.dp), contentAlignment = Alignment.Center) {
-                    Text("You must be friends to send messages.", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "You must be friends to send messages.",
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
             }
         }
     ) { innerPadding ->
-        Column(modifier = Modifier.padding(innerPadding).fillMaxSize().background(AppBackground).padding(16.dp)) {
-            Text(friend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Chat", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            if (!friend?.email.isNullOrBlank()) {
-                Text(text = friend!!.email, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .background(AppBackground)
+                .padding(16.dp)
+        ) {
+            val currentFriend = friend
+            val displayName = nickname ?: currentFriend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Chat"
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                UserAvatar(photoUrl = currentFriend?.photoUrl ?: "")
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = displayName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    if (!nickname.isNullOrBlank() && currentFriend != null) {
+                        Text(
+                            text = "(${SocialRepository.displayNameOrEmail(currentFriend)})",
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    } else if (currentFriend != null && currentFriend.email.isNotBlank()) {
+                        Text(
+                            text = currentFriend.email,
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        navController.navigate("${Routes.PROFILE}/$friendUserId")
+                    },
+                    modifier = Modifier
+                        .height(36.dp)
+                        .padding(start = 8.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFEF3347),
+                        contentColor = Color.White
+                    ),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        text = "View Profile",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             if (errorMessage != null && conversationExists) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error)
+                Text(
+                    text = errorMessage!!,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
             if (messages.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text("No messages yet. Say hello!", color = Color.Gray)
                 }
             } else {
-                LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     items(messages, key = { it.id }) { message ->
                         MessageBubble(
                             message = message,
@@ -689,23 +787,88 @@ private fun FriendPickerCard(user: UserProfile, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ConversationCard(friendName: String, friendEmail: String, preview: String, onClick: () -> Unit) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(friendName, fontWeight = FontWeight.Bold)
-            if (friendEmail.isNotBlank()) {
-                Text(
-                    text = friendEmail,
-                    color = Color.Gray,
-                    style = MaterialTheme.typography.bodySmall
-                )
+private fun ConversationCard(
+    friendName: String,
+    friendEmail: String,
+    photoUrl: String?,
+    preview: String,
+    timestamp: Long,
+    onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 0.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start
+        ) {
+            UserAvatar(
+                photoUrl = photoUrl ?: "",
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = friendName,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                if (friendEmail.isNotBlank()) {
+                    Text(
+                        text = friendEmail,
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = preview,
+                        color = Color.DarkGray,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+
+                    if (timestamp > 0L) {
+                        Text(
+                            text = " • ${formatShortTimeAgo(timestamp)}",
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+                }
             }
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = preview,
-                color = Color.DarkGray,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = Color.LightGray,
+                modifier = Modifier.size(20.dp)
             )
         }
     }
@@ -875,6 +1038,25 @@ private fun MessageBubble(
             }
         }
         Text(text = timeString, fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(top = 2.dp, start = 4.dp, end = 4.dp))
+    }
+}
+
+private fun formatShortTimeAgo(timestamp: Long): String {if (timestamp <= 0L) return ""
+    val diff = System.currentTimeMillis() - timestamp
+    val seconds = diff / 1000
+    val minutes = seconds / 60
+    val hours = minutes / 60
+    val days = hours / 24
+
+    return when {
+        minutes < 1 -> "now"
+        minutes < 60 -> "${minutes}m"
+        hours < 24 -> "${hours}h"
+        days < 7 -> "${days}d"
+        else -> {
+            val date = java.util.Date(timestamp)
+            java.text.SimpleDateFormat("MMM d", java.util.Locale.getDefault()).format(date)
+        }
     }
 }
 

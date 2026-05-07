@@ -1,16 +1,18 @@
 package com.example.cicompanion.social
 
+import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.firebase.FriendRequestNotificationSender
+import com.example.cicompanion.maps.CustomPin
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.firestore.DocumentSnapshot
-import com.example.cicompanion.calendar.model.CalendarEvent
-import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.SetOptions
+import java.time.format.DateTimeFormatter
 import java.time.ZonedDateTime
-import com.example.cicompanion.maps.CustomPin
 
 object SocialRepository {
 
@@ -66,7 +68,7 @@ object SocialRepository {
                 val users = snapshot.documents
                     .mapNotNull { it.toObject(UserProfile::class.java) }
                     .filter { it.uid.isNotBlank() && it.uid != currentUserId }
-                
+
                 val nextDoc = snapshot.documents.lastOrNull()
                 onSuccess(users, nextDoc)
             }
@@ -83,6 +85,10 @@ object SocialRepository {
         onSuccess: (UserProfile) -> Unit,
         onError: (String) -> Unit
     ) {
+        if (userId.isBlank()) {
+            onError("Invalid user ID.")
+            return
+        }
         usersCollection().document(userId).get()
             .addOnSuccessListener { document ->
                 val user = document.toObject(UserProfile::class.java)
@@ -95,6 +101,77 @@ object SocialRepository {
             .addOnFailureListener { exception ->
                 onError(exception.message ?: "Could not load user profile.")
             }
+    }
+
+    fun updateDisplayName(
+        userId: String,
+        newDisplayName: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        usersCollection().document(userId)
+            .update("displayName", newDisplayName)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onError(e.message ?: "Failed to update display name") }
+    }
+
+    fun updateBio(
+        userId: String,
+        newBio: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        usersCollection().document(userId)
+            .update("bio", newBio)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onError(e.message ?: "Failed to update bio") }
+    }
+
+    fun updateMajor(
+        userId: String,
+        newMajor: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        usersCollection().document(userId)
+            .update("major", newMajor)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onError(e.message ?: "Failed to update major") }
+    }
+
+    fun updateUserNote(
+        userId: String,
+        note: UserNote?,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        usersCollection().document(userId)
+            .update("note", note)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onError(e.message ?: "Failed to update status") }
+    }
+
+    private fun handleSearchableUsersSuccess(
+        snapshot: QuerySnapshot,
+        currentUserId: String,
+        onSuccess: (List<UserProfile>) -> Unit
+    ) {
+        val users = mapSearchableUsers(snapshot, currentUserId)
+        onSuccess(users)
+    }
+
+    private fun mapSearchableUsers(
+        snapshot: QuerySnapshot,
+        currentUserId: String
+    ): List<UserProfile> {
+        return snapshot.documents
+            .mapNotNull { it.toObject(UserProfile::class.java) }
+            .filter { it.uid.isNotBlank() && it.uid != currentUserId }
+            .sortedBy { displayNameOrEmail(it).lowercase() }
+    }
+
+    private fun searchableUsersErrorMessage(exception: Exception): String {
+        return exception.message ?: "Could not load users."
     }
 
     fun sendFriendRequest(
@@ -392,6 +469,79 @@ object SocialRepository {
         return friendIds.size
     }
 
+    fun fetchMutualFriends(
+        currentUserId: String,
+        targetUserId: String,
+        onSuccess: (List<UserProfile>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        fetchAcceptedFriendIds(currentUserId, onSuccess = { currentUserFriends ->
+            fetchAcceptedFriendIds(targetUserId, onSuccess = { targetUserFriends ->
+                val mutualIds = currentUserFriends.intersect(targetUserFriends)
+                if (mutualIds.isEmpty()) {
+                    onSuccess(emptyList())
+                } else {
+                    fetchUserProfiles(mutualIds.toList(), onSuccess, onError)
+                }
+            }, onError)
+        }, onError)
+    }
+
+    private fun fetchAcceptedFriendIds(
+        userId: String,
+        onSuccess: (Set<String>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val friendIds = mutableSetOf<String>()
+
+        friendRequestsCollection()
+            .whereEqualTo("status", "accepted")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                snapshot.documents.forEach { doc ->
+                    val from = doc.getString("fromUserId") ?: ""
+                    val to = doc.getString("toUserId") ?: ""
+                    if (from == userId) friendIds.add(to)
+                    else if (to == userId) friendIds.add(from)
+                }
+                onSuccess(friendIds)
+            }
+            .addOnFailureListener { onError(it.message ?: "Error fetching friends") }
+    }
+
+    private fun fetchUserProfiles(
+        userIds: List<String>,
+        onSuccess: (List<UserProfile>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        if (userIds.isEmpty()) {
+            onSuccess(emptyList())
+            return
+        }
+
+        // Firestore 'in' query supports up to 10 elements. If more, we'd need to chunk.
+        // For mutual friends preview, 10 is usually enough or we can chunk.
+        val chunks = userIds.chunked(10)
+        val allProfiles = mutableListOf<UserProfile>()
+        var chunksLoaded = 0
+
+        chunks.forEach { chunk ->
+            usersCollection()
+                .whereIn("uid", chunk)
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    allProfiles.addAll(snapshot.documents.mapNotNull { it.toObject(UserProfile::class.java) })
+                    chunksLoaded++
+                    if (chunksLoaded == chunks.size) {
+                        onSuccess(allProfiles)
+                    }
+                }
+                .addOnFailureListener { onError(it.message ?: "Error fetching profiles") }
+        }
+    }
+
+    fun displayNameOrEmail(user: UserProfile): String {
+        return user.displayName.ifBlank { user.email }}
     fun fetchNicknames(
         currentUserId: String,
         onSuccess: (Map<String, String>) -> Unit,
@@ -399,7 +549,7 @@ object SocialRepository {
     ) {
         nicknamesCollection(currentUserId).get()
             .addOnSuccessListener { snapshot ->
-                val map = snapshot.documents.associate { 
+                val map = snapshot.documents.associate {
                     it.id to (it.getString("nickname") ?: "")
                 }
                 onSuccess(map)
@@ -485,7 +635,7 @@ object SocialRepository {
         
         val inviteRef = eventInvitesCollection().document(inviteId)
         batch.set(inviteRef, invite)
-        
+
         batch.commit()
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { onError(it.message ?: "Could not send event invite.") }
@@ -837,9 +987,6 @@ object SocialRepository {
             .addOnFailureListener { onError(it.message ?: "Failed to find invites for deletion.") }
     }
 
-    fun displayNameOrEmail(user: UserProfile): String {
-        return user.displayName.ifBlank { user.email }
-    }
 
     private fun usersCollection() = FirebaseFirestore.getInstance().collection("users")
 

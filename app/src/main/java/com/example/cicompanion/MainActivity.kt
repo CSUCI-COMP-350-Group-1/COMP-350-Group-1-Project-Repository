@@ -162,6 +162,7 @@ fun AppNavigation(notificationRoute: String? = null,
                     title = currentScreenTitle,
                     showBackButton =
                         currentRoute == Routes.FRIENDS_AND_REQUESTS ||
+                                currentRoute == Routes.EDIT_PROFILE ||
                                 currentRoute?.startsWith(Routes.MESSAGE_THREAD_BASE) == true, // MESSAGING
                     onHamburgerClick = {
                         scope.launch { drawerState.open() }
@@ -282,6 +283,10 @@ fun AppNavigation(notificationRoute: String? = null,
 
                     composable(Routes.FRIEND_REQUESTS) {
                         FriendsAndRequestsScreen(navController, initialTab = 2)
+                    }
+
+                    composable(Routes.EDIT_PROFILE) {
+                        EditProfileScreen(navController)
                     }
                 }
             }
