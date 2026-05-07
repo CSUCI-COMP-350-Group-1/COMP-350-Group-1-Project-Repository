@@ -13,7 +13,6 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.SetOptions
 import java.time.format.DateTimeFormatter
 import java.time.ZonedDateTime
-import com.example.cicompanion.maps.CustomPin
 
 object SocialRepository {
 
@@ -542,7 +541,7 @@ object SocialRepository {
     }
 
     fun displayNameOrEmail(user: UserProfile): String {
-        return user.displayName.ifBlank { user.email }
+        return user.displayName.ifBlank { user.email }}
     fun fetchNicknames(
         currentUserId: String,
         onSuccess: (Map<String, String>) -> Unit,
@@ -988,9 +987,6 @@ object SocialRepository {
             .addOnFailureListener { onError(it.message ?: "Failed to find invites for deletion.") }
     }
 
-    fun displayNameOrEmail(user: UserProfile): String {
-        return user.displayName.ifBlank { user.email }
-    }
 
     private fun usersCollection() = FirebaseFirestore.getInstance().collection("users")
 

@@ -35,7 +35,7 @@ fun NavBar(navController: NavHostController) {
     val items = listOf(
         NavBarItem("Home", Routes.HOME, Icons.Filled.Home),
         NavBarItem("Social", Routes.SOCIAL, Icons.Filled.People),
-        NavBarItem("Calendar", Routes.CALENDAR, Icons.AutoMirrored.Filled.EventNote),
+        NavBarItem("Planning", Routes.CALENDAR, Icons.AutoMirrored.Filled.EventNote),
         NavBarItem("Map", Routes.MAP, Icons.Filled.LocationOn)
     )
     val navBarBackground = NavBackground

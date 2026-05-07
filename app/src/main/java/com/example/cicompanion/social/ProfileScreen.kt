@@ -153,9 +153,6 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                     },
                     onError = { /* Ignore */ }
                 )
-            } else {
-                nickname = null
-                requestStatus = null
             }
         } else {
             displayName = "Guest User"
@@ -295,40 +292,6 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             }
         )
     }
-}
-
-@Composable
-fun NicknameDialog(
-    initialNickname: String?,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
-) {
-    var text by remember { mutableStateOf(initialNickname ?: "") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (initialNickname == null) "Set Nickname" else "Change Nickname") },
-        text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                label = { Text("Nickname") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-        },
-        confirmButton = {
-            Button(onClick = { onConfirm(text) }) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-        }
-    }
 
     if (showStatusDialog && currentUser != null) {
         StatusDialog(
@@ -362,6 +325,39 @@ fun NicknameDialog(
             }
         )
     }
+
+}
+
+@Composable
+fun NicknameDialog(
+    initialNickname: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var text by remember { mutableStateOf(initialNickname ?: "") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (initialNickname == null) "Set Nickname" else "Change Nickname") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Nickname") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(text) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -542,7 +538,7 @@ fun ViewOnlyProfileActions(
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null)
                     Spacer(Modifier.width(12.dp))
-                    Text("Cancel Request", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Request Sent (Cancel)", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
             "accepted" -> {
