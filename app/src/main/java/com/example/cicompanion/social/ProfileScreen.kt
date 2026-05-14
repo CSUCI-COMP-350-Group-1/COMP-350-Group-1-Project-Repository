@@ -678,7 +678,7 @@ private fun ColumnScope.ProfileActionArea(
         ) {
             Icon(Icons.Default.Group, contentDescription = null)
             Spacer(Modifier.width(12.dp))
-            Text("Friends & Requests", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("Friends", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(24.dp))

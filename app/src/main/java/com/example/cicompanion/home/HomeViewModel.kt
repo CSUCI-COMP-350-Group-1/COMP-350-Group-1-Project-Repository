@@ -2,6 +2,7 @@ package com.example.cicompanion.home
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,7 +13,11 @@ import com.example.cicompanion.appNavigation.allAvailableFeatures
 import com.example.cicompanion.appNavigation.defaultFeatureItems
 import com.example.cicompanion.social.FirestoreManager
 import com.google.firebase.auth.FirebaseAuth
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.launch
+import retrofit2.Retrofit
+import retrofit2.converter.moshi.MoshiConverterFactory
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     // SharedPreferences for the saved settings across app restarts
@@ -26,6 +31,28 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private var loadedUserId: String? = null
     private var isFetching = false
+
+    var weatherState by mutableStateOf<WeatherResponse?>(null)
+
+    private val moshi = Moshi.Builder()
+        .add(KotlinJsonAdapterFactory())
+        .build()
+
+    private val weatherService = Retrofit.Builder()
+        .baseUrl("https://api.weatherapi.com/")
+        .addConverterFactory(MoshiConverterFactory.create(moshi))
+        .build()
+        .create(WeatherService::class.java)
+
+    fun fetchWeather(location: String) {
+        viewModelScope.launch {
+            try {
+                weatherState = weatherService.getCurrentWeather(location = location)
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error fetching weather: ${e.message}", e)
+            }
+        }
+    }
 
     init {
         // load from local storage if user is already signed in

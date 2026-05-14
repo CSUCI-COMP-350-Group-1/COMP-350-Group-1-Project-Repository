@@ -80,12 +80,23 @@ fun HomeScreen(
         homeViewModel.loadCustomization()
     }
 
+    LaunchedEffect(Unit) {
+        // You can replace with your actual city or lat/long
+        homeViewModel.fetchWeather("34.1620556,-119.0460379")
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .background(AppBackground)
             .padding(top = 16.dp)
     ) {
+        item {
+            WeatherWidget(
+                weather = homeViewModel.weatherState,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
         item {
             CalendarWidget(
                 upcomingEvents = upcomingEvents,

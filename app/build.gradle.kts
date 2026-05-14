@@ -50,6 +50,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {
@@ -112,4 +113,11 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+secrets {
+    defaultPropertiesFileName = "local.properties"
+
+    // Optional: If there are keys you DON'T want in your code, add them here
+    // ignoreList.add("sdkDir")
 }
