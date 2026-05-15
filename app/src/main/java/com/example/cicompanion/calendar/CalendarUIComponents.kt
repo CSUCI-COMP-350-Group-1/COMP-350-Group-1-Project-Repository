@@ -1,74 +1,89 @@
 package com.example.cicompanion.calendar
 
+import android.app.DatePickerDialog
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.calendar.model.CourseCatalogCourse
+import com.example.cicompanion.calendar.model.CourseCatalogMajor
+import com.example.cicompanion.calendar.model.SelectedClass
+import com.example.cicompanion.social.EventInvite
+import com.example.cicompanion.social.SocialRepository
+import com.example.cicompanion.social.UserAvatar
+import com.example.cicompanion.social.UserProfile
 import com.example.cicompanion.ui.theme.BrandRedDark
-import com.example.cicompanion.ui.theme.BrandRedLighter
+import com.example.cicompanion.utils.HtmlUtils
+import com.google.firebase.auth.FirebaseAuth
+import java.time.LocalDate
 import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.UUID
 
 val CoralRed = Color(0xFFEF3347)
 val CardOffWhite = Color(0xFFF6E6D8)
 val SoftText = Color(0xFF6E5555)
+val DateCellBorder = Color(0xFFE2BFB7)
+val SharedEventBlue = Color(0xFF2196F3)
+val CustomEventOrange = Color(0xFFFF9800)
+val PinnedEventPurple = Color(0xFF9C27B0)
+val DateCellWhite = Color(0xFFF7F4F8)
+val EventCardGrey = Color(0xFFF2F2F2)
 
 @Composable
 fun CalendarHeroHeader(
     title: String,
-    subtitle: String,
     modifier: Modifier = Modifier,
-    trailingContent: @Composable () -> Unit = {}
+    trailingContent: @Composable (() -> Unit)? = null
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(BrandRedLighter, BrandRedDark)
-                )
-            )
-            .padding(20.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(CoralRed)
+            .padding(16.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.White.copy(alpha = 0.9f)
-                )
-            }
-            trailingContent()
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            trailingContent?.invoke()
         }
     }
 }
@@ -80,14 +95,14 @@ fun SectionCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = CardOffWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(8.dp),
             content = content
         )
     }
@@ -97,10 +112,54 @@ fun SectionCard(
 fun SectionHeading(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.titleMedium,
+        style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurface,
-        fontWeight = FontWeight.Bold
+        fontWeight = FontWeight.Bold,
+        fontSize = 11.sp
     )
+}
+
+@Composable
+fun CompactTimeChip(
+    label: String,
+    time: LocalTime,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isSelected: Boolean = false
+) {
+    val formatter = remember { DateTimeFormatter.ofPattern("h:mm a") }
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) CoralRed.copy(alpha = 0.1f) else Color.Gray.copy(alpha = 0.05f),
+        border = BorderStroke(1.dp, if (isSelected) CoralRed else Color.LightGray.copy(alpha = 0.3f))
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 6.dp, horizontal = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = if (isSelected) CoralRed else Color.Gray, fontSize = 10.sp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    Icons.Outlined.Schedule,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = if (isSelected) CoralRed else Color.Gray
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = time.format(formatter),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isSelected) CoralRed else Color.DarkGray
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -108,9 +167,6 @@ fun WheelTimePicker(
     initialTime: LocalTime,
     onTimeChange: (LocalTime) -> Unit
 ) {
-    // EDIT CLASS TIME FIX:
-    // These values must update when initialTime changes.
-    // Without this, editing a saved class can keep the default 9:00 AM / 10:15 AM wheel state.
     var hour by remember {
         mutableIntStateOf(
             if (initialTime.hour == 0) 12
@@ -121,18 +177,11 @@ fun WheelTimePicker(
     var minute by remember { mutableIntStateOf(initialTime.minute) }
     var amPm by remember { mutableStateOf(if (initialTime.hour < 12) "AM" else "PM") }
 
-    // EDIT CLASS TIME FIX:
-    // When AddClassDialog loads an existing class, initialTime changes from the default
-    // to the saved value. Sync the picker state to that saved value.
     LaunchedEffect(initialTime) {
-        hour = if (initialTime.hour == 0) {
-            12
-        } else if (initialTime.hour > 12) {
-            initialTime.hour - 12
-        } else {
-            initialTime.hour
-        }
-
+        val h = if (initialTime.hour == 0) 12
+        else if (initialTime.hour > 12) initialTime.hour - 12
+        else initialTime.hour
+        hour = h
         minute = initialTime.minute
         amPm = if (initialTime.hour < 12) "AM" else "PM"
     }
@@ -143,44 +192,35 @@ fun WheelTimePicker(
             "PM" -> if (hour == 12) 12 else hour + 12
             else -> hour
         }
-
         val newTime = LocalTime.of(h, minute)
-
-        // EDIT CLASS TIME FIX:
-        // Avoid re-sending the same value repeatedly while syncing picker state.
         if (newTime != initialTime) {
             onTimeChange(newTime)
         }
     }
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp),
+        modifier = Modifier.fillMaxWidth().height(120.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
         WheelPicker(
             items = (1..12).toList(),
             initialIndex = hour - 1,
-            onItemSelected = { selectedHour -> hour = selectedHour },
+            onItemSelected = { hour = it },
             modifier = Modifier.weight(1f)
         )
-
         Text(":", style = MaterialTheme.typography.headlineMedium)
-
         WheelPicker(
             items = (0..59).toList(),
             initialIndex = minute,
-            onItemSelected = { selectedMinute -> minute = selectedMinute },
-            format = { value -> String.format(Locale.US, "%02d", value) },
+            onItemSelected = { minute = it },
+            format = { String.format(Locale.US, "%02d", it) },
             modifier = Modifier.weight(1f)
         )
-
         WheelPicker(
             items = listOf("AM", "PM"),
             initialIndex = if (amPm == "AM") 0 else 1,
-            onItemSelected = { selectedAmPm -> amPm = selectedAmPm },
+            onItemSelected = { amPm = it },
             modifier = Modifier.weight(1f)
         )
     }
@@ -195,18 +235,11 @@ fun <T> WheelPicker(
     format: (T) -> String = { it.toString() }
 ) {
     val safeInitialIndex = initialIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0))
-
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = safeInitialIndex)
     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
     val itemHeight = 40.dp
+    val selectedIndex by remember { derivedStateOf { listState.firstVisibleItemIndex } }
 
-    val selectedIndex by remember {
-        derivedStateOf { listState.firstVisibleItemIndex }
-    }
-
-    // EDIT CLASS TIME FIX:
-    // If the parent changes initialIndex while editing an existing class,
-    // move the wheel to the saved value instead of leaving it at the old default.
     LaunchedEffect(safeInitialIndex, items.size) {
         if (items.isNotEmpty() && listState.firstVisibleItemIndex != safeInitialIndex) {
             listState.scrollToItem(safeInitialIndex)
@@ -232,7 +265,6 @@ fun <T> WheelPicker(
                 .background(CoralRed.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
                 .border(1.dp, CoralRed.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
         )
-
         LazyColumn(
             state = listState,
             flingBehavior = flingBehavior,
@@ -242,9 +274,7 @@ fun <T> WheelPicker(
         ) {
             items(items.size) { index ->
                 Box(
-                    modifier = Modifier
-                        .height(itemHeight)
-                        .fillMaxWidth(),
+                    modifier = Modifier.height(itemHeight).fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -257,4 +287,866 @@ fun <T> WheelPicker(
             }
         }
     }
+}
+
+@Composable
+fun TimePickerDialog(initialTime: LocalTime, onDismiss: () -> Unit, onTimeSelected: (LocalTime) -> Unit) {
+    var tempTime by remember { mutableStateOf(initialTime) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select Time", fontWeight = FontWeight.Bold) },
+        text = {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                WheelTimePicker(initialTime = tempTime, onTimeChange = { tempTime = it })
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onTimeSelected(tempTime) }, colors = ButtonDefaults.buttonColors(containerColor = CoralRed), shape = RoundedCornerShape(12.dp)) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = Color.Gray)
+            }
+        }
+    )
+}
+
+@Composable
+fun ClassDetailsContent(
+    selectedClass: SelectedClass,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Column {
+            Text(
+                text = "${selectedClass.courseCode} - ${selectedClass.courseTitle}",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = selectedClass.majorName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray
+            )
+        }
+
+        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+
+        DetailRow(Icons.Outlined.Schedule, "${formatTimeForDisplay(selectedClass.startTime)} - ${formatTimeForDisplay(selectedClass.endTime)}")
+        DetailRow(Icons.Outlined.CalendarToday, selectedClass.meetingPatternLabel())
+        if (selectedClass.location.isNotBlank()) {
+            DetailRow(Icons.Outlined.LocationOn, selectedClass.location)
+        }
+
+        if (selectedClass.hasSecondTimeRange) {
+            Surface(
+                color = CoralRed.copy(alpha = 0.05f),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = if (selectedClass.notes2.isNotBlank()) selectedClass.notes2 else "Secondary Meeting / Lab",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = CoralRed
+                    )
+                    DetailRow(Icons.Outlined.Schedule, "${formatTimeForDisplay(selectedClass.startTime2)} - ${formatTimeForDisplay(selectedClass.endTime2)}", iconSize = 16.dp, textSize = 14.sp)
+                    val days2 = selectedClass.daysOfWeek2.sorted().joinToString(" ") { day ->
+                        when(day) {
+                            1 -> "Mon"
+                            2 -> "Tue"
+                            3 -> "Wed"
+                            4 -> "Thu"
+                            5 -> "Fri"
+                            6 -> "Sat"
+                            7 -> "Sun"
+                            else -> ""
+                        }
+                    }
+                    DetailRow(Icons.Outlined.CalendarToday, days2, iconSize = 16.dp, textSize = 14.sp)
+                    if (selectedClass.location2.isNotBlank()) {
+                        DetailRow(Icons.Outlined.LocationOn, selectedClass.location2, iconSize = 16.dp, textSize = 14.sp)
+                    }
+                }
+            }
+        }
+
+        if (selectedClass.termLabel.isNotBlank() || selectedClass.notes.isNotBlank()) {
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+            if (selectedClass.termLabel.isNotBlank()) {
+                Text(text = "Term: ${selectedClass.termLabel}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+            }
+            if (selectedClass.notes.isNotBlank()) {
+                Text(text = selectedClass.notes, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedButton(
+                onClick = onEdit,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Edit")
+            }
+
+            Button(
+                onClick = onDelete,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
+                Spacer(Modifier.width(8.dp))
+                Text("Remove")
+            }
+        }
+    }
+}
+
+@Composable
+fun DetailRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, iconSize: androidx.compose.ui.unit.Dp = 18.dp, textSize: androidx.compose.ui.unit.TextUnit = 16.sp) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(iconSize), tint = Color.Gray)
+        Text(text = text, fontSize = textSize)
+    }
+}
+
+@Composable
+fun AddClassDialog(
+    majors: List<CourseCatalogMajor>,
+    editingClass: SelectedClass? = null,
+    onDismiss: () -> Unit,
+    onConfirm: (SelectedClass) -> Unit
+) {
+    var selectedMajor by remember { mutableStateOf<CourseCatalogMajor?>(null) }
+    var selectedCourse by remember { mutableStateOf<CourseCatalogCourse?>(null) }
+    val selectedDays = remember { mutableStateListOf<Int>() }
+    
+    var startTime by remember { mutableStateOf(LocalTime.of(9, 0)) }
+    var endTime by remember { mutableStateOf(LocalTime.of(10, 15)) }
+
+    var hasSecondTimeRange by remember { mutableStateOf(false) }
+    val selectedDays2 = remember { mutableStateListOf<Int>() }
+    var startTime2 by remember { mutableStateOf(LocalTime.of(9, 0)) }
+    var endTime2 by remember { mutableStateOf(LocalTime.of(10, 15)) }
+    var location2Text by rememberSaveable { mutableStateOf("") }
+    var notes2Text by rememberSaveable { mutableStateOf("") }
+
+    var startDateText by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
+    var endDateText by rememberSaveable { mutableStateOf(LocalDate.now().plusMonths(4).toString()) }
+    var locationText by rememberSaveable { mutableStateOf("") }
+    var notesText by rememberSaveable { mutableStateOf("") }
+    var termLabelText by rememberSaveable { mutableStateOf("") }
+
+    var showMajorPicker by remember { mutableStateOf(false) }
+    var showCoursePicker by remember { mutableStateOf(false) }
+    var showStartTimePicker by remember { mutableStateOf(false) }
+    var showEndTimePicker by remember { mutableStateOf(false) }
+    var showStartTimePicker2 by remember { mutableStateOf(false) }
+    var showEndTimePicker2 by remember { mutableStateOf(false) }
+
+    LaunchedEffect(editingClass, majors) {
+        if (editingClass != null && majors.isNotEmpty()) {
+            val major = majors.firstOrNull { it.code == editingClass.majorCode }
+            val course = major?.courses?.firstOrNull { it.code == editingClass.courseCode }
+                ?: CourseCatalogCourse(editingClass.courseCode, editingClass.courseTitle, editingClass.typicallyOffered)
+            
+            selectedMajor = major
+            selectedCourse = course
+            selectedDays.clear()
+            selectedDays.addAll(editingClass.daysOfWeek)
+            startTime = LocalTime.parse(editingClass.startTime)
+            endTime = LocalTime.parse(editingClass.endTime)
+
+            hasSecondTimeRange = editingClass.hasSecondTimeRange
+            selectedDays2.clear()
+            selectedDays2.addAll(editingClass.daysOfWeek2)
+            startTime2 = if (editingClass.startTime2.isNotBlank()) LocalTime.parse(editingClass.startTime2) else LocalTime.of(9, 0)
+            endTime2 = if (editingClass.endTime2.isNotBlank()) LocalTime.parse(editingClass.endTime2) else LocalTime.of(10, 15)
+            location2Text = editingClass.location2
+            notes2Text = editingClass.notes2
+
+            startDateText = editingClass.startDate
+            endDateText = editingClass.endDate
+            locationText = editingClass.location
+            notesText = editingClass.notes
+            termLabelText = editingClass.termLabel
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.fillMaxWidth(0.95f),
+        shape = RoundedCornerShape(24.dp),
+        containerColor = Color.White,
+        title = {
+            Text(
+                text = if (editingClass == null) "New Class" else "Edit Class",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = CoralRed
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Course Selection Row
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(modifier = Modifier.weight(1f).clickable { showMajorPicker = true }) {
+                        OutlinedTextField(
+                            value = selectedMajor?.code ?: "",
+                            onValueChange = {},
+                            readOnly = true,
+                            enabled = false,
+                            label = { Text("Major", fontSize = 10.sp) },
+                            placeholder = { Text("Select") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(18.dp)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledBorderColor = CoralRed.copy(alpha = 0.5f),
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                disabledTrailingIconColor = Color.Gray
+                            )
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1.5f).clickable { if (selectedMajor != null) showCoursePicker = true }) {
+                        OutlinedTextField(
+                            value = selectedCourse?.code ?: "",
+                            onValueChange = {},
+                            readOnly = true,
+                            enabled = false,
+                            label = { Text("Course", fontSize = 10.sp) },
+                            placeholder = { Text("Select") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(18.dp)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledBorderColor = if (selectedMajor != null) CoralRed.copy(alpha = 0.5f) else Color.Gray.copy(alpha = 0.3f),
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                disabledTrailingIconColor = Color.Gray
+                            )
+                        )
+                    }
+                }
+
+                selectedCourse?.let {
+                    Text(
+                        text = it.title,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CoralRed,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                DayChipRows(
+                    selectedDays = selectedDays,
+                    onToggleDay = { dayValue ->
+                        if (dayValue in selectedDays) selectedDays.remove(dayValue)
+                        else selectedDays.add(dayValue)
+                    }
+                )
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CompactTimeChip(label = "Start", time = startTime, isSelected = true, onClick = { showStartTimePicker = true }, modifier = Modifier.weight(1f))
+                    CompactTimeChip(label = "End", time = endTime, isSelected = true, onClick = { showEndTimePicker = true }, modifier = Modifier.weight(1f))
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = termLabelText,
+                        onValueChange = { termLabelText = it },
+                        label = { Text("Term", fontSize = 10.sp) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = locationText,
+                        onValueChange = { locationText = it },
+                        label = { Text("Location", fontSize = 10.sp) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DatePickerField(label = "Start Date", value = startDateText, modifier = Modifier.weight(1f), onDateSelected = { startDateText = it })
+                    DatePickerField(label = "End Date", value = endDateText, modifier = Modifier.weight(1f), onDateSelected = { endDateText = it })
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Add Secondary/Lab Range", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.weight(1f))
+                    Switch(
+                        checked = hasSecondTimeRange, 
+                        onCheckedChange = { hasSecondTimeRange = it },
+                        colors = SwitchDefaults.colors(checkedTrackColor = CoralRed),
+                        modifier = Modifier.scale(0.8f)
+                    )
+                }
+
+                if (hasSecondTimeRange) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DayChipRows(
+                            selectedDays = selectedDays2,
+                            onToggleDay = { dayValue ->
+                                if (dayValue in selectedDays2) selectedDays2.remove(dayValue)
+                                else selectedDays2.add(dayValue)
+                            }
+                        )
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CompactTimeChip(label = "Start 2", time = startTime2, isSelected = true, onClick = { showStartTimePicker2 = true }, modifier = Modifier.weight(1f))
+                            CompactTimeChip(label = "End 2", time = endTime2, isSelected = true, onClick = { showEndTimePicker2 = true }, modifier = Modifier.weight(1f))
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = location2Text,
+                                onValueChange = { location2Text = it },
+                                label = { Text("2nd Loc", fontSize = 10.sp) },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = notes2Text,
+                                onValueChange = { notes2Text = it },
+                                label = { Text("2nd Notes", fontSize = 10.sp) },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                singleLine = true
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = notesText,
+                    onValueChange = { notesText = it },
+                    label = { Text("General Notes", fontSize = 10.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    maxLines = 1
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (selectedMajor != null && selectedCourse != null && selectedDays.isNotEmpty()) {
+                        val newClass = SelectedClass(
+                            id = editingClass?.id ?: UUID.randomUUID().toString(),
+                            majorCode = selectedMajor!!.code,
+                            majorName = selectedMajor!!.name,
+                            courseCode = selectedCourse!!.code,
+                            courseTitle = selectedCourse!!.title,
+                            typicallyOffered = selectedCourse!!.typicallyOffered,
+                            daysOfWeek = selectedDays.sorted(),
+                            startTime = startTime.toString(),
+                            endTime = endTime.toString(),
+                            hasSecondTimeRange = hasSecondTimeRange,
+                            daysOfWeek2 = selectedDays2.sorted(),
+                            startTime2 = startTime2.toString(),
+                            endTime2 = endTime2.toString(),
+                            location2 = location2Text.trim(),
+                            notes2 = notes2Text.trim(),
+                            startDate = startDateText,
+                            endDate = endDateText,
+                            location = locationText.trim(),
+                            notes = notesText.trim(),
+                            termLabel = termLabelText.trim(),
+                            colorArgb = colorForCourse(selectedCourse!!.code),
+                            reminderEnabled = false,
+                            createdAt = editingClass?.createdAt ?: System.currentTimeMillis(),
+                            updatedAt = System.currentTimeMillis()
+                        )
+                        onConfirm(newClass)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
+                enabled = selectedMajor != null && selectedCourse != null && selectedDays.isNotEmpty() && 
+                          startTime.isBefore(endTime) && (!hasSecondTimeRange || startTime2.isBefore(endTime2)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(if (editingClass == null) "Add" else "Save", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = Color.Gray)
+            }
+        }
+    )
+
+    if (showMajorPicker) {
+        CatalogItemPickerDialog(
+            title = "Select Major",
+            items = majors,
+            itemLabel = { item: CourseCatalogMajor -> "${item.code} - ${item.name}" },
+            searchMatcher = { item: CourseCatalogMajor, query: String -> item.name.contains(query, true) || item.code.contains(query, true) },
+            onDismiss = { showMajorPicker = false },
+            onSelect = { item: CourseCatalogMajor ->
+                selectedMajor = item
+                selectedCourse = null
+                showMajorPicker = false
+            }
+        )
+    }
+
+    if (showCoursePicker && selectedMajor != null) {
+        CatalogItemPickerDialog(
+            title = "Select Course",
+            items = selectedMajor!!.courses,
+            itemLabel = { item: CourseCatalogCourse -> "${item.code} - ${item.title}" },
+            searchMatcher = { item: CourseCatalogCourse, query: String -> item.title.contains(query, true) || item.code.contains(query, true) },
+            onDismiss = { showCoursePicker = false },
+            onSelect = { item: CourseCatalogCourse ->
+                selectedCourse = item
+                showCoursePicker = false
+            }
+        )
+    }
+
+    if (showStartTimePicker) TimePickerDialog(startTime, { showStartTimePicker = false }, { startTime = it; showStartTimePicker = false })
+    if (showEndTimePicker) TimePickerDialog(endTime, { showEndTimePicker = false }, { endTime = it; showEndTimePicker = false })
+    if (showStartTimePicker2) TimePickerDialog(startTime2, { showStartTimePicker2 = false }, { startTime2 = it; showStartTimePicker2 = false })
+    if (showEndTimePicker2) TimePickerDialog(endTime2, { showEndTimePicker2 = false }, { endTime2 = it; showEndTimePicker2 = false })
+}
+
+@Composable
+fun <T> CatalogItemPickerDialog(
+    title: String,
+    items: List<T>,
+    itemLabel: (T) -> String,
+    searchMatcher: (T, String) -> Boolean,
+    onDismiss: () -> Unit,
+    onSelect: (T) -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredItems = remember(searchQuery, items) {
+        if (searchQuery.isBlank()) items
+        else items.filter { searchMatcher(it, searchQuery) }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    placeholder = { Text("Search...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.Gray) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                if (items.isEmpty()) {
+                    Text("No items available.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+                        items(items = filteredItems) { item ->
+                            Text(
+                                text = itemLabel(item),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSelect(item) }
+                                    .padding(vertical = 12.dp, horizontal = 4.dp),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = CoralRed, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
+}
+
+@Composable
+fun DayChipRows(
+    selectedDays: List<Int>,
+    onToggleDay: (Int) -> Unit
+) {
+    val dayOptions = listOf(
+        1 to "M", 2 to "T", 3 to "W", 4 to "T", 5 to "F", 6 to "S", 7 to "S"
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        dayOptions.forEach { (value, label) ->
+            val isSelected = value in selectedDays
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(if (isSelected) CoralRed else Color.Transparent)
+                    .border(1.dp, if (isSelected) CoralRed else Color.LightGray.copy(alpha = 0.3f), CircleShape)
+                    .clickable { onToggleDay(value) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    color = if (isSelected) Color.White else Color.Gray,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun DatePickerField(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    onDateSelected: (String) -> Unit
+) {
+    val context = LocalContext.current
+    Box(modifier = modifier.clickable {
+        val parsedDate = runCatching { LocalDate.parse(value) }.getOrElse { LocalDate.now() }
+        DatePickerDialog(context, { _, year, month, dayOfMonth ->
+            onDateSelected(LocalDate.of(year, month + 1, dayOfMonth).toString())
+        }, parsedDate.year, parsedDate.monthValue - 1, parsedDate.dayOfMonth).show()
+    }) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            enabled = false,
+            label = { Text(label, fontSize = 10.sp) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            trailingIcon = { Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(16.dp)) },
+            colors = OutlinedTextFieldDefaults.colors(
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledBorderColor = CoralRed.copy(alpha = 0.5f),
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledTrailingIconColor = Color.Gray
+            )
+        )
+    }
+}
+
+@Composable
+fun SavedClassCard(
+    selectedClass: SelectedClass,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = CardOffWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "${selectedClass.courseCode} - ${selectedClass.courseTitle}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${formatTimeForDisplay(selectedClass.startTime)} - ${formatTimeForDisplay(selectedClass.endTime)} | ${selectedClass.meetingPatternLabel()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
+            }
+            
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = Color.Gray,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+fun formatTimeForDisplay(timeText: String): String = runCatching {
+    val parsedTime = LocalTime.parse(timeText)
+    val formatter = DateTimeFormatter.ofPattern("h:mm a")
+    parsedTime.format(formatter)
+}.getOrDefault(timeText)
+
+fun colorForCourse(courseCode: String): Int {
+    val palette = listOf(
+        0xFFEF3347.toInt(), 0xFF5C6BC0.toInt(), 0xFF26A69A.toInt(),
+        0xFFFFA726.toInt(), 0xFF8E24AA.toInt(), 0xFF42A5F5.toInt()
+    )
+    val index = kotlin.math.abs(courseCode.hashCode()) % palette.size
+    return palette[index]
+}
+
+@Composable
+fun IncomingInvitesSection(invites: List<EventInvite>, onAccept: (EventInvite) -> Unit, onDecline: (EventInvite) -> Unit, onInviteClick: (EventInvite) -> Unit) {
+    SectionCard(Modifier.border(1.dp, CoralRed.copy(alpha = 0.2f), RoundedCornerShape(16.dp))) {
+        SectionHeading("Invitations (${invites.size})")
+        Spacer(Modifier.height(8.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            invites.forEach { invite ->
+                Card(
+                    modifier = Modifier.fillMaxWidth().clickable { onInviteClick(invite) },
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(1.dp)
+                ) {
+                    Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(invite.eventTitle, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("from ${invite.fromDisplayName}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        }
+                        Row {
+                            IconButton(onClick = { onAccept(invite) }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(18.dp))
+                            }
+                            IconButton(onClick = { onDecline(invite) }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Default.Close, contentDescription = null, tint = CoralRed, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FriendPickerDialog(eventId: String? = null, onDismiss: () -> Unit, onInvite: (UserProfile) -> Unit) {
+    var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
+    var nicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var loading by remember { mutableStateOf(true) }
+    var query by remember { mutableStateOf("") }
+    val user = FirebaseAuth.getInstance().currentUser
+
+    LaunchedEffect(eventId) {
+        if (user != null) {
+            SocialRepository.fetchNicknames(user.uid, { nicks -> nicknames = nicks }, {})
+            SocialRepository.fetchAcceptedFriends(user.uid, { all ->
+                if (eventId != null) {
+                    SocialRepository.fetchInvitedUserIds(eventId, { inv ->
+                        friends = all.filter { !inv.contains(it.uid) }
+                        loading = false
+                    }, {
+                        friends = all
+                        loading = false
+                    })
+                } else {
+                    friends = all
+                    loading = false
+                }
+            }, {
+                loading = false
+            })
+        }
+    }
+
+    val filtered = friends.filter { it.displayName.contains(query, true) || it.email.contains(query, true) || (nicknames[it.uid] ?: "").contains(query, true) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Invite a Friend", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    placeholder = { Text("Search friends...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.Gray) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                if (loading) {
+                    Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = CoralRed)
+                    }
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
+                        items(items = filtered) { friend ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { onInvite(friend) }
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                UserAvatar(photoUrl = friend.photoUrl)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(nicknames[friend.uid] ?: friend.displayName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                                    Text(friend.email, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = CoralRed, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
+}
+
+@Composable
+fun EventMembersDialog(event: CalendarEvent, currentUserId: String, onDismiss: () -> Unit, onKick: (List<String>) -> Unit) {
+    var members by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
+    var nicks by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var loading by remember { mutableStateOf(true) }
+    var sel by remember { mutableStateOf(setOf<String>()) }
+    val isOwner = event.ownerId == currentUserId
+
+    LaunchedEffect(currentUserId) {
+        SocialRepository.fetchNicknames(currentUserId, { fetchedNicks -> nicks = fetchedNicks }, {})
+    }
+
+    DisposableEffect(event.id) {
+        val reg = SocialRepository.listenToEventMembers(event.id, { fetchedMembers -> members = fetchedMembers; loading = false }, { loading = false })
+        onDispose { reg.remove() }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Event Members", fontWeight = FontWeight.Bold) },
+        text = {
+            if (loading) {
+                Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = BrandRedDark)
+                }
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item { Text("Host", style = MaterialTheme.typography.labelSmall, color = Color.Gray) }
+                    item { MemberRow(event.ownerId ?: "", currentUserId, nicks[event.ownerId], true) }
+                    if (members.any { it.uid != event.ownerId }) {
+                        item {
+                            Spacer(Modifier.height(8.dp))
+                            Text("Participants", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                        }
+                        items(items = members.filter { it.uid != event.ownerId }) { m ->
+                            MemberRow(m.uid, currentUserId, nicks[m.uid], false, sel.contains(m.uid), {
+                                if (isOwner) {
+                                    if (sel.contains(m.uid)) sel -= m.uid else sel += m.uid
+                                }
+                            })
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (isOwner && sel.isNotEmpty()) {
+                Button(onClick = { onKick(sel.toList()) }, colors = ButtonDefaults.buttonColors(containerColor = BrandRedDark)) {
+                    Text("Remove Selected")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
+@Composable
+fun MemberRow(uId: String, curId: String, nick: String?, isOwn: Boolean, isSel: Boolean = false, onTog: () -> Unit = {}) {
+    var p by remember { mutableStateOf<UserProfile?>(null) }
+    LaunchedEffect(uId) { SocialRepository.fetchUserProfile(uId, { profile -> p = fetchedProfile(profile) }, {}) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable { onTog() }
+            .background(if (isSel) BrandRedDark.copy(alpha = 0.1f) else Color.Transparent)
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        UserAvatar(p?.photoUrl ?: "")
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text((nick ?: p?.displayName ?: "Loading...") + if (uId == curId) " (You)" else "", fontWeight = if (isOwn) FontWeight.Bold else FontWeight.Medium)
+            if (isOwn) Text("Host", style = MaterialTheme.typography.bodySmall, color = CustomEventOrange)
+        }
+        if (!isOwn) {
+            Checkbox(checked = isSel, onCheckedChange = { onTog() })
+        }
+    }
+}
+
+// Helper for MemberRow profile state update
+private fun fetchedProfile(profile: UserProfile?): UserProfile? = profile
+
+@Composable
+fun InviteDetailDialog(invite: EventInvite, onDismiss: () -> Unit, onAccept: () -> Unit, onDecline: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(invite.eventTitle, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("From: ${invite.fromDisplayName}", fontWeight = FontWeight.Bold, color = SharedEventBlue)
+                Text("When: ${invite.eventStart.substring(0, 10)} at ${invite.eventStart.substring(11, 16)}")
+                if (!invite.eventLocation.isNullOrBlank()) Text("Where: ${invite.eventLocation}")
+                if (!invite.eventDescription.isNullOrBlank()) {
+                    HorizontalDivider()
+                    Text(HtmlUtils.stripHtml(invite.eventDescription!!))
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onAccept, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))) {
+                Text("Accept")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDecline) {
+                Text("Decline", color = CoralRed)
+            }
+        }
+    )
 }
