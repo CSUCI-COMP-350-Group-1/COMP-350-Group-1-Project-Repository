@@ -16,11 +16,11 @@ private val DarkColorScheme = darkColorScheme(
     onPrimary = Color.White,
     secondary = PurpleGrey80,
     tertiary = Pink80,
-    background = Color(0xFF121212),
-    surface = Color(0xFF1E1E1E),
+    background = Color.Black, // Pure black for OLED screens
+    surface = Color(0xFF121212), // Dark gray surface to distinguish from background
     onBackground = Color.White,
     onSurface = Color.White,
-    surfaceVariant = Color(0xFF2C2C2C),
+    surfaceVariant = Color(0xFF1E1E1E),
     onSurfaceVariant = Color.LightGray
 )
 
@@ -35,12 +35,6 @@ private val LightColorScheme = lightColorScheme(
     onSurface = Color.Black,
     surfaceVariant = Color(0xFFF5F5F5),
     onSurfaceVariant = Color.DarkGray
-
-    /* Other default colors to override
-    primaryContainer = ,
-    onPrimaryContainer = ,
-    ...
-    */
 )
 
 @Composable

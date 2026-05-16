@@ -5,10 +5,10 @@ import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -35,12 +35,10 @@ import androidx.navigation.NavHostController
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.maps.CustomPin
 import com.example.cicompanion.ui.Routes
-import com.example.cicompanion.ui.theme.AppBackground
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -125,18 +123,20 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
     }
 
     Scaffold(
-        containerColor = AppBackground
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
-                .background(AppBackground)
-                .padding(16.dp)
+                .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = 16.dp, vertical = 0.dp)
         ) {
+            Spacer(modifier = Modifier.height(16.dp))
+            
             if (sharedLocation != null) {
                 Surface(
-                    color = Color(0xFFFFF9C4),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
                 ) {
@@ -144,7 +144,8 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                         text = "Sharing location: $sharedLocation. Pick a friend to send to.",
                         modifier = Modifier.padding(12.dp),
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 }
             }
@@ -153,8 +154,8 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                 onClick = { navController.navigate(Routes.FRIENDS_AND_REQUESTS) },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFEF3347),
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 Text("Manage Friends")
@@ -165,7 +166,8 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
             Text(
                 text = "Start a Chat",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -173,7 +175,7 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
             when {
                 isLoadingFriends -> {
                     Box(modifier = Modifier.fillMaxWidth().height(96.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color(0xFFEF3347))
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 }
                 friends.isEmpty() -> {
@@ -204,7 +206,8 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
             Text(
                 text = "Recent Messages",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
             )
 
             if (errorMessage != null) {
@@ -461,226 +464,255 @@ fun MessageThreadScreen(
     }
 
     Scaffold(
-        containerColor = AppBackground,
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             if (isFriend) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.White)
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box {
-                        IconButton(onClick = { showAttachmentMenu = !showAttachmentMenu }) {
-                            Icon(Icons.Default.Add, contentDescription = "Add attachment", tint = Color(0xFFEF3347))
-                        }
-                        DropdownMenu(
-                            expanded = showAttachmentMenu,
-                            onDismissRequest = { showAttachmentMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Ping Current Location") },
-                                onClick = {
-                                    showAttachmentMenu = false
-                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                                        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
-                                            .addOnSuccessListener { location ->
-                                                if (location != null && friend != null) {
-                                                    MessagingRepository.sendMessage(
-                                                        currentUser = currentUser,
-                                                        friend = friend!!,
-                                                        messageText = "My current location",
-                                                        type = "location",
-                                                        metadata = mapOf(
-                                                            "lat" to location.latitude.toString(),
-                                                            "lng" to location.longitude.toString()
-                                                        ),
-                                                        onSuccess = { conversationExists = true },
-                                                        onError = { errorMessage = it }
-                                                    )
-                                                }
-                                            }
-                                    } else {
-                                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                                    }
-                                },
-                                leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Send Custom Pin") },
-                                onClick = {
-                                    showAttachmentMenu = false
-                                    showPinPicker = true
-                                },
-                                leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Share Event") },
-                                onClick = {
-                                    showAttachmentMenu = false
-                                    showEventPicker = true
-                                },
-                                leadingIcon = { Icon(Icons.Default.Event, contentDescription = null) }
-                            )
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = messageText,
-                        onValueChange = { messageText = it },
-                        modifier = Modifier.weight(1f),
-                        placeholder = { Text("Type a message") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    IconButton(
-                        onClick = {
-                            val targetFriend = friend ?: return@IconButton
-                            isSending = true
-
-                            MessagingRepository.sendMessage(
-                                currentUser = currentUser,
-                                friend = targetFriend,
-                                messageText = messageText,
-                                onSuccess = {
-                                    messageText = ""
-                                    isSending = false
-                                    conversationExists = true
-                                    errorMessage = null
-                                },
-                                onError = {
-                                    errorMessage = it
-                                    isSending = false
-                                }
-                            )
-                        },
-                        enabled = messageText.isNotBlank() && !isSending && friend != null
+                Column {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.background)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = Color(0xFFEF3347))
+                        Box {
+                            IconButton(onClick = { showAttachmentMenu = !showAttachmentMenu }) {
+                                Icon(Icons.Default.Add, contentDescription = "Add attachment", tint = MaterialTheme.colorScheme.primary)
+                            }
+                            DropdownMenu(
+                                expanded = showAttachmentMenu,
+                                onDismissRequest = { showAttachmentMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Ping Current Location") },
+                                    onClick = {
+                                        showAttachmentMenu = false
+                                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                                            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                                                .addOnSuccessListener { location ->
+                                                    if (location != null && friend != null) {
+                                                        MessagingRepository.sendMessage(
+                                                            currentUser = currentUser,
+                                                            friend = friend!!,
+                                                            messageText = "My current location",
+                                                            type = "location",
+                                                            metadata = mapOf(
+                                                                "lat" to location.latitude.toString(),
+                                                                "lng" to location.longitude.toString()
+                                                            ),
+                                                            onSuccess = { conversationExists = true },
+                                                            onError = { errorMessage = it }
+                                                        )
+                                                    }
+                                                }
+                                        } else {
+                                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                                        }
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Send Custom Pin") },
+                                    onClick = {
+                                        showAttachmentMenu = false
+                                        showPinPicker = true
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Share Event") },
+                                    onClick = {
+                                        showAttachmentMenu = false
+                                        showEventPicker = true
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Event, contentDescription = null) }
+                                )
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = messageText,
+                            onValueChange = { messageText = it },
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text("Type a message") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(24.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        IconButton(
+                            onClick = {
+                                val targetFriend = friend ?: return@IconButton
+                                isSending = true
+
+                                MessagingRepository.sendMessage(
+                                    currentUser = currentUser,
+                                    friend = targetFriend,
+                                    messageText = messageText,
+                                    onSuccess = {
+                                        messageText = ""
+                                        isSending = false
+                                        conversationExists = true
+                                        errorMessage = null
+                                    },
+                                    onError = {
+                                        errorMessage = it
+                                        isSending = false
+                                    }
+                                )
+                            },
+                            enabled = messageText.isNotBlank() && !isSending && friend != null
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
+                        }
                     }
                 }
             } else {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White)
+                        .background(MaterialTheme.colorScheme.background)
                         .padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         "You must be friends to send messages.",
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
-        }
+        },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { innerPadding ->
         Column(
             modifier = Modifier
-                .padding(innerPadding)
+                .padding(bottom = innerPadding.calculateBottomPadding())
                 .fillMaxSize()
-                .background(AppBackground)
-                .padding(16.dp)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             val currentFriend = friend
             val displayName = nickname ?: currentFriend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Chat"
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            // Header Section
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp) // Equal top/bottom padding
             ) {
-                UserAvatar(photoUrl = currentFriend?.photoUrl ?: "")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    UserAvatar(photoUrl = currentFriend?.photoUrl ?: "")
 
-                Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    if (!nickname.isNullOrBlank() && currentFriend != null) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "(${SocialRepository.displayNameOrEmail(currentFriend)})",
-                            color = Color.Gray,
-                            style = MaterialTheme.typography.bodySmall,
+                            text = displayName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onBackground
                         )
-                    } else if (currentFriend != null && currentFriend.email.isNotBlank()) {
+
+                        if (!nickname.isNullOrBlank() && currentFriend != null) {
+                            Text(
+                                text = "(${SocialRepository.displayNameOrEmail(currentFriend)})",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        } else if (currentFriend != null && currentFriend.email.isNotBlank()) {
+                            Text(
+                                text = currentFriend.email,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            navController.navigate("${Routes.PROFILE}/$friendUserId")
+                        },
+                        modifier = Modifier
+                            .height(36.dp)
+                            .padding(start = 8.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                    ) {
                         Text(
-                            text = currentFriend.email,
-                            color = Color.Gray,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            text = "View Profile",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
+            }
 
-                Button(
-                    onClick = {
-                        navController.navigate("${Routes.PROFILE}/$friendUserId")
-                    },
-                    modifier = Modifier
-                        .height(36.dp)
-                        .padding(start = 8.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFEF3347),
-                        contentColor = Color.White
-                    ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                ) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // Messages Section
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 8.dp)
+            ) {
+                if (errorMessage != null && conversationExists) {
                     Text(
-                        text = "View Profile",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                        text = errorMessage!!,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(vertical = 8.dp)
                     )
                 }
-            }
 
-            if (errorMessage != null && conversationExists) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = errorMessage!!,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (messages.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("No messages yet. Say hello!", color = Color.Gray)
-                }
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(messages, key = { it.id }) { message ->
-                        MessageBubble(
-                            message = message,
-                            isMine = message.senderId == currentUser.uid,
-                            navController = navController,
-                            ownedPins = userPins,
-                            onPinSaved = {
-                                // already handled by listener
-                            }
-                        )
+                if (messages.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No messages yet. Say hello!", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(top = 8.dp)
+                    ) {
+                        items(messages, key = { it.id }) { message ->
+                            MessageBubble(
+                                message = message,
+                                isMine = message.senderId == currentUser.uid,
+                                navController = navController,
+                                ownedPins = emptyList(),
+                                onPinSaved = {
+                                    // already handled by listener
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -707,7 +739,8 @@ private fun FriendPickerCard(
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground
         )
     }
 }
@@ -730,22 +763,22 @@ private fun <T> ItemPickerDialog(
         Card(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color(0xFFEF3347))
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     placeholder = { Text("Search...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFFEF3347),
-                        unfocusedBorderColor = Color.LightGray
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
                     ),
                     singleLine = true
                 )
@@ -754,7 +787,7 @@ private fun <T> ItemPickerDialog(
 
                 if (filteredItems.isEmpty()) {
                     Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
-                        Text("No items found.", textAlign = TextAlign.Center, color = Color.Gray)
+                        Text("No items found.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else {
                     LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
@@ -764,15 +797,16 @@ private fun <T> ItemPickerDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable { onItemSelected(item) }
-                                    .padding(vertical = 12.dp, horizontal = 8.dp)
+                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                color = MaterialTheme.colorScheme.onSurface
                             )
-                            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         }
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-                    Text("Cancel", color = Color.Gray)
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -800,8 +834,9 @@ private fun ConversationCard(
             .fillMaxWidth()
             .padding(horizontal = 0.dp, vertical = 4.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
@@ -827,14 +862,15 @@ private fun ConversationCard(
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
                 if (friendEmail.isNotBlank()) {
                     Text(
                         text = friendEmail,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -846,7 +882,7 @@ private fun ConversationCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = preview,
-                        color = Color.DarkGray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -856,7 +892,7 @@ private fun ConversationCard(
                     if (timestamp > 0L) {
                         Text(
                             text = " • ${formatShortTimeAgo(timestamp)}",
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(start = 4.dp)
                         )
@@ -867,7 +903,7 @@ private fun ConversationCard(
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = Color.LightGray,
+                tint = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -904,7 +940,12 @@ private fun MessageBubble(
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isMine) Alignment.End else Alignment.Start) {
         Card(
             shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = if (isMine) Color(0xFFEF3347) else Color.White)
+            colors = CardDefaults.cardColors(
+                containerColor = if (isMine) MaterialTheme.colorScheme.primary 
+                                else MaterialTheme.colorScheme.surfaceVariant
+            ),
+            border = null,
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 when (message.type) {
@@ -913,12 +954,12 @@ private fun MessageBubble(
                             Icon(
                                 if (message.type == "pin") Icons.Default.PushPin else Icons.Default.LocationOn,
                                 contentDescription = null,
-                                tint = if (isMine) Color.White else Color(0xFFEF3347)
+                                tint = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = message.text,
-                                color = if (isMine) Color.White else Color.Black,
+                                color = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -954,8 +995,8 @@ private fun MessageBubble(
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isMine) Color.White.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.5f),
-                                contentColor = if (isMine) Color.White else Color.Black
+                                containerColor = if (isMine) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                             ),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                             modifier = Modifier.height(32.dp)
@@ -971,18 +1012,18 @@ private fun MessageBubble(
                             Icon(
                                 Icons.Default.Event,
                                 contentDescription = null,
-                                tint = if (isMine) Color.White else Color(0xFFEF3347)
+                                tint = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "Event Invitation",
-                                color = if (isMine) Color.White else Color.Black,
+                                color = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Text(
                             text = message.metadata["eventTitle"] ?: "Unknown Event",
-                            color = if (isMine) Color.White else Color.Black,
+                            color = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -1007,11 +1048,11 @@ private fun MessageBubble(
                                             SocialRepository.declineEventInvite(it, { invite = null }, {})
                                         }
                                     },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                                     modifier = Modifier.height(32.dp),
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                                 ) {
-                                    Text("Decline", fontSize = 12.sp, color = Color.Black)
+                                    Text("Decline", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         } else if (!isMine && invite?.status == "accepted") {
@@ -1022,8 +1063,8 @@ private fun MessageBubble(
                         Button(
                             onClick = { navController.navigate(Routes.CALENDAR) },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isMine) Color.White.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.5f),
-                                contentColor = if (isMine) Color.White else Color.Black
+                                containerColor = if (isMine) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                             ),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                             modifier = Modifier.height(32.dp)
@@ -1032,16 +1073,17 @@ private fun MessageBubble(
                         }
                     }
                     else -> {
-                        Text(text = message.text, color = if (isMine) Color.White else Color.Black)
+                        Text(text = message.text, color = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }
         }
-        Text(text = timeString, fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(top = 2.dp, start = 4.dp, end = 4.dp))
+        Text(text = timeString, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp, start = 4.dp, end = 4.dp))
     }
 }
 
-private fun formatShortTimeAgo(timestamp: Long): String {if (timestamp <= 0L) return ""
+private fun formatShortTimeAgo(timestamp: Long): String {
+    if (timestamp <= 0L) return ""
     val diff = System.currentTimeMillis() - timestamp
     val seconds = diff / 1000
     val minutes = seconds / 60
@@ -1062,25 +1104,18 @@ private fun formatShortTimeAgo(timestamp: Long): String {if (timestamp <= 0L) re
 
 @Composable
 private fun EmptyCard(text: String) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Mail, contentDescription = null, tint = Color.Gray)
+            Icon(Icons.Default.Mail, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.width(8.dp))
-            Text(text = text, color = Color.Gray)
+            Text(text = text, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
 private fun SignedOutMessagingMessage() {
-    Box(modifier = Modifier.fillMaxSize().background(AppBackground), contentAlignment = Alignment.Center) {
-        Text("Please sign in to view your messages.")
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+        Text("Please sign in to view your messages.", color = MaterialTheme.colorScheme.onBackground)
     }
-}
-
-fun Color.toArgb(): Int {
-    return (this.alpha * 255.0f + 0.5f).toInt() shl 24 or
-            ((this.red * 255.0f + 0.5f).toInt() shl 16) or
-            ((this.green * 255.0f + 0.5f).toInt() shl 8) or
-            (this.blue * 255.0f + 0.5f).toInt()
 }
