@@ -62,7 +62,8 @@ private fun rememberAuthUser(): FirebaseUser? {
     return currentUser
 }
 
-// GROUP MESSAGING CHANGE: one display-name helper used by list, header, and message bubbles.
+// GROUP MESSAGING CHANGE
+// one display name helper used by list, header, and message bubbles
 private fun displayUserName(
     userId: String,
     currentUser: FirebaseUser?,
@@ -82,7 +83,8 @@ private fun displayUserName(
         ?: "Member"
 }
 
-// GROUP MESSAGING CHANGE: if no custom group name exists, show all participant names/nicknames.
+// GROUP MESSAGING
+// if no custom group name exists, show all participant names/nicknames.
 private fun conversationTitle(
     conversation: ConversationSummary,
     currentUser: FirebaseUser?,
@@ -133,8 +135,9 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
             },
             onCreate = { selectedFriendIds, groupName ->
                 isCreatingGroup = true
-                // GROUP MESSAGING CHANGE: create the group conversation before navigating
-                // so the shared group name can sync immediately.
+                // GROUP MESSAGING
+                // create the group conversation before navigating
+                // so shared group name can sync immediately
                 MessagingRepository.createGroupConversation(
                     currentUser = signedInUser,
                     selectedFriendIds = selectedFriendIds,
@@ -200,7 +203,7 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
     val friendsById = remember(friends) { friends.associateBy { it.uid } }
     val currentUserId = currentUser?.uid.orEmpty()
 
-    // GROUP MESSAGING CHANGE:
+    // GROUP MESSAGING
     // Direct chats require the other user to be your friend.
     // Group chats are shown if you are in the group and at least one other group member is your friend.
     val activeConversations = remember(rawConversations, friendsById, currentUserId) {
@@ -260,7 +263,7 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                 Text("Manage Friends")
             }
 
-            // GROUP MESSAGING CHANGE: users need at least two friends plus themselves to make a group.
+            // GROUP MESSAGING CHANGE: users need at least two friends plus themselves to make a group
             OutlinedButton(
                 onClick = { showCreateGroupDialog = true },
                 enabled = friends.size >= 2,
@@ -358,7 +361,7 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                                 ?: "Friend"
                         }
 
-                        // GROUP MESSAGING CHANGE: group subtitle shows members; direct subtitle shows email.
+                        // GROUP MESSAGING CHANGE: group subtitle shows members direct subtitle shows email
                         val subtitle = if (conversation.isGroup) {
                             conversationSubtitle(
                                 conversation = conversation,
@@ -442,20 +445,23 @@ fun MessageThreadScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // GROUP MESSAGING CHANGE: true when this screen was opened for a group chat.
+    // GROUP MESSAGING CHANGE true when this screen was opened for a group chat.
     val isGroupThread = friendUserId == Routes.GROUP_THREAD_USER_ID
 
-    // GROUP MESSAGING CHANGE: live conversation document, used for group name, members, and sending.
+    // GROUP MESSAGING
+    // live conversation document, used for group name, members, and sending.
     var conversation by remember { mutableStateOf<ConversationSummary?>(null) }
 
-    // GROUP MESSAGING CHANGE: profiles/nicknames for group member display.
+    // GROUP MESSAGING CHANGE:
+    // profiles/nicknames for group member display.
     var memberProfilesById by remember { mutableStateOf<Map<String, UserProfile>>(emptyMap()) }
     var nicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
     // GROUP MESSAGING CHANGE: used to allow group sending if current user is friends with at least one group member.
     var friendStatuses by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
-    // GROUP MESSAGING CHANGE: rename dialog for group chats.
+    // GROUP MESSAGING CHANGE:
+    // rename dialog for group chats.
     var showEditGroupNameDialog by remember { mutableStateOf(false) }
 
     var friend by remember { mutableStateOf<UserProfile?>(null) }

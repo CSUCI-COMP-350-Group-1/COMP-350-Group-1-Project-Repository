@@ -45,7 +45,8 @@ object MessagingRepository {
         return conversation.participantIds.firstOrNull { it != currentUserId }
     }
 
-    // GROUP MESSAGING CHANGE: supports conversation list/header display for group chats.
+    // GROUP MESSAGING CHANGE:
+    // supports conversation list/header display for group chats.
     fun findOtherParticipantIds(
         conversation: ConversationSummary,
         currentUserId: String
@@ -208,7 +209,8 @@ object MessagingRepository {
             .addOnFailureListener { e -> onError(e.message ?: "Could not delete message.") }
     }
 
-    // GROUP MESSAGING CHANGE: creates the group conversation immediately, even before the
+    // GROUP MESSAGING CHANGE:
+    // creates the group conversation immediately, even before the
     // first message, so users can rename the group right away.
     fun createGroupConversation(
         currentUser: FirebaseUser,
@@ -249,7 +251,7 @@ object MessagingRepository {
             }
     }
 
-    // GROUP MESSAGING CHANGE: group name is stored on the conversation, so all participants
+    // GROUP MESSAGING CHANGE group name is stored on the conversation, so all participants
     // see updates through their conversation listener.
     fun updateGroupName(
         conversationId: String,
@@ -368,7 +370,7 @@ object MessagingRepository {
                 ?: currentUser.email
                 ?: "Someone"
 
-            // GROUP MESSAGING CHANGE: direct messages notify one recipient; groups notify everyone else.
+            // GROUP MESSAGING CHANGE:direct messages notify one recipient; groups notify everyone else.
             recipientIds.forEach { targetUserId ->
                 MessageNotificationSender.sendDirectMessageNotification(
                     targetUserId = targetUserId,
