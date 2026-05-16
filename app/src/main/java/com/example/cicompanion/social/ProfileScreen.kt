@@ -414,10 +414,16 @@ fun MutualFriendsSection(mutualFriends: List<UserProfile>) {
         val remainingCount = mutualFriends.size - friendNames.size
 
         val text = when {
-            mutualFriends.size == 1 -> "Mutual friend with ${friendNames[0]}"
-            mutualFriends.size == 2 -> "Mutual friends with ${friendNames[0]} and ${friendNames[1]}"
-            else -> "Mutual friends with ${friendNames[0]}, ${friendNames[1]} and $remainingCount others"
+            mutualFriends.size == 1 -> "Friends with ${friendNames[0]}"
+            mutualFriends.size == 2 -> "Friends with ${friendNames[0]} and ${friendNames[1]}"
+            else -> "Friends with ${friendNames[0]}, ${friendNames[1]} and $remainingCount others"
         }
+
+//        val text = when {
+//            mutualFriends.size == 1 -> "Mutual friend with ${friendNames[0]}"
+//            mutualFriends.size == 2 -> "Mutual friends with ${friendNames[0]} and ${friendNames[1]}"
+//            else -> "Mutual friends with ${friendNames[0]}, ${friendNames[1]} and $remainingCount others"
+//        }
 
         Text(
             text = text,

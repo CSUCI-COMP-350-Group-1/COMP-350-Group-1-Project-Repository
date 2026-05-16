@@ -50,7 +50,8 @@ fun WeatherWidget(
 
                 Column {
                     Text(
-                        text = "${weather.current.tempF.toInt()}°F in ${weather.location.name}",
+                        // text = "${weather.current.tempF.toInt()}°F in ${weather.location.name}",
+                        text = "${weather.current.tempF.toInt()}°C on Campus",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
