@@ -17,12 +17,19 @@ object Routes {
 
     // MESSAGING: new thread route
     const val MESSAGE_THREAD_BASE = "message_thread"
+
+    const val GROUP_THREAD_USER_ID = "group"
     const val MESSAGE_THREAD = "$MESSAGE_THREAD_BASE/{conversationId}/{friendUserId}?initialMessage={initialMessage}"
 
     // MESSAGING: helper to build a concrete route
     fun messageThread(conversationId: String, friendUserId: String, initialMessage: String? = null): String {
         val base = "$MESSAGE_THREAD_BASE/$conversationId/$friendUserId"
         return if (initialMessage != null) "$base?initialMessage=$initialMessage" else base
+    }
+
+    // GROUP MESSAGING: helper for group routes.
+    fun groupMessageThread(conversationId: String, initialMessage: String? = null): String {
+        return messageThread(conversationId, GROUP_THREAD_USER_ID, initialMessage)
     }
 
     // MAP: helper to build map route with location
