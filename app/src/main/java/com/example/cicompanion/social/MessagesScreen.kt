@@ -263,11 +263,19 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                 Text("Manage Friends")
             }
 
-            // GROUP MESSAGING CHANGE: users need at least two friends plus themselves to make a group
-            OutlinedButton(
+
+            Button(
                 onClick = { showCreateGroupDialog = true },
                 enabled = friends.size >= 2,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFEF3347),
+                    contentColor = Color.White,
+                    disabledContainerColor = Color(0xFFEF3347).copy(alpha = 0.35f),
+                    disabledContentColor = Color.White.copy(alpha = 0.75f)
+                )
             ) {
                 Icon(Icons.Default.Group, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
@@ -346,8 +354,9 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
 
                         val friend = friendsById[friendUserId]
 
-                        // GROUP MESSAGING CHANGE: group conversations display their shared name,
-                        // or fall back to all participant names/nicknames.
+                        // GROUP MESSAGING
+                        // group conversations display their shared name,
+                        // or back to all participant names/nicknames.
                         val title = if (conversation.isGroup) {
                             conversationTitle(
                                 conversation = conversation,
@@ -361,7 +370,8 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                                 ?: "Friend"
                         }
 
-                        // GROUP MESSAGING CHANGE: group subtitle shows members direct subtitle shows email
+                        // GROUP MESSAGING
+                        // group subtitle shows members direct subtitle shows email
                         val subtitle = if (conversation.isGroup) {
                             conversationSubtitle(
                                 conversation = conversation,
@@ -445,22 +455,24 @@ fun MessageThreadScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // GROUP MESSAGING CHANGE true when this screen was opened for a group chat.
+    // GROUP MESSAGING
+    // true when this screen was opened for a group chat
     val isGroupThread = friendUserId == Routes.GROUP_THREAD_USER_ID
 
     // GROUP MESSAGING
     // live conversation document, used for group name, members, and sending.
     var conversation by remember { mutableStateOf<ConversationSummary?>(null) }
 
-    // GROUP MESSAGING CHANGE:
+    // GROUP MESSAGING
     // profiles/nicknames for group member display.
     var memberProfilesById by remember { mutableStateOf<Map<String, UserProfile>>(emptyMap()) }
     var nicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
-    // GROUP MESSAGING CHANGE: used to allow group sending if current user is friends with at least one group member.
+    // GROUP MESSAGING:
+    // used to allow group sending if current user is friends with at least one group member.
     var friendStatuses by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
-    // GROUP MESSAGING CHANGE:
+    // GROUP MESSAGING C
     // rename dialog for group chats.
     var showEditGroupNameDialog by remember { mutableStateOf(false) }
 
@@ -524,7 +536,7 @@ fun MessageThreadScreen(
 
     val currentConversation = conversation
 
-// GROUP MESSAGING CHANGE:
+// GROUP MESSAGING
 // A group member can send if:
 // 1. they are actually in the group, and
 // 2. they are friends with at least one other member of the group.
@@ -541,10 +553,7 @@ fun MessageThreadScreen(
         isFriend
     }
 
-    // GROUP MESSAGING CHANGE:
-// One send helper for direct and group chats.
-// Direct chats keep the original 1-on-1 behavior.
-// Group chats use the shared conversation document.
+    // GROUP MESSAGING CHANG:
     fun sendThreadMessage(
         text: String,
         type: String = "text",
@@ -605,7 +614,7 @@ fun MessageThreadScreen(
     }
 
     // GROUP MESSAGING CHANGE:
-// Load group member profiles so the group title can fall back to names/nicknames.
+    // Load group member profiles so group title can fall back to names/nicknames.
     LaunchedEffect(currentUser.uid, currentConversation?.participantIds, isGroupThread) {
         if (!isGroupThread) {
             memberProfilesById = emptyMap()
@@ -636,7 +645,7 @@ fun MessageThreadScreen(
 
                 // GROUP MESSAGING CHANGE:
                 // Direct chats still require friendship with the other user.
-                // Group chats are handled by canSendMessages below.
+                // Group chats are handled by canSendMessages
                 if (!isGroupThread) {
                     isFriend = statuses[friendUserId] == "accepted"
                 }
@@ -662,7 +671,7 @@ fun MessageThreadScreen(
 
         if (isGroupThread) {
             // GROUP MESSAGING CHANGE:
-            // Do not try to fetch a user profile for the fake route id "group".
+            // Do not try to fetch user profile for the fake route id "group".
             friend = null
             nickname = null
             isFriend = true
@@ -679,8 +688,8 @@ fun MessageThreadScreen(
     }
 
     // GROUP MESSAGING CHANGE:
-// Group chats need a live conversation listener so group-name changes sync.
-// Direct chats keep the old existence-check flow so new 1-on-1 chats do not crash or act like group chats.
+    // Group chats need a live conversation listener so group-name changes sync
+    // Direct chats keep the old existence-check flow so new 1-on-1 chats do not crash or act like group chats.
     DisposableEffect(conversationId, isGroupThread) {
         if (!isGroupThread) {
             onDispose { }
@@ -751,8 +760,8 @@ fun MessageThreadScreen(
     }
 
     // GROUP MESSAGING CHANGE:
-// EventInvite documents are still one-recipient-per-document.
-// For group chats, create one invite per group member, then send one group chat message.
+    // EventInvite documents are still one recipient perdocument.
+    // For group chats, create one invite per group member, then send one group chat message.
     fun sendEventInviteToThread(
         event: CalendarEvent,
         onSuccess: () -> Unit = {}
@@ -831,7 +840,8 @@ fun MessageThreadScreen(
             items = userPins,
             itemName = { it.name },
             onItemSelected = { pin ->
-                // GROUP MESSAGING CHANGE: custom pins now work in direct and group chats.
+                // GROUP MESSAGING CHANGE:
+                // custom pins now work in direct and group chats.
                 sendThreadMessage(
                     text = "Pin: ${pin.name}",
                     type = "pin",
@@ -857,10 +867,10 @@ fun MessageThreadScreen(
             items = userEvents.filter { it.ownerId == currentUser.uid },
             itemName = { it.title },
             onItemSelected = { event ->
-                // GROUP MESSAGING CHANGE:
-                // Works for both direct and group chats.
-                // Direct chat sends one invite.
-                // Group chat sends one invite per group member, then one group message.
+                // GROUP MESSAGING CHANG
+                // Works for both direct and group chats
+                // Direct chat sends one invite
+                // Group chat sends one invite per group member, then one group message
                 sendEventInviteToThread(
                     event = event,
                     onSuccess = {
@@ -877,7 +887,7 @@ fun MessageThreadScreen(
 
     // GROUP MESSAGING CHANGE:
     // Any member can rename the group. The name is stored on the conversation document,
-    // so every group member sees the new name live.
+    // so every group member sees the new name live
     if (showEditGroupNameDialog && isGroupThread && currentConversation != null) {
         EditGroupNameDialog(
             initialName = currentConversation.groupName,
@@ -924,7 +934,8 @@ fun MessageThreadScreen(
                                         fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
                                             .addOnSuccessListener { location ->
                                                 if (location != null) {
-                                                    // GROUP MESSAGING CHANGE: location sharing now works in direct and group chats.
+                                                    // GROUP MESSAGING CHANGE:
+                                                    // location sharing now works in direct and group chats
                                                     sendThreadMessage(
                                                         text = "My current location",
                                                         type = "location",
@@ -1087,7 +1098,7 @@ fun MessageThreadScreen(
                 }
 
                 if (isGroupThread) {
-                    // GROUP MESSAGING CHANGE: group members can rename the shared group chat.
+                    // GROUP MESSAGING group members can rename the shared group chat
                     Button(
                         onClick = { showEditGroupNameDialog = true },
                         modifier = Modifier
@@ -1289,7 +1300,7 @@ private fun CreateGroupChatDialog(
         title = { Text("New Group Chat") },
         text = {
             Column {
-                // GROUP MESSAGING CHANGE: optional name; blank falls back to participant names.
+                // GROUP MESSAGING optional name, blank falls back to participant names.
                 OutlinedTextField(
                     value = groupName,
                     onValueChange = { groupName = it.take(80) },
@@ -1388,7 +1399,8 @@ private fun EditGroupNameDialog(
         title = { Text("Group Chat Name") },
         text = {
             Column {
-                // GROUP MESSAGING CHANGE: saving blank clears the custom name and restores
+                // GROUP MESSAGING
+                // saving blank clears the custom name and restores
                 // the automatic participant names/nicknames fallback.
                 OutlinedTextField(
                     value = groupName,
@@ -1559,7 +1571,8 @@ private fun MessageBubble(
     }
 
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isMine) Alignment.End else Alignment.Start) {
-        // GROUP MESSAGING CHANGE: show sender name above incoming group messages.
+        // GROUP MESSAGING:
+        // show sender name above incoming group messages.
         if (!isMine && !senderName.isNullOrBlank()) {
             Text(
                 text = senderName,
