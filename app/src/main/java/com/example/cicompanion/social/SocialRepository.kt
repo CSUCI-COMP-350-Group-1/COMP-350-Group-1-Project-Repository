@@ -16,6 +16,8 @@ import java.time.ZonedDateTime
 
 object SocialRepository {
 
+    private val profileCache = mutableMapOf<String, UserProfile>()
+
     // MESSAGING: reusable helper for accepted friends only
     fun fetchAcceptedFriends(
         currentUserId: String,
@@ -27,6 +29,9 @@ object SocialRepository {
                 val allUsers = snapshot.documents
                     .mapNotNull { it.toObject(UserProfile::class.java) }
                     .filter { it.uid.isNotBlank() && it.uid != currentUserId }
+
+                // Cache these profiles
+                allUsers.forEach { profileCache[it.uid] = it }
 
                 fetchAllFriendRequestStatuses(
                     currentUserId = currentUserId,
@@ -69,6 +74,8 @@ object SocialRepository {
                     .mapNotNull { it.toObject(UserProfile::class.java) }
                     .filter { it.uid.isNotBlank() && it.uid != currentUserId }
 
+                users.forEach { profileCache[it.uid] = it }
+
                 val nextDoc = snapshot.documents.lastOrNull()
                 onSuccess(users, nextDoc)
             }
@@ -89,10 +96,17 @@ object SocialRepository {
             onError("Invalid user ID.")
             return
         }
+
+        profileCache[userId]?.let {
+            onSuccess(it)
+            return
+        }
+
         usersCollection().document(userId).get()
             .addOnSuccessListener { document ->
                 val user = document.toObject(UserProfile::class.java)
                 if (user != null) {
+                    profileCache[userId] = user
                     onSuccess(user)
                 } else {
                     onError("User profile not found.")
@@ -103,6 +117,57 @@ object SocialRepository {
             }
     }
 
+    fun fetchUserProfiles(
+        userIds: List<String>,
+        onSuccess: (List<UserProfile>) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        if (userIds.isEmpty()) {
+            onSuccess(emptyList())
+            return
+        }
+
+        val results = mutableMapOf<String, UserProfile>()
+        val toFetch = mutableListOf<String>()
+
+        userIds.forEach { uid ->
+            profileCache[uid]?.let { results[uid] = it } ?: toFetch.add(uid)
+        }
+
+        if (toFetch.isEmpty()) {
+            onSuccess(userIds.mapNotNull { results[it] })
+            return
+        }
+
+        val chunks = toFetch.chunked(10)
+        var chunksRemaining = chunks.size
+
+        chunks.forEach { chunk ->
+            usersCollection()
+                .whereIn("uid", chunk)
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    snapshot.documents.forEach { doc ->
+                        doc.toObject(UserProfile::class.java)?.let {
+                            profileCache[it.uid] = it
+                            results[it.uid] = it
+                        }
+                    }
+                    chunksRemaining--
+                    if (chunksRemaining == 0) {
+                        onSuccess(userIds.mapNotNull { results[it] })
+                    }
+                }
+                .addOnFailureListener {
+                    chunksRemaining--
+                    if (chunksRemaining == 0) {
+                        if (results.isNotEmpty()) onSuccess(userIds.mapNotNull { results[it] })
+                        else onError(it.message ?: "Error fetching profiles")
+                    }
+                }
+        }
+    }
+
     fun updateDisplayName(
         userId: String,
         newDisplayName: String,
@@ -111,7 +176,10 @@ object SocialRepository {
     ) {
         usersCollection().document(userId)
             .update("displayName", newDisplayName)
-            .addOnSuccessListener { onSuccess() }
+            .addOnSuccessListener { 
+                profileCache.remove(userId)
+                onSuccess() 
+            }
             .addOnFailureListener { e -> onError(e.message ?: "Failed to update display name") }
     }
 
@@ -123,7 +191,10 @@ object SocialRepository {
     ) {
         usersCollection().document(userId)
             .update("bio", newBio)
-            .addOnSuccessListener { onSuccess() }
+            .addOnSuccessListener { 
+                profileCache.remove(userId)
+                onSuccess() 
+            }
             .addOnFailureListener { e -> onError(e.message ?: "Failed to update bio") }
     }
 
@@ -135,7 +206,10 @@ object SocialRepository {
     ) {
         usersCollection().document(userId)
             .update("major", newMajor)
-            .addOnSuccessListener { onSuccess() }
+            .addOnSuccessListener { 
+                profileCache.remove(userId)
+                onSuccess() 
+            }
             .addOnFailureListener { e -> onError(e.message ?: "Failed to update major") }
     }
 
@@ -147,31 +221,11 @@ object SocialRepository {
     ) {
         usersCollection().document(userId)
             .update("note", note)
-            .addOnSuccessListener { onSuccess() }
+            .addOnSuccessListener { 
+                profileCache.remove(userId)
+                onSuccess() 
+            }
             .addOnFailureListener { e -> onError(e.message ?: "Failed to update status") }
-    }
-
-    private fun handleSearchableUsersSuccess(
-        snapshot: QuerySnapshot,
-        currentUserId: String,
-        onSuccess: (List<UserProfile>) -> Unit
-    ) {
-        val users = mapSearchableUsers(snapshot, currentUserId)
-        onSuccess(users)
-    }
-
-    private fun mapSearchableUsers(
-        snapshot: QuerySnapshot,
-        currentUserId: String
-    ): List<UserProfile> {
-        return snapshot.documents
-            .mapNotNull { it.toObject(UserProfile::class.java) }
-            .filter { it.uid.isNotBlank() && it.uid != currentUserId }
-            .sortedBy { displayNameOrEmail(it).lowercase() }
-    }
-
-    private fun searchableUsersErrorMessage(exception: Exception): String {
-        return exception.message ?: "Could not load users."
     }
 
     fun sendFriendRequest(
@@ -354,7 +408,7 @@ object SocialRepository {
                 if (outgoingDoc != null) {
                     outgoingDoc.reference.delete()
                         .addOnSuccessListener { onSuccess() }
-                        .addOnFailureListener { onError("Permission Denied: Only the receiver can remove this friend. Please check your Firestore Security Rules.") }
+                        .addOnFailureListener { onError("Permission Denied.") }
                 } else {
                     // 2. Check requests sent TO me
                     collection.whereEqualTo("toUserId", currentUserId).get()
@@ -364,7 +418,7 @@ object SocialRepository {
                             if (incomingDoc != null) {
                                 incomingDoc.reference.delete()
                                     .addOnSuccessListener { onSuccess() }
-                                    .addOnFailureListener { onError("Permission Denied: Could not delete incoming friendship. Check Firestore Rules.") }
+                                    .addOnFailureListener { onError("Permission Denied.") }
                             } else {
                                 onError("No friendship found to remove.")
                             }
@@ -418,7 +472,6 @@ object SocialRepository {
                             val request = doc.toObject(FriendRequest::class.java)
                             if (request != null && request.fromUserId.isNotBlank()) {
                                 val existingStatus = allStatuses[request.fromUserId]
-                                // Accepted status takes priority
                                 if (existingStatus != "accepted") {
                                     allStatuses[request.fromUserId] = if (request.status == "pending") "pending_received" else request.status
                                 }
@@ -456,7 +509,6 @@ object SocialRepository {
         currentUserId: String
     ): Int {
         val friendIds = mutableSetOf<String>()
-
         snapshot.documents
             .mapNotNull { it.toObject(FriendRequest::class.java) }
             .forEach { request ->
@@ -465,7 +517,6 @@ object SocialRepository {
                     request.toUserId -> friendIds.add(request.fromUserId)
                 }
             }
-
         return friendIds.size
     }
 
@@ -493,7 +544,6 @@ object SocialRepository {
         onError: (String) -> Unit
     ) {
         val friendIds = mutableSetOf<String>()
-
         friendRequestsCollection()
             .whereEqualTo("status", "accepted")
             .get()
@@ -509,39 +559,10 @@ object SocialRepository {
             .addOnFailureListener { onError(it.message ?: "Error fetching friends") }
     }
 
-    private fun fetchUserProfiles(
-        userIds: List<String>,
-        onSuccess: (List<UserProfile>) -> Unit,
-        onError: (String) -> Unit
-    ) {
-        if (userIds.isEmpty()) {
-            onSuccess(emptyList())
-            return
-        }
-
-        // Firestore 'in' query supports up to 10 elements. If more, we'd need to chunk.
-        // For mutual friends preview, 10 is usually enough or we can chunk.
-        val chunks = userIds.chunked(10)
-        val allProfiles = mutableListOf<UserProfile>()
-        var chunksLoaded = 0
-
-        chunks.forEach { chunk ->
-            usersCollection()
-                .whereIn("uid", chunk)
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    allProfiles.addAll(snapshot.documents.mapNotNull { it.toObject(UserProfile::class.java) })
-                    chunksLoaded++
-                    if (chunksLoaded == chunks.size) {
-                        onSuccess(allProfiles)
-                    }
-                }
-                .addOnFailureListener { onError(it.message ?: "Error fetching profiles") }
-        }
+    fun displayNameOrEmail(user: UserProfile): String {
+        return user.displayName.ifBlank { user.email }
     }
 
-    fun displayNameOrEmail(user: UserProfile): String {
-        return user.displayName.ifBlank { user.email }}
     fun fetchNicknames(
         currentUserId: String,
         onSuccess: (Map<String, String>) -> Unit,
@@ -630,13 +651,7 @@ object SocialRepository {
             sentAt = System.currentTimeMillis()
         )
 
-        val db = FirebaseFirestore.getInstance()
-        val batch = db.batch()
-        
-        val inviteRef = eventInvitesCollection().document(inviteId)
-        batch.set(inviteRef, invite)
-
-        batch.commit()
+        eventInvitesCollection().document(inviteId).set(invite)
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { onError(it.message ?: "Could not send event invite.") }
     }
@@ -654,17 +669,10 @@ object SocialRepository {
                     onError(e.message ?: "Error listening to event invites.")
                     return@addSnapshotListener
                 }
-                if (snapshot == null) {
-                    onInvitesChanged(emptyList())
-                    return@addSnapshotListener
-                }
-                onInvitesChanged(snapshot.documents.mapNotNull { it.toObject(EventInvite::class.java) })
+                onInvitesChanged(snapshot?.documents?.mapNotNull { it.toObject(EventInvite::class.java) } ?: emptyList())
             }
     }
 
-    /**
-     * Real-time listener for accepted event invites of the current user.
-     */
     fun listenToAcceptedEventInvites(
         currentUserId: String,
         onInvitesChanged: (List<EventInvite>) -> Unit,
@@ -678,11 +686,23 @@ object SocialRepository {
                     onError(e.message ?: "Error listening to accepted invites.")
                     return@addSnapshotListener
                 }
-                if (snapshot == null) {
-                    onInvitesChanged(emptyList())
+                onInvitesChanged(snapshot?.documents?.mapNotNull { it.toObject(EventInvite::class.java) } ?: emptyList())
+            }
+    }
+
+    fun listenToEventInvitesForEvent(
+        eventId: String,
+        onInvitesChanged: (List<EventInvite>) -> Unit,
+        onError: (String) -> Unit
+    ): ListenerRegistration {
+        return eventInvitesCollection()
+            .whereEqualTo("eventId", eventId)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    onError(e.message ?: "Error listening to invites.")
                     return@addSnapshotListener
                 }
-                onInvitesChanged(snapshot.documents.mapNotNull { it.toObject(EventInvite::class.java) })
+                onInvitesChanged(snapshot?.documents?.mapNotNull { it.toObject(EventInvite::class.java) } ?: emptyList())
             }
     }
 
@@ -697,7 +717,6 @@ object SocialRepository {
         db.runTransaction { transaction ->
             transaction.update(inviteRef, "status", "accepted")
             
-            // Also save to receiver's custom events
             val eventData = hashMapOf(
                 "id" to invite.eventId,
                 "title" to invite.eventTitle,
@@ -730,30 +749,6 @@ object SocialRepository {
             .addOnFailureListener { e -> onError(e.message ?: "Could not decline invite.") }
     }
 
-    /**
-     * Real-time listener for event member IDs.
-     */
-    fun listenToEventMemberIds(
-        eventId: String,
-        onIdsChanged: (List<String>) -> Unit,
-        onError: (String) -> Unit
-    ): ListenerRegistration {
-        return eventInvitesCollection()
-            .whereEqualTo("eventId", eventId)
-            .whereEqualTo("status", "accepted")
-            .addSnapshotListener { snapshot, e ->
-                if (e != null) {
-                    onError(e.message ?: "Error listening to members.")
-                    return@addSnapshotListener
-                }
-                val ids = snapshot?.documents?.mapNotNull { it.getString("toUserId") } ?: emptyList()
-                onIdsChanged(ids)
-            }
-    }
-
-    /**
-     * Fetches all user IDs who have an invite (accepted or pending) for a specific event sent by the current user.
-     */
     fun fetchInvitedUserIds(
         eventId: String,
         onSuccess: (List<String>) -> Unit,
@@ -777,9 +772,25 @@ object SocialRepository {
             }
     }
 
-    /**
-     * Real-time listener for event members (Full Profiles)
-     */
+    fun listenToInvitedUserIds(
+        eventId: String,
+        onIdsChanged: (List<String>) -> Unit,
+        onError: (String) -> Unit
+    ): ListenerRegistration {
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+        return eventInvitesCollection()
+            .whereEqualTo("eventId", eventId)
+            .whereEqualTo("fromUserId", currentUserId ?: "")
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    onError(e.message ?: "Error listening to invited users.")
+                    return@addSnapshotListener
+                }
+                val ids = snapshot?.documents?.mapNotNull { it.getString("toUserId") } ?: emptyList()
+                onIdsChanged(ids)
+            }
+    }
+
     fun listenToEventMembers(
         eventId: String,
         onMembersChanged: (List<UserProfile>) -> Unit,
@@ -795,31 +806,15 @@ object SocialRepository {
                 }
                 
                 val memberIds = snapshot?.documents?.mapNotNull { it.getString("toUserId") } ?: emptyList()
-                
                 if (memberIds.isEmpty()) {
                     onMembersChanged(emptyList())
                     return@addSnapshotListener
                 }
 
-                val profiles = mutableListOf<UserProfile>()
-                var loadedCount = 0
-                memberIds.forEach { uid ->
-                    fetchUserProfile(uid, 
-                        onSuccess = { 
-                            profiles.add(it)
-                            if (++loadedCount == memberIds.size) onMembersChanged(profiles) 
-                        },
-                        onError = { 
-                            if (++loadedCount == memberIds.size) onMembersChanged(profiles) 
-                        }
-                    )
-                }
+                fetchUserProfiles(memberIds, onMembersChanged, onError)
             }
     }
 
-    /**
-     * Real-time listener for custom events
-     */
     fun listenToCustomEvents(
         userId: String,
         onEventsChanged: (List<CalendarEvent>) -> Unit,
@@ -832,12 +827,7 @@ object SocialRepository {
                     onError(e.message ?: "Error listening to custom events.")
                     return@addSnapshotListener
                 }
-                if (snapshot == null) {
-                    onEventsChanged(emptyList())
-                    return@addSnapshotListener
-                }
-                
-                val events = snapshot.documents.mapNotNull { doc ->
+                val events = snapshot?.documents?.mapNotNull { doc ->
                     val id = doc.getString("id") ?: ""
                     val title = doc.getString("title") ?: ""
                     val description = doc.getString("description")
@@ -867,40 +857,42 @@ object SocialRepository {
                         maxMembers = maxMembers,
                         isPinnedByLeader = isPinnedByLeader,
                         isBookmarked = isBookmarked,
-                        isShared = false // Logic in ViewModel determines visibility based on ownerId
+                        isShared = false
                     )
-                }
+                } ?: emptyList()
                 onEventsChanged(events)
             }
     }
 
-    /**
-     * Real-time listener for custom pins
-     */
     fun listenToCustomPins(
         userId: String,
         onPinsChanged: (List<CustomPin>) -> Unit,
         onError: (String) -> Unit
     ): ListenerRegistration {
-        return FirebaseFirestore.getInstance().collection("users").document(userId)
+        return usersCollection().document(userId)
             .collection("customPins")
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
                     onError(e.message ?: "Error listening to custom pins.")
                     return@addSnapshotListener
                 }
-                if (snapshot == null) {
-                    onPinsChanged(emptyList())
-                    return@addSnapshotListener
-                }
-                
-                val pins = snapshot.documents.mapNotNull { doc ->
-                    doc.toObject(CustomPin::class.java)
-                }
+                val pins = snapshot?.documents?.mapNotNull { doc ->
+                    CustomPin(
+                        id = doc.getString("id") ?: "",
+                        userId = doc.getString("userId") ?: "",
+                        name = doc.getString("name") ?: "",
+                        latitude = doc.getDouble("latitude") ?: 0.0,
+                        longitude = doc.getDouble("longitude") ?: 0.0,
+                        description = doc.getString("description") ?: "",
+                        colorArgb = doc.getLong("colorArgb")?.toInt() ?: 0,
+                        isFavorited = doc.getBoolean("isFavorited") ?: false,
+                        associatedEventId = doc.getString("associatedEventId")
+                    )
+                } ?: emptyList()
                 onPinsChanged(pins)
             }
     }
-    
+
     fun leaveEvent(
         userId: String,
         eventId: String,
@@ -932,8 +924,6 @@ object SocialRepository {
     ) {
         val inviteId = "${ownerId}_${targetUserId}_${eventId}"
         val inviteRef = eventInvitesCollection().document(inviteId)
-        
-        // Only delete the invite. We cannot delete documents in other users' collections.
         inviteRef.delete()
             .addOnSuccessListener { onSuccess() }
             .addOnFailureListener { onError(it.message ?: "Failed to kick user.") }
@@ -964,22 +954,15 @@ object SocialRepository {
         onError: (String) -> Unit
     ) {
         val db = FirebaseFirestore.getInstance()
-        
         eventInvitesCollection()
             .whereEqualTo("eventId", eventId)
-            .whereEqualTo("fromUserId", ownerId)
             .get()
             .addOnSuccessListener { snapshot ->
                 val batch = db.batch()
-                
-                // Delete owner's copy
                 val ownerEventRef = db.collection("users").document(ownerId)
                     .collection("customEvents").document(eventId)
                 batch.delete(ownerEventRef)
-                
-                // Delete all invites (makes the event disappear for members via VM filtering)
                 snapshot.documents.forEach { batch.delete(it.reference) }
-                
                 batch.commit()
                     .addOnSuccessListener { onSuccess() }
                     .addOnFailureListener { onError(it.message ?: "Failed to delete event globally.") }
@@ -987,15 +970,8 @@ object SocialRepository {
             .addOnFailureListener { onError(it.message ?: "Failed to find invites for deletion.") }
     }
 
-
     private fun usersCollection() = FirebaseFirestore.getInstance().collection("users")
-
-    private fun friendRequestsCollection() =
-        FirebaseFirestore.getInstance().collection("friend_requests")
-
-    private fun nicknamesCollection(currentUserId: String) =
-        usersCollection().document(currentUserId).collection("nicknames")
-
-    private fun eventInvitesCollection() =
-        FirebaseFirestore.getInstance().collection("event_invites")
+    private fun friendRequestsCollection() = FirebaseFirestore.getInstance().collection("friend_requests")
+    private fun nicknamesCollection(currentUserId: String) = usersCollection().document(currentUserId).collection("nicknames")
+    private fun eventInvitesCollection() = FirebaseFirestore.getInstance().collection("event_invites")
 }

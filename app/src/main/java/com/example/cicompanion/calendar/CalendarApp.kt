@@ -1,6 +1,7 @@
 package com.example.cicompanion.calendar
 
 import android.widget.Toast
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -146,8 +147,8 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                 onDelete = { eventToDelete = eventToShowDetails; eventToShowDetails = null },
                 onEdit = { eventToEdit = eventToShowDetails; eventToShowDetails = null },
                 onTogglePin = { viewModel.togglePinEvent(eventToShowDetails!!) },
-                onInvite = { eventToInvite = eventToShowDetails; eventToShowDetails = null },
-                onShowMembers = { eventMembersToShow = eventToShowDetails; eventToShowDetails = null },
+                onInvite = { eventToInvite = eventToShowDetails },
+                onShowMembers = { eventMembersToShow = eventToShowDetails },
                 notificationsEnabled = viewModel.isEventNotificationEnabled(eventToShowDetails!!),
                 onNotificationToggle = { enabled -> viewModel.setEventNotificationEnabled(eventToShowDetails!!, enabled) }
             )
@@ -250,7 +251,6 @@ fun CalendarApp(viewModel: CalendarViewModel) {
             currentUser?.let { user ->
                 SocialRepository.sendEventInvite(user, friend.uid, event, onSuccess = {
                     EventInviteNotificationSender.sendEventInviteNotification(friend.uid, user.displayName ?: user.email ?: "Someone", event.title, event.id)
-                    eventToInvite = null
                     Toast.makeText(context, "Invite sent!", Toast.LENGTH_SHORT).show()
                 }, onError = { })
             }
@@ -260,7 +260,6 @@ fun CalendarApp(viewModel: CalendarViewModel) {
     eventMembersToShow?.let { event ->
         EventMembersDialog(event = event, currentUserId = currentUser?.uid ?: "", onDismiss = { eventMembersToShow = null }, onKick = { targetUids ->
             viewModel.kickUsers(event.id, targetUids)
-            eventMembersToShow = null
         })
     }
 
@@ -413,7 +412,7 @@ private fun AddEventDialog(
     )
     if (showStartTimePicker) TimePickerDialog(startTime, { showStartTimePicker = false }, { startTime = it; showStartTimePicker = false })
     if (showEndTimePicker) TimePickerDialog(endTime, { showEndTimePicker = false }, { endTime = it; showEndTimePicker = false })
-    if (showFriendPicker) FriendPickerDialog(onDismiss = { showFriendPicker = false }, onInvite = { friend -> if (!invitedFriends.any { it.uid == friend.uid }) invitedFriends += friend; showFriendPicker = false })
+    if (showFriendPicker) FriendPickerDialog(onDismiss = { showFriendPicker = false }, onInvite = { friend -> if (!invitedFriends.any { it.uid == friend.uid }) invitedFriends += friend })
 }
 
 @Composable
