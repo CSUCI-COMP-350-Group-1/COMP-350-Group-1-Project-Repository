@@ -6,6 +6,7 @@ data class DirectMessage(
     val conversationId: String = "",
     val senderId: String = "",
     val receiverId: String = "",
+    val recipientIds: List<String> = emptyList(),
     val text: String = "",
     val sentAt: Long = 0L,
     val type: String = "text", // "text", "location", "pin", "event_invite"

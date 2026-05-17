@@ -62,6 +62,53 @@ private fun rememberAuthUser(): FirebaseUser? {
     return currentUser
 }
 
+// GROUP MESSAGING CHANGE
+// one display name helper used by list, header, and message bubbles
+private fun displayUserName(
+    userId: String,
+    currentUser: FirebaseUser?,
+    profilesById: Map<String, UserProfile>,
+    nicknames: Map<String, String>
+): String {
+    if (userId == currentUser?.uid) {
+        return currentUser.displayName
+            ?.takeIf { it.isNotBlank() }
+            ?: currentUser.email
+            ?: "You"
+    }
+
+    return nicknames[userId]
+        ?.takeIf { it.isNotBlank() }
+        ?: profilesById[userId]?.let { SocialRepository.displayNameOrEmail(it) }
+        ?: "Member"
+}
+
+// GROUP MESSAGING
+// if no custom group name exists, show all participant names/nicknames.
+private fun conversationTitle(
+    conversation: ConversationSummary,
+    currentUser: FirebaseUser?,
+    profilesById: Map<String, UserProfile>,
+    nicknames: Map<String, String>
+): String {
+    return conversation.groupName
+        .takeIf { it.isNotBlank() }
+        ?: conversation.participantIds.joinToString(", ") { userId ->
+            displayUserName(userId, currentUser, profilesById, nicknames)
+        }
+}
+
+private fun conversationSubtitle(
+    conversation: ConversationSummary,
+    currentUser: FirebaseUser?,
+    profilesById: Map<String, UserProfile>,
+    nicknames: Map<String, String>
+): String {
+    return conversation.participantIds.joinToString(", ") { userId ->
+        displayUserName(userId, currentUser, profilesById, nicknames)
+    }
+}
+
 @Composable
 fun MessagesScreen(navController: NavHostController, sharedLocation: String? = null) {
     val currentUser = rememberAuthUser()
@@ -71,6 +118,44 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
     var rawConversations by remember { mutableStateOf<List<ConversationSummary>>(emptyList()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoadingFriends by remember { mutableStateOf(currentUser != null) }
+    var showCreateGroupDialog by remember { mutableStateOf(false) }
+    var isCreatingGroup by remember { mutableStateOf(false) }
+
+
+
+
+    if (showCreateGroupDialog && currentUser != null) {
+        val signedInUser = currentUser
+        CreateGroupChatDialog(
+            friends = friends,
+            nicknames = nicknames,
+            isCreating = isCreatingGroup,
+            onDismiss = {
+                if (!isCreatingGroup) showCreateGroupDialog = false
+            },
+            onCreate = { selectedFriendIds, groupName ->
+                isCreatingGroup = true
+                // GROUP MESSAGING
+                // create the group conversation before navigating
+                // so shared group name can sync immediately
+                MessagingRepository.createGroupConversation(
+                    currentUser = signedInUser,
+                    selectedFriendIds = selectedFriendIds,
+                    groupName = groupName,
+                    onSuccess = { newConversationId ->
+                        isCreatingGroup = false
+                        showCreateGroupDialog = false
+                        navController.navigate(Routes.groupMessageThread(newConversationId))
+                    },
+                    onError = { error ->
+                        isCreatingGroup = false
+                        errorMessage = error
+                    }
+                )
+            }
+        )
+    }
+
 
     LaunchedEffect(currentUser?.uid) {
         if (currentUser == null) {
@@ -116,11 +201,29 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
     }
 
     val friendsById = remember(friends) { friends.associateBy { it.uid } }
+    val currentUserId = currentUser?.uid.orEmpty()
 
-    val activeConversations = remember(rawConversations, friendsById) {
-        rawConversations.filter { conversation ->
-            val otherId = MessagingRepository.findOtherParticipantId(conversation, currentUser!!.uid)
-            otherId != null && friendsById.containsKey(otherId)
+    // GROUP MESSAGING
+    // Direct chats require the other user to be your friend.
+    // Group chats are shown if you are in the group and at least one other group member is your friend.
+    val activeConversations = remember(rawConversations, friendsById, currentUserId) {
+        if (currentUserId.isBlank()) {
+            emptyList()
+        } else {
+            rawConversations.filter { conversation ->
+                val otherParticipantIds = MessagingRepository.findOtherParticipantIds(
+                    conversation = conversation,
+                    currentUserId = currentUserId
+                )
+
+                currentUserId in conversation.participantIds &&
+                        if (conversation.isGroup) {
+                            otherParticipantIds.any { friendId -> friendsById.containsKey(friendId) }
+                        } else {
+                            otherParticipantIds.size == 1 &&
+                                    friendsById.containsKey(otherParticipantIds.first())
+                        }
+            }
         }
     }
 
@@ -158,6 +261,25 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                 )
             ) {
                 Text("Manage Friends")
+            }
+
+
+            Button(
+                onClick = { showCreateGroupDialog = true },
+                enabled = friends.size >= 2,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFEF3347),
+                    contentColor = Color.White,
+                    disabledContainerColor = Color(0xFFEF3347).copy(alpha = 0.35f),
+                    disabledContentColor = Color.White.copy(alpha = 0.75f)
+                )
+            ) {
+                Icon(Icons.Default.Group, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("New Group Chat")
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -221,32 +343,97 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(activeConversations, key = { it.id }) { conversation ->
-                        val friendUserId = MessagingRepository.findOtherParticipantId(conversation, currentUser?.uid ?: "").orEmpty()
+                    items(
+                        items = activeConversations,
+                        key = { conversation: ConversationSummary -> conversation.id }
+                    ) { conversation: ConversationSummary ->
+
+                        val friendUserId = MessagingRepository
+                            .findOtherParticipantId(conversation, currentUser?.uid ?: "")
+                            .orEmpty()
+
                         val friend = friendsById[friendUserId]
+
+                        // GROUP MESSAGING
+                        // group conversations display their shared name,
+                        // or back to all participant names/nicknames.
+                        val title = if (conversation.isGroup) {
+                            conversationTitle(
+                                conversation = conversation,
+                                currentUser = currentUser,
+                                profilesById = friendsById,
+                                nicknames = nicknames
+                            )
+                        } else {
+                            nicknames[friendUserId]
+                                ?: friend?.let { SocialRepository.displayNameOrEmail(it) }
+                                ?: "Friend"
+                        }
+
+                        // GROUP MESSAGING
+                        // group subtitle shows members direct subtitle shows email
+                        val subtitle = if (conversation.isGroup) {
+                            conversationSubtitle(
+                                conversation = conversation,
+                                currentUser = currentUser,
+                                profilesById = friendsById,
+                                nicknames = nicknames
+                            )
+                        } else {
+                            friend?.email.orEmpty()
+                        }
 
                         val messageDisplayPreview = when {
                             conversation.lastMessageText.contains("[location]", ignoreCase = true) -> {
-                                if (conversation.lastMessageSenderId == currentUser?.uid) "You sent a location" else "Sent you a location"
+                                if (conversation.lastMessageSenderId == currentUser?.uid) {
+                                    "You sent a location"
+                                } else {
+                                    "Sent a location"
+                                }
                             }
-                            conversation.lastMessageText.contains("[pin]", ignoreCase = true) || conversation.lastMessageText.contains("custom pin:", ignoreCase = true) -> {
-                                if (conversation.lastMessageSenderId == currentUser?.uid) "You shared a pin" else "Sent you a pin"
+
+                            conversation.lastMessageText.contains("[pin]", ignoreCase = true) ||
+                                    conversation.lastMessageText.contains("custom pin:", ignoreCase = true) -> {
+                                if (conversation.lastMessageSenderId == currentUser?.uid) {
+                                    "You shared a pin"
+                                } else {
+                                    "Shared a pin"
+                                }
                             }
+
                             conversation.lastMessageText.contains("[event_invite]", ignoreCase = true) -> {
-                                if (conversation.lastMessageSenderId == currentUser?.uid) "You sent an event invitation" else "Sent you an event invitation"
+                                if (conversation.lastMessageSenderId == currentUser?.uid) {
+                                    "You sent an event invitation"
+                                } else {
+                                    "Sent an event invitation"
+                                }
                             }
+
                             else -> conversation.lastMessageText
                         }
 
                         ConversationCard(
-                            friendName = nicknames[friendUserId] ?: friend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Friend",
-                            friendEmail = friend?.email ?: "",
+                            friendName = title,
+                            friendEmail = subtitle,
                             preview = messageDisplayPreview,
-                            photoUrl = friend?.photoUrl,
+                            photoUrl = if (conversation.isGroup) "" else friend?.photoUrl,
                             timestamp = conversation.lastMessageAt,
                             onClick = {
-                                val initialMsg = if (sharedLocation != null) "Check out this custom pin: $sharedLocation" else null
-                                navController.navigate(Routes.messageThread(conversation.id, friendUserId, initialMsg))
+                                val initialMsg = if (sharedLocation != null) {
+                                    "Check out this custom pin: $sharedLocation"
+                                } else {
+                                    null
+                                }
+
+                                if (conversation.isGroup) {
+                                    navController.navigate(
+                                        Routes.groupMessageThread(conversation.id, initialMsg)
+                                    )
+                                } else {
+                                    navController.navigate(
+                                        Routes.messageThread(conversation.id, friendUserId, initialMsg)
+                                    )
+                                }
                             }
                         )
                     }
@@ -267,6 +454,27 @@ fun MessageThreadScreen(
     val currentUser = rememberAuthUser()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // GROUP MESSAGING
+    // true when this screen was opened for a group chat
+    val isGroupThread = friendUserId == Routes.GROUP_THREAD_USER_ID
+
+    // GROUP MESSAGING
+    // live conversation document, used for group name, members, and sending.
+    var conversation by remember { mutableStateOf<ConversationSummary?>(null) }
+
+    // GROUP MESSAGING
+    // profiles/nicknames for group member display.
+    var memberProfilesById by remember { mutableStateOf<Map<String, UserProfile>>(emptyMap()) }
+    var nicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+
+    // GROUP MESSAGING:
+    // used to allow group sending if current user is friends with at least one group member.
+    var friendStatuses by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+
+    // GROUP MESSAGING C
+    // rename dialog for group chats.
+    var showEditGroupNameDialog by remember { mutableStateOf(false) }
 
     var friend by remember { mutableStateOf<UserProfile?>(null) }
     var nickname by remember { mutableStateOf<String?>(null) }
@@ -326,34 +534,188 @@ fun MessageThreadScreen(
         return
     }
 
-    LaunchedEffect(currentUser.uid, friendUserId) {
-        SocialRepository.fetchAllFriendRequestStatuses(
-            currentUserId = currentUser.uid,
-            onSuccess = { statuses ->
-                isFriend = statuses[friendUserId] == "accepted"
-            },
-            onError = { isFriend = false }
-        )
+    val currentConversation = conversation
 
-        MessagingRepository.fetchUserProfile(
-            userId = friendUserId,
-            onSuccess = {
-                friend = it
+// GROUP MESSAGING
+// A group member can send if:
+// 1. they are actually in the group, and
+// 2. they are friends with at least one other member of the group.
+    val groupHasAtLeastOneFriend = currentConversation
+        ?.participantIds
+        ?.filter { userId -> userId != currentUser.uid }
+        ?.any { userId -> friendStatuses[userId] == "accepted" }
+        ?: false
+
+    val canSendMessages = if (isGroupThread) {
+        currentConversation?.participantIds?.contains(currentUser.uid) == true &&
+                groupHasAtLeastOneFriend
+    } else {
+        isFriend
+    }
+
+    // GROUP MESSAGING CHANG:
+    fun sendThreadMessage(
+        text: String,
+        type: String = "text",
+        metadata: Map<String, String> = emptyMap(),
+        onSuccess: () -> Unit = {}
+    ) {
+        if (isGroupThread) {
+            val targetConversation = conversation
+            if (targetConversation == null) {
+                errorMessage = "Group chat is still loading."
+                isSending = false
+                return
+            }
+
+            MessagingRepository.sendMessageToConversation(
+                currentUser = currentUser,
+                conversation = targetConversation,
+                messageText = text,
+                type = type,
+                metadata = metadata,
+                onSuccess = {
+                    conversationExists = true
+                    errorMessage = null
+                    isSending = false
+                    onSuccess()
+                },
+                onError = {
+                    errorMessage = it
+                    isSending = false
+                }
+            )
+        } else {
+            val targetFriend = friend
+            if (targetFriend == null) {
+                errorMessage = "Chat is still loading."
+                isSending = false
+                return
+            }
+
+            MessagingRepository.sendMessage(
+                currentUser = currentUser,
+                friend = targetFriend,
+                messageText = text,
+                type = type,
+                metadata = metadata,
+                onSuccess = {
+                    conversationExists = true
+                    errorMessage = null
+                    isSending = false
+                    onSuccess()
+                },
+                onError = {
+                    errorMessage = it
+                    isSending = false
+                }
+            )
+        }
+    }
+
+    // GROUP MESSAGING CHANGE:
+    // Load group member profiles so group title can fall back to names/nicknames.
+    LaunchedEffect(currentUser.uid, currentConversation?.participantIds, isGroupThread) {
+        if (!isGroupThread) {
+            memberProfilesById = emptyMap()
+            return@LaunchedEffect
+        }
+
+        val participantIds = currentConversation?.participantIds.orEmpty()
+        if (participantIds.isEmpty()) {
+            memberProfilesById = emptyMap()
+            return@LaunchedEffect
+        }
+
+        MessagingRepository.fetchUserProfiles(
+            userIds = participantIds,
+            onSuccess = { profiles ->
+                memberProfilesById = profiles
                 errorMessage = null
             },
             onError = { errorMessage = it }
+        )
+    }
+
+    LaunchedEffect(currentUser.uid, friendUserId, isGroupThread) {
+        SocialRepository.fetchAllFriendRequestStatuses(
+            currentUserId = currentUser.uid,
+            onSuccess = { statuses ->
+                friendStatuses = statuses
+
+                // GROUP MESSAGING CHANGE:
+                // Direct chats still require friendship with the other user.
+                // Group chats are handled by canSendMessages
+                if (!isGroupThread) {
+                    isFriend = statuses[friendUserId] == "accepted"
+                }
+            },
+            onError = {
+                friendStatuses = emptyMap()
+                if (!isGroupThread) {
+                    isFriend = false
+                }
+            }
         )
 
         SocialRepository.fetchNicknames(
             currentUserId = currentUser.uid,
             onSuccess = { map ->
-                nickname = map[friendUserId]
+                nicknames = map
+                nickname = if (isGroupThread) null else map[friendUserId]
             },
-            onError = { /* ignore nickname load error */ }
+            onError = {
+                // Ignore nickname load error.
+            }
         )
+
+        if (isGroupThread) {
+            // GROUP MESSAGING CHANGE:
+            // Do not try to fetch user profile for the fake route id "group".
+            friend = null
+            nickname = null
+            isFriend = true
+        } else {
+            MessagingRepository.fetchUserProfile(
+                userId = friendUserId,
+                onSuccess = {
+                    friend = it
+                    errorMessage = null
+                },
+                onError = { errorMessage = it }
+            )
+        }
     }
 
-    LaunchedEffect(conversationId) {
+    // GROUP MESSAGING CHANGE:
+    // Group chats need a live conversation listener so group-name changes sync
+    // Direct chats keep the old existence-check flow so new 1-on-1 chats do not crash or act like group chats.
+    DisposableEffect(conversationId, isGroupThread) {
+        if (!isGroupThread) {
+            onDispose { }
+        } else {
+            val registration = MessagingRepository.listenToConversation(
+                conversationId = conversationId,
+                onUpdate = { updatedConversation ->
+                    conversation = updatedConversation
+                    conversationExists = updatedConversation != null
+                    errorMessage = null
+                },
+                onError = { errorMessage = it }
+            )
+
+            onDispose {
+                registration.remove()
+            }
+        }
+    }
+
+    LaunchedEffect(conversationId, isGroupThread) {
+        if (isGroupThread) {
+            return@LaunchedEffect
+        }
+
+        // Direct messages use the original direct-chat behavior.
         MessagingRepository.checkConversationExists(
             conversationId = conversationId,
             onResult = { exists ->
@@ -397,17 +759,91 @@ fun MessageThreadScreen(
         }
     }
 
+    // GROUP MESSAGING CHANGE:
+    // EventInvite documents are still one recipient perdocument.
+    // For group chats, create one invite per group member, then send one group chat message.
+    fun sendEventInviteToThread(
+        event: CalendarEvent,
+        onSuccess: () -> Unit = {}
+    ) {
+        if (isGroupThread) {
+            val targetConversation = conversation
+            if (targetConversation == null) {
+                errorMessage = "Group chat is still loading."
+                return
+            }
+
+            val recipientIds = targetConversation.participantIds
+                .filter { userId -> userId != currentUser.uid }
+
+            if (recipientIds.isEmpty()) {
+                errorMessage = "No group members found."
+                return
+            }
+
+            var completedCount = 0
+            var failed = false
+
+            recipientIds.forEach { targetUserId ->
+                SocialRepository.sendEventInvite(
+                    currentUser = currentUser,
+                    targetUserId = targetUserId,
+                    event = event,
+                    onSuccess = {
+                        completedCount++
+
+                        if (!failed && completedCount == recipientIds.size) {
+                            sendThreadMessage(
+                                text = "Sent an invite for: ${event.title}",
+                                type = "event_invite",
+                                metadata = mapOf(
+                                    "eventId" to event.id,
+                                    "eventTitle" to event.title
+                                ),
+                                onSuccess = onSuccess
+                            )
+                        }
+                    },
+                    onError = { error ->
+                        if (!failed) {
+                            failed = true
+                            errorMessage = error
+                        }
+                    }
+                )
+            }
+        } else {
+            // Direct chat behavior stays the same: one invite to the one friend.
+            SocialRepository.sendEventInvite(
+                currentUser = currentUser,
+                targetUserId = friendUserId,
+                event = event,
+                onSuccess = {
+                    sendThreadMessage(
+                        text = "Sent you an invite for: ${event.title}",
+                        type = "event_invite",
+                        metadata = mapOf(
+                            "eventId" to event.id,
+                            "eventTitle" to event.title
+                        ),
+                        onSuccess = onSuccess
+                    )
+                },
+                onError = { errorMessage = it }
+            )
+        }
+    }
+
     if (showPinPicker) {
         ItemPickerDialog(
             title = "Select a Pin",
             items = userPins,
             itemName = { it.name },
             onItemSelected = { pin ->
-                val targetFriend = friend ?: return@ItemPickerDialog
-                MessagingRepository.sendMessage(
-                    currentUser = currentUser,
-                    friend = targetFriend,
-                    messageText = "Pin: ${pin.name}",
+                // GROUP MESSAGING CHANGE:
+                // custom pins now work in direct and group chats.
+                sendThreadMessage(
+                    text = "Pin: ${pin.name}",
                     type = "pin",
                     metadata = mapOf(
                         "pinId" to pin.id,
@@ -417,9 +853,7 @@ fun MessageThreadScreen(
                         "description" to pin.description,
                         "colorArgb" to pin.colorArgb.toString(),
                         "associatedEventId" to (pin.associatedEventId ?: "")
-                    ),
-                    onSuccess = { conversationExists = true },
-                    onError = { errorMessage = it }
+                    )
                 )
                 showPinPicker = false
             },
@@ -433,37 +867,50 @@ fun MessageThreadScreen(
             items = userEvents.filter { it.ownerId == currentUser.uid },
             itemName = { it.title },
             onItemSelected = { event ->
-                val targetFriend = friend ?: return@ItemPickerDialog
-                SocialRepository.sendEventInvite(
-                    currentUser = currentUser,
-                    targetUserId = friendUserId,
+                // GROUP MESSAGING CHANG
+                // Works for both direct and group chats
+                // Direct chat sends one invite
+                // Group chat sends one invite per group member, then one group message
+                sendEventInviteToThread(
                     event = event,
                     onSuccess = {
-                        MessagingRepository.sendMessage(
-                            currentUser = currentUser,
-                            friend = targetFriend,
-                            messageText = "Sent you an invite for: ${event.title}",
-                            type = "event_invite",
-                            metadata = mapOf(
-                                "eventId" to event.id,
-                                "eventTitle" to event.title
-                            ),
-                            onSuccess = { conversationExists = true },
-                            onError = { errorMessage = it }
-                        )
-                    },
-                    onError = { errorMessage = it }
+                        conversationExists = true
+                        errorMessage = null
+                    }
                 )
+
                 showEventPicker = false
             },
             onDismiss = { showEventPicker = false }
         )
     }
 
+    // GROUP MESSAGING CHANGE:
+    // Any member can rename the group. The name is stored on the conversation document,
+    // so every group member sees the new name live
+    if (showEditGroupNameDialog && isGroupThread && currentConversation != null) {
+        EditGroupNameDialog(
+            initialName = currentConversation.groupName,
+            onDismiss = { showEditGroupNameDialog = false },
+            onSave = { newName ->
+                MessagingRepository.updateGroupName(
+                    conversationId = conversationId,
+                    currentUserId = currentUser.uid,
+                    newGroupName = newName,
+                    onSuccess = {
+                        showEditGroupNameDialog = false
+                        errorMessage = null
+                    },
+                    onError = { errorMessage = it }
+                )
+            }
+        )
+    }
+
     Scaffold(
         containerColor = AppBackground,
         bottomBar = {
-            if (isFriend) {
+            if (canSendMessages) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -486,18 +933,16 @@ fun MessageThreadScreen(
                                     if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                                         fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
                                             .addOnSuccessListener { location ->
-                                                if (location != null && friend != null) {
-                                                    MessagingRepository.sendMessage(
-                                                        currentUser = currentUser,
-                                                        friend = friend!!,
-                                                        messageText = "My current location",
+                                                if (location != null) {
+                                                    // GROUP MESSAGING CHANGE:
+                                                    // location sharing now works in direct and group chats
+                                                    sendThreadMessage(
+                                                        text = "My current location",
                                                         type = "location",
                                                         metadata = mapOf(
                                                             "lat" to location.latitude.toString(),
                                                             "lng" to location.longitude.toString()
-                                                        ),
-                                                        onSuccess = { conversationExists = true },
-                                                        onError = { errorMessage = it }
+                                                        )
                                                     )
                                                 }
                                             }
@@ -539,28 +984,26 @@ fun MessageThreadScreen(
 
                     IconButton(
                         onClick = {
-                            val targetFriend = friend ?: return@IconButton
                             isSending = true
 
-                            MessagingRepository.sendMessage(
-                                currentUser = currentUser,
-                                friend = targetFriend,
-                                messageText = messageText,
+                            // GROUP MESSAGING CHANGE:
+                            // Use the shared direct/group send helper.
+                            // Group chats do not have a single friend object.
+                            sendThreadMessage(
+                                text = messageText,
                                 onSuccess = {
                                     messageText = ""
-                                    isSending = false
-                                    conversationExists = true
-                                    errorMessage = null
-                                },
-                                onError = {
-                                    errorMessage = it
                                     isSending = false
                                 }
                             )
                         },
-                        enabled = messageText.isNotBlank() && !isSending && friend != null
+                        enabled = messageText.isNotBlank() && !isSending && canSendMessages
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = Color(0xFFEF3347))
+                        Icon(
+                            Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Send",
+                            tint = Color(0xFFEF3347)
+                        )
                     }
                 }
             } else {
@@ -572,7 +1015,11 @@ fun MessageThreadScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "You must be friends to send messages.",
+                        text = if (isGroupThread) {
+                            "You must be friends with at least one group member to send messages."
+                        } else {
+                            "You must be friends to send messages."
+                        },
                         color = Color.Gray,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -588,13 +1035,45 @@ fun MessageThreadScreen(
                 .padding(16.dp)
         ) {
             val currentFriend = friend
-            val displayName = nickname ?: currentFriend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Chat"
+
+// GROUP MESSAGING CHANGE:
+// Direct chat title uses friend/nickname.
+// Group chat title uses groupName, or falls back to participant names/nicknames.
+            val displayName = if (isGroupThread && currentConversation != null) {
+                conversationTitle(
+                    conversation = currentConversation,
+                    currentUser = currentUser,
+                    profilesById = memberProfilesById,
+                    nicknames = nicknames
+                )
+            } else {
+                nickname ?: currentFriend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Chat"
+            }
+
+            val subtitle = if (isGroupThread && currentConversation != null) {
+                conversationSubtitle(
+                    conversation = currentConversation,
+                    currentUser = currentUser,
+                    profilesById = memberProfilesById,
+                    nicknames = nicknames
+                )
+            } else {
+                when {
+                    !nickname.isNullOrBlank() && currentFriend != null ->
+                        "(${SocialRepository.displayNameOrEmail(currentFriend)})"
+
+                    currentFriend != null && currentFriend.email.isNotBlank() ->
+                        currentFriend.email
+
+                    else -> ""
+                }
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                UserAvatar(photoUrl = currentFriend?.photoUrl ?: "")
+                UserAvatar(photoUrl = if (isGroupThread) "" else currentFriend?.photoUrl ?: "")
 
                 Spacer(modifier = Modifier.width(12.dp))
 
@@ -607,17 +1086,9 @@ fun MessageThreadScreen(
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    if (!nickname.isNullOrBlank() && currentFriend != null) {
+                    if (subtitle.isNotBlank()) {
                         Text(
-                            text = "(${SocialRepository.displayNameOrEmail(currentFriend)})",
-                            color = Color.Gray,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    } else if (currentFriend != null && currentFriend.email.isNotBlank()) {
-                        Text(
-                            text = currentFriend.email,
+                            text = subtitle,
                             color = Color.Gray,
                             style = MaterialTheme.typography.bodySmall,
                             maxLines = 1,
@@ -626,25 +1097,47 @@ fun MessageThreadScreen(
                     }
                 }
 
-                Button(
-                    onClick = {
-                        navController.navigate("${Routes.PROFILE}/$friendUserId")
-                    },
-                    modifier = Modifier
-                        .height(36.dp)
-                        .padding(start = 8.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFEF3347),
-                        contentColor = Color.White
-                    ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                ) {
-                    Text(
-                        text = "View Profile",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                if (isGroupThread) {
+                    // GROUP MESSAGING group members can rename the shared group chat
+                    Button(
+                        onClick = { showEditGroupNameDialog = true },
+                        modifier = Modifier
+                            .height(36.dp)
+                            .padding(start = 8.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFEF3347),
+                            contentColor = Color.White
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                    ) {
+                        Text(
+                            text = "Rename",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            navController.navigate("${Routes.PROFILE}/$friendUserId")
+                        },
+                        modifier = Modifier
+                            .height(36.dp)
+                            .padding(start = 8.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFEF3347),
+                            contentColor = Color.White
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                    ) {
+                        Text(
+                            text = "View Profile",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 
@@ -679,7 +1172,19 @@ fun MessageThreadScreen(
                             ownedPins = userPins,
                             onPinSaved = {
                                 // already handled by listener
-                            }
+                            },
+                            // GROUP MESSAGING CHANGE: only show sender names in group chats.
+                            senderName = if (isGroupThread) {
+                                displayUserName(
+                                    userId = message.senderId,
+                                    currentUser = currentUser,
+                                    profilesById = memberProfilesById,
+                                    nicknames = nicknames
+                                )
+                            } else {
+                                null
+                            },
+                            currentUserId = currentUser.uid
                         )
                     }
                 }
@@ -777,6 +1282,152 @@ private fun <T> ItemPickerDialog(
             }
         }
     }
+}
+
+@Composable
+private fun CreateGroupChatDialog(
+    friends: List<UserProfile>,
+    nicknames: Map<String, String>,
+    isCreating: Boolean,
+    onDismiss: () -> Unit,
+    onCreate: (selectedFriendIds: List<String>, groupName: String) -> Unit
+) {
+    var groupName by rememberSaveable { mutableStateOf("") }
+    val selectedFriendIds = remember { mutableStateListOf<String>() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("New Group Chat") },
+        text = {
+            Column {
+                // GROUP MESSAGING optional name, blank falls back to participant names.
+                OutlinedTextField(
+                    value = groupName,
+                    onValueChange = { groupName = it.take(80) },
+                    label = { Text("Group name (optional)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "Select at least 2 friends",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+                    items(friends, key = { it.uid }) { friend ->
+                        val checked = friend.uid in selectedFriendIds
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (checked) selectedFriendIds.remove(friend.uid)
+                                    else selectedFriendIds.add(friend.uid)
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = checked,
+                                onCheckedChange = { isChecked ->
+                                    if (isChecked) selectedFriendIds.add(friend.uid)
+                                    else selectedFriendIds.remove(friend.uid)
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            UserAvatar(photoUrl = friend.photoUrl)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = nicknames[friend.uid]
+                                        ?.takeIf { it.isNotBlank() }
+                                        ?: SocialRepository.displayNameOrEmail(friend),
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (friend.email.isNotBlank()) {
+                                    Text(
+                                        text = friend.email,
+                                        color = Color.Gray,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onCreate(selectedFriendIds.toList(), groupName) },
+                enabled = selectedFriendIds.size >= 2 && !isCreating,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFEF3347),
+                    contentColor = Color.White
+                )
+            ) {
+                Text(if (isCreating) "Creating..." else "Create")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isCreating) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun EditGroupNameDialog(
+    initialName: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var groupName by rememberSaveable(initialName) { mutableStateOf(initialName) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Group Chat Name") },
+        text = {
+            Column {
+                // GROUP MESSAGING
+                // saving blank clears the custom name and restores
+                // the automatic participant names/nicknames fallback.
+                OutlinedTextField(
+                    value = groupName,
+                    onValueChange = { groupName = it.take(80) },
+                    label = { Text("Group name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSave(groupName) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFEF3347),
+                    contentColor = Color.White
+                )
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -880,7 +1531,12 @@ private fun MessageBubble(
     isMine: Boolean,
     navController: NavHostController,
     ownedPins: List<CustomPin> = emptyList(),
-    onPinSaved: () -> Unit = {}
+    onPinSaved: () -> Unit = {},
+    senderName: String? = null,
+
+    // GROUP MESSAGING CHANGE:
+    // Needed so group event invites can find the invite document for this user.
+    currentUserId: String = ""
 ) {
     val timeString = remember(message.sentAt) {
         val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
@@ -895,13 +1551,36 @@ private fun MessageBubble(
     }
 
     if (message.type == "event_invite" && !isMine) {
-        LaunchedEffect(message.id) {
-            val inviteId = "${message.senderId}_${message.receiverId}_${message.metadata["eventId"]}"
-            SocialRepository.fetchEventInvite(inviteId, { invite = it }, { inviteError = it })
+        LaunchedEffect(message.id, currentUserId) {
+            val eventId = message.metadata["eventId"].orEmpty()
+
+            // GROUP MESSAGING CHANGE:
+            // Direct messages use receiverId.
+            // Group messages have receiverId blank, so use the signed-in user's uid.
+            val inviteRecipientId = message.receiverId.ifBlank { currentUserId }
+
+            if (eventId.isNotBlank() && inviteRecipientId.isNotBlank()) {
+                val inviteId = "${message.senderId}_${inviteRecipientId}_${eventId}"
+                SocialRepository.fetchEventInvite(
+                    inviteId,
+                    { invite = it },
+                    { inviteError = it }
+                )
+            }
         }
     }
 
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isMine) Alignment.End else Alignment.Start) {
+        // GROUP MESSAGING:
+        // show sender name above incoming group messages.
+        if (!isMine && !senderName.isNullOrBlank()) {
+            Text(
+                text = senderName,
+                color = Color.Gray,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+            )
+        }
         Card(
             shape = RoundedCornerShape(14.dp),
             colors = CardDefaults.cardColors(containerColor = if (isMine) Color(0xFFEF3347) else Color.White)
