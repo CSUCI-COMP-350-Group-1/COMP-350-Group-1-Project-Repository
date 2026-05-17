@@ -31,7 +31,9 @@ object MessageNotificationSender {
         senderUserId: String,
         senderDisplayName: String,
         conversationId: String,
-        messagePreview: String
+        messagePreview: String,
+        isGroup: Boolean = false,
+        conversationTitle: String = ""
     ) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -41,7 +43,9 @@ object MessageNotificationSender {
                         "senderUserId" to senderUserId,
                         "senderDisplayName" to senderDisplayName,
                         "conversationId" to conversationId,
-                        "messagePreview" to messagePreview
+                        "messagePreview" to messagePreview,
+                        "isGroup" to isGroup.toString(),
+                        "conversationTitle" to conversationTitle
                     )
                 )
                 Log.d(TAG, "Direct message push request sent to backend.")
