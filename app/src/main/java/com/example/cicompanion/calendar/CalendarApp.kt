@@ -322,6 +322,7 @@ private fun CalendarScreenBody(
 
             CalendarModeTabs(selectedMode = viewModel.mode, onModeSelected = viewModel::updateMode, modifier = Modifier.fillMaxWidth())
 
+            // a snare
             CalendarContent(
                 mode = viewModel.mode,
                 visibleMonth = viewModel.visibleMonth,
