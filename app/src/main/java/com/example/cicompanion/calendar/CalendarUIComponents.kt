@@ -4,12 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -36,15 +38,15 @@ fun CalendarHeroHeader(
     modifier: Modifier = Modifier,
     trailingContent: @Composable () -> Unit = {}
 ) {
+    val topBarGradient = Brush.linearGradient(
+        colors = listOf(BrandRedDark, BrandRedLighter)
+    )
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(BrandRedLighter, BrandRedDark)
-                )
-            )
+            .background(topBarGradient)
             .padding(20.dp)
     ) {
         Row(
@@ -53,19 +55,21 @@ fun CalendarHeroHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
+                @Suppress("DEPRECATION")
                 Text(
                     text = title,
                     style = MaterialTheme.typography.headlineSmall,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.Bold
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                @Suppress("DEPRECATION")
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = Color.White.copy(alpha = 0.9f)
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
                 )
             }
             trailingContent()
@@ -78,11 +82,15 @@ fun SectionCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
+    val containerColor = if (isDark) MaterialTheme.colorScheme.surface else CardOffWhite
+    
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = CardOffWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 0.dp else 6.dp),
+        border = if (isDark) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null
     ) {
         Column(
             modifier = Modifier
@@ -106,7 +114,8 @@ fun SectionHeading(text: String) {
 @Composable
 fun WheelTimePicker(
     initialTime: LocalTime,
-    onTimeChange: (LocalTime) -> Unit
+    onTimeChange: (LocalTime) -> Unit,
+    color: Color = MaterialTheme.colorScheme.primary
 ) {
     // EDIT CLASS TIME FIX:
     // These values must update when initialTime changes.
@@ -164,15 +173,17 @@ fun WheelTimePicker(
             items = (1..12).toList(),
             initialIndex = hour - 1,
             onItemSelected = { selectedHour -> hour = selectedHour },
+            color = color,
             modifier = Modifier.weight(1f)
         )
 
-        Text(":", style = MaterialTheme.typography.headlineMedium)
+        Text(":", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface)
 
         WheelPicker(
             items = (0..59).toList(),
             initialIndex = minute,
             onItemSelected = { selectedMinute -> minute = selectedMinute },
+            color = color,
             format = { value -> String.format(Locale.US, "%02d", value) },
             modifier = Modifier.weight(1f)
         )
@@ -181,6 +192,7 @@ fun WheelTimePicker(
             items = listOf("AM", "PM"),
             initialIndex = if (amPm == "AM") 0 else 1,
             onItemSelected = { selectedAmPm -> amPm = selectedAmPm },
+            color = color,
             modifier = Modifier.weight(1f)
         )
     }
@@ -192,6 +204,7 @@ fun <T> WheelPicker(
     initialIndex: Int,
     onItemSelected: (T) -> Unit,
     modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary,
     format: (T) -> String = { it.toString() }
 ) {
     val safeInitialIndex = initialIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0))
@@ -229,8 +242,8 @@ fun <T> WheelPicker(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(itemHeight)
-                .background(CoralRed.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                .border(1.dp, CoralRed.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                .background(color.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
         )
 
         LazyColumn(
@@ -251,7 +264,7 @@ fun <T> WheelPicker(
                         text = format(items[index]),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
-                        color = if (selectedIndex == index) CoralRed else Color.Gray
+                        color = if (selectedIndex == index) color else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

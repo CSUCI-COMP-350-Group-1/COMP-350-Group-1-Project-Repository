@@ -1,17 +1,10 @@
 package com.example.cicompanion.ui
 
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarDefaults
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -22,13 +15,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
-import com.example.cicompanion.ui.theme.DarkBackground
-import com.example.cicompanion.ui.theme.AppWhite
-import com.example.cicompanion.ui.theme.BrandRedLight
-import com.example.cicompanion.ui.theme.GrayIcon
-import com.example.cicompanion.ui.theme.NavBackground
-import kotlin.math.min
-import androidx.navigation.NavGraph.Companion.findStartDestination
 
 @Composable
 fun NavBar(navController: NavHostController) {
@@ -38,21 +24,26 @@ fun NavBar(navController: NavHostController) {
         NavBarItem("Planning", Routes.CALENDAR, Icons.AutoMirrored.Filled.EventNote),
         NavBarItem("Map", Routes.MAP, Icons.Filled.LocationOn)
     )
-    val navBarBackground = NavBackground
-    val borderColor = Color.Gray.copy(alpha = 0.3f)
+
+    // Capture theme colors in a composable context
+    val backgroundColor = MaterialTheme.colorScheme.surface
+    val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    val selectedColor = MaterialTheme.colorScheme.primary
+    val unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     NavigationBar(
-        containerColor = navBarBackground,
+        containerColor = backgroundColor,
         windowInsets = NavigationBarDefaults.windowInsets,
         modifier = Modifier
             .heightIn(min = 80.dp)
             .drawWithContent {
                 drawContent()
-                drawLine(color =
-                    borderColor,
+                // Top border for the Nav Bar
+                drawLine(
+                    color = borderColor,
                     start = Offset(0f, 0f),
                     end = Offset(size.width, 0f),
-                    strokeWidth = 1.dp.toPx()
+                    strokeWidth = 3.dp.toPx()
                 )
             }
     ){
@@ -64,21 +55,22 @@ fun NavBar(navController: NavHostController) {
 
             NavigationBarItem(
                 icon = { Icon(
-                    imageVector =
-                        item.icon,
-                    contentDescription = item.title,
-                    tint = if(isSelected) BrandRedLight else GrayIcon
+                    imageVector = item.icon,
+                    contentDescription = item.title
                 ) },
                 label = { 
                     Text(
                         text = item.title,
-                        color = if(isSelected) BrandRedLight else GrayIcon,
                         maxLines = 1
                     )
                 },
                 selected = isSelected,
                 colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = Color.Transparent
+                    indicatorColor = Color.Transparent,
+                    selectedIconColor = selectedColor,
+                    unselectedIconColor = unselectedColor,
+                    selectedTextColor = selectedColor,
+                    unselectedTextColor = unselectedColor
                 ),
 
                 onClick = {
@@ -87,16 +79,7 @@ fun NavBar(navController: NavHostController) {
                     if (currentDestination != item.route) {
                         navController.navigate(item.route)
                     } else {
-                        navController.navigate(item.route) {
-
-                            popUpTo(navController.graph.startDestinationId) {
-                                saveState = true
-                            }
-
-                            launchSingleTop = true
-
-                            //restoreState = true
-                        }
+                        // User is already on this screen, we could scroll to top or do nothing
                     }
                 }
             )

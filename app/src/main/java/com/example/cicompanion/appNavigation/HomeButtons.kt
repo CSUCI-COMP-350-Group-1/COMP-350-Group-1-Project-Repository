@@ -1,6 +1,8 @@
 package com.example.cicompanion.appNavigation
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -45,6 +47,7 @@ val defaultFeatureItems = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FeatureCard(feature: FeatureItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val isDark = isSystemInDarkTheme()
     val buttonGradient = Brush.linearGradient(
         colors = listOf(BrandOrange, BrandCrimson, BrandPink)
     )
@@ -55,12 +58,17 @@ fun FeatureCard(feature: FeatureItem, onClick: () -> Unit, modifier: Modifier = 
             .fillMaxWidth()
             .height(110.dp),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary
+        )
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(buttonGradient),
+                .then(if (isDark) Modifier else Modifier.background(buttonGradient)),
             contentAlignment = Alignment.Center
         ) {
             @Suppress("DEPRECATION")
@@ -68,13 +76,13 @@ fun FeatureCard(feature: FeatureItem, onClick: () -> Unit, modifier: Modifier = 
                 Icon(
                     imageVector = feature.icon,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = if (isDark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(36.dp)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = feature.label,
-                    color = Color.White,
+                    color = if (isDark) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.Bold
                 )
             }

@@ -44,7 +44,7 @@ fun EditProfileScreen(navController: NavHostController) {
     }
 
     Scaffold(
-        containerColor = Color.White
+        containerColor = MaterialTheme.colorScheme.onPrimary
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -56,7 +56,7 @@ fun EditProfileScreen(navController: NavHostController) {
                 text = "Profile Settings",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 24.dp)
             )
 
@@ -64,8 +64,8 @@ fun EditProfileScreen(navController: NavHostController) {
                 onClick = { showNameDialog = true },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, Color.LightGray),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
             ) {
                 Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(12.dp))
@@ -79,8 +79,8 @@ fun EditProfileScreen(navController: NavHostController) {
                 onClick = { showBioDialog = true },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, Color.LightGray),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
             ) {
                 Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(12.dp))
@@ -94,8 +94,8 @@ fun EditProfileScreen(navController: NavHostController) {
                 onClick = { showMajorDialog = true },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, Color.LightGray),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
             ) {
                 Icon(Icons.Default.School, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(12.dp))
@@ -211,7 +211,7 @@ fun DisplayNameDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = Color.Gray)
+                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
@@ -259,7 +259,7 @@ fun BioDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = Color.Gray)
+                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
@@ -298,7 +298,7 @@ fun MajorDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = Color.Gray)
+                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )

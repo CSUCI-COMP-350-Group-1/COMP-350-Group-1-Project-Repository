@@ -1040,7 +1040,7 @@ private fun MessageBubble(
                                     modifier = Modifier.height(32.dp),
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                                 ) {
-                                    Text("Accept", fontSize = 12.sp, color = Color.White)
+                                    Text("Accept", fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimary)
                                 }
                                 Button(
                                     onClick = {

@@ -2,31 +2,23 @@ package com.example.cicompanion.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cicompanion.calendar.model.CalendarEvent
-import com.example.cicompanion.ui.theme.BrandRedDark
-import com.example.cicompanion.ui.theme.BrandRedLight
-import com.example.cicompanion.ui.theme.GrayIcon
-import com.example.cicompanion.ui.theme.NavBackground
 import com.example.cicompanion.utils.HtmlUtils
 import java.time.format.DateTimeFormatter
 
@@ -65,11 +57,11 @@ fun CalendarWidget(
             )
         }
         */
-        
+
         Text(
             text = "Upcoming Events",
             style = MaterialTheme.typography.labelMedium,
-            color = GrayIcon,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
@@ -80,10 +72,10 @@ fun CalendarWidget(
                     .height(150.dp)
                     .border(
                         width = 1.dp,
-                        color = GrayIcon.copy(alpha = 0.3f),
+                        color = MaterialTheme.colorScheme.outlineVariant,
                         shape = RoundedCornerShape(12.dp)
                     ),
-                color = NavBackground,
+                color = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Box(
@@ -93,7 +85,7 @@ fun CalendarWidget(
                     Text(
                         text = if (selectedTab == 0) "No upcoming events" else "No bookmarked events",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = GrayIcon
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -108,10 +100,10 @@ fun CalendarWidget(
                 .height(150.dp)
                 .border(
                     width = 1.dp,
-                    color = GrayIcon.copy(alpha = 0.3f),
+                    color = MaterialTheme.colorScheme.outlineVariant,
                     shape = RoundedCornerShape(12.dp)
                 ),
-            color = NavBackground,
+            color = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(12.dp)
         ) {
             Row(
@@ -142,7 +134,7 @@ fun CalendarWidget(
                         verticalArrangement = Arrangement.Center
                     ) {
                         repeat(currentEvents.size) { index ->
-                            val dotColor = if (pagerState.currentPage == index) BrandRedLight else GrayIcon.copy(alpha = 0.5f)
+                            val dotColor = if (pagerState.currentPage == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                             Box(
                                 modifier = Modifier
                                     .padding(vertical = 3.dp)
@@ -158,37 +150,13 @@ fun CalendarWidget(
 }
 
 @Composable
-private fun WidgetTab(text: String, isSelected: Boolean, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        color = if (isSelected) BrandRedDark else Color.White,
-        shape = RoundedCornerShape(20.dp),
-        border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, GrayIcon.copy(alpha = 0.3f)),
-        modifier = Modifier.height(30.dp)
-    ) {
-        Box(
-            modifier = Modifier.padding(horizontal = 12.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isSelected) Color.White else Color.Gray,
-                fontSize = 12.sp
-            )
-        }
-    }
-}
-
-@Composable
 private fun EventWidgetCard(event: CalendarEvent, onInfoClick: (CalendarEvent) -> Unit) {
     val isCustom = event.calendarId == "custom"
     val isBookmarked = event.isBookmarked
     val badgeColor = when {
         isBookmarked && event.calendarId != "custom" -> BookmarkYellow
         isCustom -> CustomEventOrange
-        else -> BrandRed
+        else -> MaterialTheme.colorScheme.primary
     }
 
     val eventDateText = event.start.format(DateTimeFormatter.ofPattern("EEE, MMM d"))
@@ -215,7 +183,8 @@ private fun EventWidgetCard(event: CalendarEvent, onInfoClick: (CalendarEvent) -
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             
@@ -243,20 +212,20 @@ private fun EventWidgetCard(event: CalendarEvent, onInfoClick: (CalendarEvent) -
         Text(
             text = eventDateText,
             style = MaterialTheme.typography.bodySmall,
-            color = Color.Black.copy(alpha = 0.7f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
             fontWeight = FontWeight.Medium
         )
         Text(
             text = event.timeLabel(),
             style = MaterialTheme.typography.bodySmall,
-            color = GrayIcon
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         
         if (!event.location.isNullOrBlank()) {
             Text(
                 text = HtmlUtils.stripHtml(event.location),
                 style = MaterialTheme.typography.bodySmall,
-                color = GrayIcon,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -271,9 +240,9 @@ private fun EventWidgetCard(event: CalendarEvent, onInfoClick: (CalendarEvent) -
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                 modifier = Modifier.height(28.dp)
             ) {
-                Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(14.dp), tint = BrandRedDark)
+                Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(4.dp))
-                Text("More Info", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = BrandRedDark)
+                Text("More Info", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
         }
     }

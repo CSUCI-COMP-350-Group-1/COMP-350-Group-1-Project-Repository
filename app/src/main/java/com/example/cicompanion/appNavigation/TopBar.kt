@@ -42,7 +42,7 @@ fun screenTitleForRoute(route: String?): String {
         route == Routes.USER_SEARCH -> "User Search"
         route == Routes.FRIEND_REQUESTS -> "Friend Requests"
         route == Routes.FRIENDS_AND_REQUESTS -> "Friends & Requests"
-        route == Routes.SEARCH -> "Search"
+        route == Routes.SEARCH -> "Feature Search"
         route == Routes.EDIT_PROFILE -> "Edit Profile"
         route?.startsWith(Routes.MESSAGE_THREAD_BASE) == true -> "Chat" // MESSAGING
         else -> "CI Companion"
@@ -65,14 +65,14 @@ fun TopBar(
 
     Box(modifier = Modifier.background(topBarGradient)) {
         CenterAlignedTopAppBar(
-            title = { Text(title, color = Color.White) },
+            title = { Text(title, color = MaterialTheme.colorScheme.onPrimary) },
             colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                 containerColor = Color.Transparent,
-                navigationIconContentColor = Color.White,
-                actionIconContentColor = Color.White
+                navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                actionIconContentColor = MaterialTheme.colorScheme.onPrimary
             ),
             navigationIcon = {
-                if (showBackButton) {
+                if (showBackButton) {MaterialTheme.colorScheme.onPrimary
                     IconButton(onClick = onBackClick) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
@@ -216,7 +216,7 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
 
             // Search Button (which was moved from the bottom to here)
             NavigationDrawerItem(
-                label = { Text("Search for Feature") },
+                label = { Text("Find a Feature") },
                 selected = false,
                 icon = { Icon(Icons.Default.Search, contentDescription = null) },
                 onClick = {

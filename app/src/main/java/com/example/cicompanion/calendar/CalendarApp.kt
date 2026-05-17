@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -104,13 +106,13 @@ fun CalendarApp(viewModel: CalendarViewModel) {
     }
 
     Scaffold(
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             if (currentUser != null) {
                 ExtendedFloatingActionButton(
                     onClick = { showAddEventDialog = true },
-                    containerColor = CoralRed,
-                    contentColor = Color.White,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.padding(bottom = 8.dp),
                     icon = {
@@ -121,15 +123,15 @@ fun CalendarApp(viewModel: CalendarViewModel) {
                                     .align(Alignment.BottomEnd)
                                     .offset(x = 4.dp, y = 4.dp)
                                     .size(14.dp)
-                                    .background(Color.White, CircleShape)
+                                    .background(MaterialTheme.colorScheme.onPrimary, CircleShape)
                                     .padding(1.dp)
-                                    .background(CoralRed, CircleShape),
+                                    .background(MaterialTheme.colorScheme.primary, CircleShape),
                             contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     Icons.Default.Add,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
                                     modifier = Modifier.size(10.dp)
                                 )
                             }
@@ -253,26 +255,27 @@ fun CalendarApp(viewModel: CalendarViewModel) {
         val isOwner = event.ownerId == currentUser?.uid
         AlertDialog(
             onDismissRequest = { eventToDelete = null },
-            title = { Text(if (isOwner) "Delete Event Globally" else "Leave Event") },
-            text = { Text(if (isOwner) "Do you really want to delete this event for everyone?" else "Do you want to remove this event from your calendar?") },
+            title = { Text(if (isOwner) "Delete Event Globally" else "Leave Event", color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text(if (isOwner) "Do you really want to delete this event for everyone?" else "Do you want to remove this event from your calendar?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(
                     onClick = {
                         viewModel.deleteEvent(event)
                         eventToDelete = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = CoralRed)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text(if (isOwner) "Delete All" else "Leave")
+                    Text(if (isOwner) "Delete All" else "Leave", color = MaterialTheme.colorScheme.onPrimary)
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { eventToDelete = null }
                 ) {
-                    Text("Cancel", fontWeight = FontWeight.Bold, color = Color.Gray)
+                    Text("Cancel", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            }
+            },
+            containerColor = MaterialTheme.colorScheme.surface
         )
     }
 
@@ -438,35 +441,81 @@ fun IncomingInvitesSection(
     onDecline: (EventInvite) -> Unit,
     onInviteClick: (EventInvite) -> Unit
 ) {
-    SectionCard(modifier = Modifier.border(2.dp, CoralRed.copy(alpha = 0.3f), RoundedCornerShape(24.dp))) {
+    SectionCard(modifier = Modifier.border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(24.dp))) {
         SectionHeading(text = "Event Invitations (${invites.size})")
         Spacer(modifier = Modifier.height(12.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             invites.forEach { invite ->
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable { onInviteClick(invite) },
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     shape = RoundedCornerShape(16.dp),
-                    elevation = CardDefaults.cardElevation(2.dp)
+                    elevation = CardDefaults.cardElevation(2.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = invite.eventTitle, fontWeight = FontWeight.Bold)
-                            Text(text = "from ${invite.fromDisplayName}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            Text(text = invite.eventTitle, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            Text(text = "from ${invite.fromDisplayName}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Row {
                             IconButton(onClick = { onAccept(invite) }) {
                                 Icon(Icons.Default.Check, contentDescription = "Accept", tint = Color(0xFF4CAF50))
                             }
                             IconButton(onClick = { onDecline(invite) }) {
-                                Icon(Icons.Default.Close, contentDescription = "Decline", tint = CoralRed)
+                                Icon(Icons.Default.Close, contentDescription = "Decline", tint = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ErrorMessage(
+    message: String,
+    onDismiss: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
     }
@@ -480,12 +529,12 @@ private fun FilterDropdown(viewModel: CalendarViewModel) {
         IconButton(
             onClick = { expanded = true },
             modifier = Modifier
-                .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f), CircleShape)
         ) {
             Icon(
                 imageVector = Icons.Outlined.FilterList,
                 contentDescription = "Filter",
-                tint = Color.White
+                tint = MaterialTheme.colorScheme.onPrimary
             )
         }
 
@@ -493,20 +542,21 @@ private fun FilterDropdown(viewModel: CalendarViewModel) {
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier
-                .background(Color.White)
+                .background(MaterialTheme.colorScheme.surface)
                 .width(200.dp)
         ) {
             Text(
                 text = "Filter Events",
                 modifier = Modifier.padding(16.dp),
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
             
             FilterMenuItem(
                 label = "CSUCI Events",
                 isSelected = viewModel.filterCsuci,
-                color = CoralRed,
+                color = MaterialTheme.colorScheme.primary,
                 onClick = { viewModel.toggleFilterCsuci() }
             )
             FilterMenuItem(
@@ -557,55 +607,16 @@ private fun FilterMenuItem(
                         Icon(
                             Icons.Default.Check,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(16.dp)
                         )
                     }
                 }
-                Text(text = label, style = MaterialTheme.typography.bodyMedium)
+                Text(text = label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
             }
         },
         onClick = onClick
     )
-}
-
-@Composable
-private fun ErrorMessage(
-    message: String,
-    onDismiss: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            Text(
-                text = "Dismiss",
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable(onClick = onDismiss)
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            )
-        }
-    }
 }
 
 @Composable
@@ -635,19 +646,20 @@ private fun ModeCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val accentColor = CoralRed
-    val containerColor = if (isSelected) accentColor else DateCellWhite
+    val isDark = isSystemInDarkTheme()
+    val accentColor = MaterialTheme.colorScheme.primary
+    val containerColor = if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
     val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else accentColor
-    val borderColor = if (isSelected) Color.Transparent else DateCellBorder
+    val borderColor = if (isSelected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant
 
     Box(
         modifier = modifier
-            .shadow(elevation = if (isSelected) 6.dp else 0.dp, shape = RoundedCornerShape(16.dp))
+            .shadow(elevation = if (isSelected && !isDark) 6.dp else 0.dp, shape = RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
             .background(containerColor)
             .border(1.dp, borderColor, RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 16.dp),
+            .padding(horizontal = 4.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -940,12 +952,14 @@ private fun HeaderWithArrows(
             onClick = onPrevious
         )
 
+        @Suppress("DEPRECATION")
         Text(
             text = title,
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.titleLarge,
             textAlign = TextAlign.Center,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         NavigationCircleButton(
@@ -964,10 +978,11 @@ private fun NavigationCircleButton(
         modifier = Modifier
             .size(40.dp)
             .clip(CircleShape)
-            .background(DateCellWhite)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
+        @Suppress("DEPRECATION")
         Text(
             text = symbol,
             color = MaterialTheme.colorScheme.primary,
@@ -1004,11 +1019,12 @@ private fun WeekdayChip(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(DateCellWhite)
-            .border(1.dp, DateCellBorder, RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
             .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
+        @Suppress("DEPRECATION")
         Text(
             text = text,
             textAlign = TextAlign.Center,
@@ -1090,14 +1106,27 @@ private fun DateCell(
     eventInfo: DayEventInfo,
     onClick: () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
+    val bgColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+    }
+    
+    val borderColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    }
+
     Box(
         modifier = modifier
             .height(68.dp)
             .padding(2.dp)
-            .background(resolveDateCellBackgroundColor(isSelected), RoundedCornerShape(8.dp))
+            .background(bgColor, RoundedCornerShape(8.dp))
             .border(
                 width = 1.dp,
-                color = resolveDateCellBorderColor(isSelected),
+                color = borderColor,
                 shape = RoundedCornerShape(8.dp)
             )
             .clickable(onClick = onClick)
@@ -1110,7 +1139,7 @@ private fun DateCell(
             Text(
                 text = date.dayOfMonth.toString(),
                 style = MaterialTheme.typography.bodyLarge,
-                color = resolveDateCellTextColor(isSelected),
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold
             )
 
@@ -1233,8 +1262,6 @@ private fun EventsList(
                 onInvite = { onRequestInvite(event) },
                 onShowMembers = { onShowMembers(event) },
                 isHighlighted = event.id == highlightedEventId,
-
-                // EVENT NOTIFICATION MERGE:
                 notificationsEnabled = isEventNotificationEnabled(event),
                 onNotificationToggle = { enabled ->
                     onToggleEventNotification(event, enabled)
@@ -1247,10 +1274,11 @@ private fun EventsList(
 @Composable
 private fun EmptyEventsMessage() {
     SectionCard {
+        @Suppress("DEPRECATION")
         Text(
             text = "No events for this date.",
             style = MaterialTheme.typography.bodyLarge,
-            color = SoftText
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -1265,30 +1293,30 @@ private fun EventCard(
     onInvite: () -> Unit,
     onShowMembers: () -> Unit,
     isHighlighted: Boolean = false,
-
-    // EVENT NOTIFICATION MERGE:
     notificationsEnabled: Boolean,
     onNotificationToggle: (Boolean) -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
     val isCustom = event.calendarId == "custom"
     val currentUser = FirebaseAuth.getInstance().currentUser
     val isOwner = event.ownerId == currentUser?.uid
     
     val containerColor = when {
-        !isCustom -> EventCardGrey
+        isDark -> MaterialTheme.colorScheme.surface
+        !isCustom -> Color(0xFFF2F2F2)
         isOwner && event.isShared -> SharedEventLightBlue
-        isOwner -> CardOffWhite
+        isOwner -> Color(0xFFFDFDFD)
         else -> SharedEventLightBlue
     }
-    val borderColor = if (isHighlighted) CoralRed else Color.Transparent
+    val borderColor = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(if (isHighlighted) 2.dp else 0.dp, borderColor, RoundedCornerShape(22.dp)),
+            .border(if (isHighlighted || isDark) 1.dp else 0.dp, borderColor, RoundedCornerShape(22.dp)),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isCustom) 5.dp else 3.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 0.dp else if (isCustom) 5.dp else 3.dp)
     ) {
         Column(
             modifier = Modifier
@@ -1309,7 +1337,7 @@ private fun EventCard(
                         Icon(
                             imageVector = if (event.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
                             contentDescription = "Pin",
-                            tint = if (event.isPinned) PinnedEventPurple else Color.Gray,
+                            tint = if (event.isPinned) PinnedEventPurple else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -1317,6 +1345,7 @@ private fun EventCard(
                 
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        @Suppress("DEPRECATION")
                         Text(
                             text = HtmlUtils.stripHtml(event.title),
                             style = MaterialTheme.typography.titleMedium,
@@ -1336,6 +1365,7 @@ private fun EventCard(
                     }
                     
                     if (isCustom && (!isOwner || event.isShared)) {
+                        @Suppress("DEPRECATION")
                         Text(
                             text = if (isOwner) "Shared Event (You are Leader)" else "Shared Event",
                             style = MaterialTheme.typography.labelSmall,
@@ -1347,12 +1377,11 @@ private fun EventCard(
 
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (isCustom) {
-                        // Members Button
                         IconButton(
                             onClick = onShowMembers,
                             modifier = Modifier.size(24.dp)
                         ) {
-                            Icon(Icons.Outlined.Group, contentDescription = "Members", tint = Color.DarkGray, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Outlined.Group, contentDescription = "Members", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                         }
 
                         if (isOwner) {
@@ -1369,7 +1398,7 @@ private fun EventCard(
                                     Icon(
                                         Icons.Default.PersonAdd,
                                         contentDescription = "Invite Friend",
-                                        tint = Color.Blue,
+                                        tint = SharedEventBlue,
                                         modifier = Modifier.size(14.dp)
                                     )
                                 }
@@ -1382,13 +1411,13 @@ private fun EventCard(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(Color.Gray.copy(alpha = 0.1f), CircleShape),
+                                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f), CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         Icons.Default.Edit,
                                         contentDescription = "Edit",
-                                        tint = Color.Gray,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(14.dp)
                                     )
                                 }
@@ -1416,7 +1445,7 @@ private fun EventCard(
                     }
                     EventBadge(
                         text = if (event.isPinned) "Pinned" else if (isCustom) (if (isOwner) (if (event.isShared) "Shared (Leader)" else "Custom") else "Shared") else "CSUCI",
-                        color = if (event.isPinned) PinnedEventPurple else if (isCustom) (if (isOwner) (if (event.isShared) SharedEventBlue else CustomEventOrange) else SharedEventBlue) else CoralRed
+                        color = if (event.isPinned) PinnedEventPurple else if (isCustom) (if (isOwner) (if (event.isShared) SharedEventBlue else CustomEventOrange) else SharedEventBlue) else MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -1428,19 +1457,19 @@ private fun EventCard(
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
                     Icon(Icons.Outlined.Info, contentDescription = null, modifier = Modifier.size(14.dp), tint = PinnedEventPurple)
                     Spacer(Modifier.width(6.dp))
+                    @Suppress("DEPRECATION")
                     Text("The leader has this event pinned", style = MaterialTheme.typography.labelSmall, color = PinnedEventPurple)
                 }
             }
 
             event.description?.let { EventDescription(text = HtmlUtils.stripHtml(it)) }
-            // EVENT NOTIFICATION MERGE:
-            // Per-user push reminder toggle.
-            // Classes opt in once; custom/campus/shared events opt in per event version.
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                @Suppress("DEPRECATION")
                 Text(
                     text = "Push reminders",
                     style = MaterialTheme.typography.bodyMedium,
@@ -1500,40 +1529,43 @@ fun EventMembersDialog(
                 .wrapContentHeight()
                 .padding(vertical = 24.dp),
             shape = RoundedCornerShape(28.dp),
-            color = Color.White,
-            tonalElevation = 8.dp
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp,
+            border = if (isSystemInDarkTheme()) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null
         ) {
+            @Suppress("DEPRECATION")
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(24.dp)
             ) {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
+                        @Suppress("DEPRECATION")
                         Text(
                             text = "Event Members",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.ExtraBold,
-                            color = BrandRedDark
+                            color = MaterialTheme.colorScheme.primary
                         )
+                        @Suppress("DEPRECATION")
                         Text(
                             text = "${members.size + 1} members total",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(
                         onClick = onDismiss,
                         modifier = Modifier
-                            .background(Color.Gray.copy(alpha = 0.1f), CircleShape)
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), CircleShape)
                             .size(36.dp)
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                     }
                 }
 
@@ -1541,7 +1573,7 @@ fun EventMembersDialog(
 
                 if (isLoading) {
                     Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = BrandRedDark, strokeWidth = 3.dp)
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, strokeWidth = 3.dp)
                     }
                 } else {
                     LazyColumn(
@@ -1550,7 +1582,6 @@ fun EventMembersDialog(
                             .heightIn(max = 450.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Leader Section
                         item {
                             MemberGroupHeader(text = "Host")
                             PremiumMemberRow(
@@ -1562,7 +1593,6 @@ fun EventMembersDialog(
                             )
                         }
                         
-                        // Others Section
                         if (otherMembers.isNotEmpty() || !isOwner) {
                             item {
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -1609,10 +1639,10 @@ fun EventMembersDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
-                            .shadow(if (canKickSelected) 8.dp else 0.dp, RoundedCornerShape(16.dp)),
+                            .shadow(if (canKickSelected && !isSystemInDarkTheme()) 8.dp else 0.dp, RoundedCornerShape(16.dp)),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (canKickSelected) BrandRedDark else Color.Gray.copy(alpha = 0.2f),
-                            contentColor = if (canKickSelected) Color.White else Color.Gray
+                            containerColor = if (canKickSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                            contentColor = if (canKickSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                         ),
                         shape = RoundedCornerShape(16.dp),
                         enabled = canKickSelected
@@ -1635,10 +1665,11 @@ fun EventMembersDialog(
 
 @Composable
 fun MemberGroupHeader(text: String) {
+    @Suppress("DEPRECATION")
     Text(
         text = text.uppercase(),
         style = MaterialTheme.typography.labelSmall,
-        color = Color.Gray,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         letterSpacing = 1.sp,
         fontWeight = FontWeight.Bold,
         modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
@@ -1658,13 +1689,14 @@ fun EmptyMembersPlaceholder() {
                 Icons.Outlined.Group, 
                 contentDescription = null, 
                 modifier = Modifier.size(48.dp), 
-                tint = Color.Gray.copy(alpha = 0.3f)
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
             )
             Spacer(Modifier.height(8.dp))
+            @Suppress("DEPRECATION")
             Text(
                 "No other members yet",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -1703,9 +1735,9 @@ fun PremiumMemberRow(
             .clip(RoundedCornerShape(16.dp))
             .clickable(enabled = isSelectable) { onToggleSelect() },
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) BrandRedDark.copy(alpha = 0.05f) else Color.Transparent
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent
         ),
-        border = if (isSelected) BorderStroke(1.dp, BrandRedDark.copy(alpha = 0.3f)) else null
+        border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)) else null
     ) {
         Row(
             modifier = Modifier
@@ -1720,12 +1752,12 @@ fun PremiumMemberRow(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .size(18.dp)
-                            .background(Color.White, CircleShape)
+                            .background(MaterialTheme.colorScheme.surface, CircleShape)
                             .padding(2.dp)
                             .background(CustomEventOrange, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Star, contentDescription = null, tint = Color.White, modifier = Modifier.size(10.dp))
+                        Icon(Icons.Default.Star, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(10.dp))
                     }
                 }
             }
@@ -1733,23 +1765,27 @@ fun PremiumMemberRow(
             Spacer(modifier = Modifier.width(16.dp))
             
             Column(modifier = Modifier.weight(1f)) {
+                @Suppress("DEPRECATION")
                 Text(
                     text = if (isMe) "$displayLabel (You)" else displayLabel,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = if (isOwner || isMe) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isMe) BrandRedDark else Color.DarkGray
+                    color = if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                 )
                 if (nickname != null && baseName != "Loading...") {
+                    @Suppress("DEPRECATION")
                     Text(
                         text = "($baseName)",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 if (isOwner) {
+                    @Suppress("DEPRECATION")
                     Text("Event Host", style = MaterialTheme.typography.bodySmall, color = CustomEventOrange)
                 } else if (isMe) {
-                    Text("You", style = MaterialTheme.typography.bodySmall, color = BrandRedDark.copy(alpha = 0.7f))
+                    @Suppress("DEPRECATION")
+                    Text("You", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
                 }
             }
 
@@ -1758,8 +1794,8 @@ fun PremiumMemberRow(
                     checked = isSelected,
                     onCheckedChange = { onToggleSelect() },
                     colors = CheckboxDefaults.colors(
-                        checkedColor = BrandRedDark,
-                        uncheckedColor = Color.Gray.copy(alpha = 0.5f)
+                        checkedColor = MaterialTheme.colorScheme.primary,
+                        uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
                 )
             } else if (isOwner) {
@@ -1793,13 +1829,14 @@ private fun AddEventDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.padding(16.dp),
         shape = RoundedCornerShape(24.dp),
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.surface,
         title = { 
+            @Suppress("DEPRECATION")
             Text(
                 text = "New Shared Event",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = CoralRed
+                color = MaterialTheme.colorScheme.primary
             )
         },
         text = {
@@ -1809,10 +1846,11 @@ private fun AddEventDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                @Suppress("DEPRECATION")
                 Text(
                     text = "Date: ${selectedDate.format(DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy"))}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = SoftText
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
                 OutlinedTextField(
@@ -1821,14 +1859,24 @@ private fun AddEventDialog(
                     label = { Text("Title") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    singleLine = true
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary
+                    )
                 )
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text("Description") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary
+                    )
                 )
                 OutlinedTextField(
                     value = location,
@@ -1836,29 +1884,38 @@ private fun AddEventDialog(
                     label = { Text("Location") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    singleLine = true
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary
+                    )
                 )
 
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Invite Friends", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        @Suppress("DEPRECATION")
+                        Text("Invite Friends", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         Spacer(Modifier.weight(1f))
                         TextButton(onClick = { showFriendPicker = true }) {
-                            Text("+ Add", color = SharedEventBlue)
+                            @Suppress("DEPRECATION")
+                            Text("+ Add", color = MaterialTheme.colorScheme.primary)
                         }
                     }
                     if (invitedFriends.isEmpty()) {
-                        Text("No one invited. You can do this later.", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                        @Suppress("DEPRECATION")
+                        Text("No one invited. You can do this later.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         Column(modifier = Modifier.heightIn(max = 120.dp)) {
                             invitedFriends.forEach { friend ->
                                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
                                     UserAvatar(photoUrl = friend.photoUrl)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(SocialRepository.displayNameOrEmail(friend), style = MaterialTheme.typography.bodySmall)
+                                    @Suppress("DEPRECATION")
+                                    Text(SocialRepository.displayNameOrEmail(friend), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
                                     Spacer(Modifier.weight(1f))
                                     IconButton(onClick = { invitedFriends = invitedFriends.filter { it.uid != friend.uid } }, modifier = Modifier.size(24.dp)) {
-                                        Icon(Icons.Default.Close, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(14.dp))
+                                        Icon(Icons.Default.Close, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
                                     }
                                 }
                             }
@@ -1869,10 +1926,11 @@ private fun AddEventDialog(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Time Range", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    @Suppress("DEPRECATION")
+                    Text("Time Range", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = startTime, onTimeChange = { startTime = it }) }
-                        Text("to", Modifier.padding(horizontal = 8.dp))
+                        Text("to", Modifier.padding(horizontal = 8.dp), color = MaterialTheme.colorScheme.onSurface)
                         Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = endTime, onTimeChange = { endTime = it }) }
                     }
                 }
@@ -1881,16 +1939,16 @@ private fun AddEventDialog(
         confirmButton = {
             Button(
                 onClick = { onConfirm(title, description, location, startTime, endTime, invitedFriends) },
-                colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 enabled = title.isNotBlank(),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Create Event", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Create Event", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Back", color = CoralRed, fontWeight = FontWeight.Bold)
+                Text("Back", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
         }
     )
@@ -1924,13 +1982,13 @@ private fun EditEventDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.padding(16.dp),
         shape = RoundedCornerShape(24.dp),
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.surface,
         title = { 
             Text(
                 text = "Edit Event",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = CoralRed
+                color = MaterialTheme.colorScheme.primary
             )
         },
         text = {
@@ -1943,7 +2001,7 @@ private fun EditEventDialog(
                 Text(
                     text = "Date: ${event.start.toLocalDate().format(DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy"))}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = SoftText
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
                 OutlinedTextField(
@@ -1952,14 +2010,24 @@ private fun EditEventDialog(
                     label = { Text("Title") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    singleLine = true
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary
+                    )
                 )
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text("Description") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary
+                    )
                 )
                 OutlinedTextField(
                     value = location,
@@ -1967,13 +2035,18 @@ private fun EditEventDialog(
                     label = { Text("Location") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    singleLine = true
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary
+                    )
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Time", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text("Time", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     Row {
                          Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = startTime, onTimeChange = { startTime = it }) }
                          Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = endTime, onTimeChange = { endTime = it }) }
@@ -1984,16 +2057,16 @@ private fun EditEventDialog(
         confirmButton = {
             Button(
                 onClick = { onConfirm(title, description, location, startTime, endTime) },
-                colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 enabled = title.isNotBlank(),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Save", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Back", color = CoralRed, fontWeight = FontWeight.Bold)
+                Text("Back", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
         }
     )
@@ -2051,7 +2124,7 @@ fun FriendPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Invite a Friend", fontWeight = FontWeight.Bold) },
+        title = { Text("Invite a Friend", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
@@ -2059,20 +2132,24 @@ fun FriendPickerDialog(
                     onValueChange = { searchQuery = it },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     placeholder = { Text("Search friends...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
                 )
 
                 if (isLoading) {
                     Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = CoralRed)
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 } else if (friends.isEmpty()) {
-                    Text(if (eventId != null) "All eligible friends are already invited." else "You don't have any friends to invite.", 
-                        textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    Text(if (eventId != null) "All eligible friends are already invited." else "You don't have any friends to invite.",
+                        textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else if (filteredFriends.isEmpty()) {
-                    Text("No friends match \"$searchQuery\"", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    Text("No friends match \"$searchQuery\"", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                         items(filteredFriends, key = { it.uid }) { friend ->
@@ -2094,19 +2171,20 @@ fun FriendPickerDialog(
                                     Text(
                                         text = displayLabel,
                                         style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     if (nickname != null) {
                                         Text(
                                             text = "($baseName)",
                                             style = MaterialTheme.typography.bodySmall,
-                                            color = Color.Gray
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                     Text(
                                         text = friend.email,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = Color.Gray
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -2118,9 +2196,10 @@ fun FriendPickerDialog(
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = CoralRed, fontWeight = FontWeight.Bold)
+                Text("Cancel", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.surface
     )
 }
 
@@ -2150,21 +2229,6 @@ private fun buildWeekDates(
 
 private fun buildOrderedDays(firstDayOfWeek: DayOfWeek): List<DayOfWeek> {
     return (0..6).map { firstDayOfWeek.plus(it.toLong()) }
-}
-
-@Composable
-private fun resolveDateCellBackgroundColor(isSelected: Boolean): Color {
-    return if (isSelected) CardOffWhite else Color.White
-}
-
-@Composable
-private fun resolveDateCellBorderColor(isSelected: Boolean): Color {
-    return if (isSelected) CoralRed else Color.Transparent
-}
-
-@Composable
-private fun resolveDateCellTextColor(isSelected: Boolean): Color {
-    return if (isSelected) CoralRed else MaterialTheme.colorScheme.onSurface
 }
 
 private fun buildDayEventInfoMap(events: List<CalendarEvent>, currentUserId: String?): Map<LocalDate, DayEventInfo> {
@@ -2240,7 +2304,7 @@ private fun EventMetaLine(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodyMedium,
-        color = SoftText
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 
@@ -2265,15 +2329,15 @@ fun InviteDetailDialog(
         shape = RoundedCornerShape(24.dp),
         title = { 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Event, contentDescription = null, tint = CoralRed)
+                Icon(Icons.Outlined.Event, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
-                Text(invite.eventTitle, fontWeight = FontWeight.Bold)
+                Text(invite.eventTitle, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             }
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("From: ", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    Text("From: ", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     Text(invite.fromDisplayName, style = MaterialTheme.typography.bodyMedium, color = SharedEventBlue)
                 }
                 
@@ -2283,28 +2347,29 @@ fun InviteDetailDialog(
                 val timeFormatter = DateTimeFormatter.ofPattern("h:mm a")
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+                    Icon(Icons.Outlined.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(8.dp))
-                    Text(start.format(dayFormatter), style = MaterialTheme.typography.bodySmall)
+                    Text(start.format(dayFormatter), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+                    Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(8.dp))
-                    Text("${start.format(timeFormatter)} - ${end.format(timeFormatter)}", style = MaterialTheme.typography.bodySmall)
+                    @Suppress("DEPRECATION")
+                    Text("${start.format(timeFormatter)} - ${end.format(timeFormatter)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 
                 if (!invite.eventLocation.isNullOrBlank()) {
                     Row(verticalAlignment = Alignment.Top) {
-                        Icon(Icons.Outlined.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+                        Icon(Icons.Outlined.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.width(8.dp))
-                        Text(invite.eventLocation, style = MaterialTheme.typography.bodySmall)
+                        Text(invite.eventLocation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 
                 if (!invite.eventDescription.isNullOrBlank()) {
-                    HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                    Text(invite.eventDescription, style = MaterialTheme.typography.bodyMedium)
+                    HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    Text(invite.eventDescription, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                 }
                 
                 if (invite.isPinnedByLeader) {
@@ -2320,6 +2385,7 @@ fun InviteDetailDialog(
                         ) {
                             Icon(Icons.Outlined.PushPin, contentDescription = null, tint = PinnedEventPurple, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(8.dp))
+                            @Suppress("DEPRECATION")
                             Text("The leader has this event pinned", style = MaterialTheme.typography.labelSmall, color = PinnedEventPurple, fontWeight = FontWeight.Medium)
                         }
                     }
@@ -2328,13 +2394,14 @@ fun InviteDetailDialog(
         },
         confirmButton = {
             Button(onClick = onAccept, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)), shape = RoundedCornerShape(12.dp)) {
-                Text("Accept", fontWeight = FontWeight.Bold)
+                Text("Accept", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
             }
         },
         dismissButton = {
             TextButton(onClick = onDecline) {
-                Text("Decline", color = CoralRed, fontWeight = FontWeight.Bold)
+                Text("Decline", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.surface
     )
 }
