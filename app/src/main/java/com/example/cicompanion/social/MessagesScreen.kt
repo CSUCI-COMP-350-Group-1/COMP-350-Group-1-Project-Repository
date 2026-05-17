@@ -952,12 +952,12 @@ private fun MessageBubble(
 
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isMine) Alignment.End else Alignment.Start) {
         Card(
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(14.dp),
             colors = CardDefaults.cardColors(containerColor = if (isMine) Color(0xFFEF3347) else Color.White),
             border = if (isMine) null else BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f)),
-            modifier = Modifier.widthIn(max = 260.dp)
+            modifier = Modifier.widthIn(max = 300.dp)
         ) {
-            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+            Column(modifier = Modifier.padding(12.dp)) {
                 when (message.type) {
                     "location", "pin" -> {
                         val isLocation = message.type == "location"
@@ -968,14 +968,14 @@ private fun MessageBubble(
                                 if (isLocation) Icons.Default.LocationOn else Icons.Default.PushPin,
                                 contentDescription = null,
                                 tint = if (isMine) Color.White else Color(0xFFEF3347),
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = if (isPin && isPinDeletedBySender) "Pin no longer exists" else message.text,
                                 color = if (isMine) Color.White else Color.Black,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
+                                fontSize = 15.sp
                             )
                         }
 
@@ -984,8 +984,8 @@ private fun MessageBubble(
                             Text(
                                 text = "Near $addressText",
                                 color = if (isMine) Color.White.copy(alpha = 0.8f) else Color.Gray,
-                                fontSize = 9.sp,
-                                modifier = Modifier.padding(start = 20.dp)
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(start = 28.dp, top = 2.dp)
                             )
                         }
 
@@ -994,15 +994,15 @@ private fun MessageBubble(
                                 text = if (isMine) "Already on your map" else "Saved to Map", 
                                 color = if (isMine) Color.White.copy(alpha = 0.9f) else Color(0xFF4CAF50), 
                                 fontWeight = FontWeight.Bold, 
-                                fontSize = 9.sp,
-                                modifier = Modifier.padding(start = 20.dp)
+                                fontSize = 12.sp, 
+                                modifier = Modifier.padding(start = 28.dp, top = 2.dp)
                             )
                         }
 
                         val shouldHideButton = (isPin && isPinDeletedBySender)
 
                         if (!shouldHideButton) {
-                            Spacer(modifier = Modifier.height(3.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
                             Button(
                                 onClick = {
                                     if (lat != null && lng != null) {
@@ -1030,13 +1030,13 @@ private fun MessageBubble(
                                     containerColor = if (isMine) Color.White.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.3f),
                                     contentColor = if (isMine) Color.White else Color.Black
                                 ),
-                                shape = RoundedCornerShape(4.dp),
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                                modifier = Modifier.height(20.dp).wrapContentWidth()
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                                modifier = Modifier.height(34.dp).wrapContentWidth()
                             ) {
                                 Text(
                                     text = if (isAlreadySaved || (isPin && isMine)) "View on Map" else "View/Add Pin on Map",
-                                    fontSize = 9.sp,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -1048,26 +1048,27 @@ private fun MessageBubble(
                                 Icons.Default.Event,
                                 contentDescription = null,
                                 tint = if (isMine) Color.White else Color(0xFFEF3347),
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(22.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "Event Invitation",
                                 color = if (isMine) Color.White else Color.Black,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
+                                fontSize = 15.sp
                             )
                         }
                         Text(
                             text = message.metadata["eventTitle"] ?: "Unknown Event",
                             color = if (isMine) Color.White else Color.Black,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontSize = 10.sp
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontSize = 15.sp,
+                            modifier = Modifier.padding(start = 30.dp)
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         if (!isMine && invite?.status == "pending") {
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(modifier = Modifier.padding(start = 30.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Button(
                                     onClick = {
                                         invite?.let {
@@ -1075,10 +1076,11 @@ private fun MessageBubble(
                                         }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                                    modifier = Modifier.height(20.dp),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                    modifier = Modifier.height(34.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                                    shape = RoundedCornerShape(10.dp)
                                 ) {
-                                    Text("Accept", fontSize = 9.sp, color = Color.White)
+                                    Text("Accept", fontSize = 13.sp, color = Color.White)
                                 }
                                 Button(
                                     onClick = {
@@ -1087,36 +1089,38 @@ private fun MessageBubble(
                                         }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray),
-                                    modifier = Modifier.height(20.dp),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                    modifier = Modifier.height(34.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                                    shape = RoundedCornerShape(10.dp)
                                 ) {
-                                    Text("Decline", fontSize = 9.sp, color = Color.Black)
+                                    Text("Decline", fontSize = 13.sp, color = Color.Black)
                                 }
                             }
                         } else if (!isMine && invite?.status == "accepted") {
-                            Text("Accepted", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                            Text("Accepted", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(start = 30.dp))
                         }
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Button(
                             onClick = { navController.navigate(Routes.CALENDAR) },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (isMine) Color.White.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.5f),
                                 contentColor = if (isMine) Color.White else Color.Black
                             ),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                            modifier = Modifier.height(20.dp)
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                            modifier = Modifier.height(34.dp).wrapContentWidth().padding(start = 30.dp),
+                            shape = RoundedCornerShape(10.dp)
                         ) {
-                            Text("Go to Calendar", fontSize = 9.sp)
+                            Text("Go to Calendar", fontSize = 14.sp)
                         }
                     }
                     else -> {
-                        Text(text = message.text, color = if (isMine) Color.White else Color.Black, fontSize = 12.sp)
+                        Text(text = message.text, color = if (isMine) Color.White else Color.Black, fontSize = 16.sp)
                     }
                 }
             }
         }
-        Text(text = timeString, fontSize = 9.sp, color = Color.Gray, modifier = Modifier.padding(top = 1.dp, start = 4.dp, end = 4.dp))
+        Text(text = timeString, fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp, start = 8.dp, end = 8.dp))
     }
 }
 
