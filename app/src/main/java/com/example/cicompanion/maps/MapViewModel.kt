@@ -14,6 +14,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.launch
 import java.util.UUID
+import kotlin.math.abs
 
 class MapViewModel : ViewModel() {
     var customPins by mutableStateOf<List<CustomPin>>(emptyList())
@@ -85,6 +86,7 @@ class MapViewModel : ViewModel() {
         if (!isPinMode) {
             tempPinLocation = null
             editingPinId = null
+            errorMessage = null
         }
     }
 
@@ -92,6 +94,11 @@ class MapViewModel : ViewModel() {
         isPinMode = false
         tempPinLocation = null
         editingPinId = null
+        errorMessage = null
+    }
+
+    fun clearError() {
+        errorMessage = null
     }
 
     fun startEditingLocation(pinId: String) {
@@ -111,9 +118,24 @@ class MapViewModel : ViewModel() {
         tempPinLocation = null
     }
 
+    private fun isDuplicate(latitude: Double, longitude: Double, currentPinId: String?): Boolean {
+        // Check if any existing pin is very close to this location
+        // Threshold of ~1 meter (0.00001 degrees)
+        return customPins.any { 
+            it.id != currentPinId && 
+            abs(it.latitude - latitude) < 0.00001 && 
+            abs(it.longitude - longitude) < 0.00001 
+        }
+    }
+
     fun savePin(name: String, description: String, color: Color, associatedEventId: String? = null) {
         val location = tempPinLocation ?: return
         val user = FirebaseAuth.getInstance().currentUser ?: return
+
+        if (isDuplicate(location.latitude, location.longitude, editingPinId)) {
+            errorMessage = "A pin already exists at this location."
+            return
+        }
 
         val pinToSave = if (editingPinId != null) {
             val existing = customPins.find { it.id == editingPinId }
@@ -150,6 +172,7 @@ class MapViewModel : ViewModel() {
                 isPinMode = false
                 tempPinLocation = null
                 editingPinId = null
+                errorMessage = null
             }
         }
     }

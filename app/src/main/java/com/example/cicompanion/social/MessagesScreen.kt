@@ -3,8 +3,10 @@ package com.example.cicompanion.social
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.location.Geocoder
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -40,10 +42,12 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
 
 @Composable
 private fun rememberAuthUser(): FirebaseUser? {
@@ -275,7 +279,7 @@ fun MessageThreadScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSending by remember { mutableStateOf(false) }
     var conversationExists by remember { mutableStateOf(false) }
-    var isFriend by remember { mutableStateOf(true) }
+    var isFriend by remember { mutableStateOf<Boolean>(true) }
 
     var userPins by remember { mutableStateOf<List<CustomPin>>(emptyList()) }
     var userEvents by remember { mutableStateOf<List<CalendarEvent>>(emptyList()) }
@@ -882,17 +886,28 @@ private fun MessageBubble(
     ownedPins: List<CustomPin> = emptyList(),
     onPinSaved: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val timeString = remember(message.sentAt) {
         val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
         sdf.format(Date(message.sentAt))
     }
-    val scope = rememberCoroutineScope()
-
+    
     var invite by remember { mutableStateOf<EventInvite?>(null) }
     var inviteError by remember { mutableStateOf<String?>(null) }
-    var isPinAlreadySaved by remember(message.id, ownedPins) {
-        mutableStateOf(message.type == "pin" && ownedPins.any { it.latitude == message.metadata["lat"]?.toDoubleOrNull() && it.longitude == message.metadata["lng"]?.toDoubleOrNull() })
+    var addressText by remember { mutableStateOf<String?>(null) }
+    
+    // Check if the coordinate in the metadata is already saved as a pin by the current user
+    val isAlreadySaved = remember(message.id, ownedPins) {
+        val lat = message.metadata["lat"]?.toDoubleOrNull()
+        val lng = message.metadata["lng"]?.toDoubleOrNull()
+        (message.type == "pin" || message.type == "location") && lat != null && lng != null &&
+        ownedPins.any { 
+            abs(it.latitude - lat) < 0.00001 && 
+            abs(it.longitude - lng) < 0.00001 
+        }
     }
+
+    var isPinDeletedBySender by remember { mutableStateOf(false) }
 
     if (message.type == "event_invite" && !isMine) {
         LaunchedEffect(message.id) {
@@ -901,69 +916,130 @@ private fun MessageBubble(
         }
     }
 
+    if (message.type == "pin") {
+        LaunchedEffect(message.metadata["pinId"]) {
+            val pinId = message.metadata["pinId"]
+            if (pinId != null) {
+                SocialRepository.checkPinExists(message.senderId, pinId) { exists ->
+                    isPinDeletedBySender = !exists
+                }
+            }
+        }
+    }
+
+    // Geocoding for rough area implementation
+    val lat = message.metadata["lat"]?.toDoubleOrNull()
+    val lng = message.metadata["lng"]?.toDoubleOrNull()
+    if ((message.type == "location" || message.type == "pin") && lat != null && lng != null) {
+        LaunchedEffect(lat, lng) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val geocoder = Geocoder(context, Locale.getDefault())
+                    val addresses = geocoder.getFromLocation(lat, lng, 1)
+                    if (!addresses.isNullOrEmpty()) {
+                        val addr = addresses[0]
+                        val area = when {
+                            !addr.featureName.isNullOrEmpty() && addr.featureName != addr.thoroughfare -> addr.featureName
+                            !addr.thoroughfare.isNullOrEmpty() -> addr.thoroughfare
+                            else -> addr.locality
+                        }
+                        addressText = area
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isMine) Alignment.End else Alignment.Start) {
         Card(
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = if (isMine) Color(0xFFEF3347) else Color.White)
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(containerColor = if (isMine) Color(0xFFEF3347) else Color.White),
+            border = if (isMine) null else BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f)),
+            modifier = Modifier.widthIn(max = 260.dp)
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
                 when (message.type) {
                     "location", "pin" -> {
+                        val isLocation = message.type == "location"
+                        val isPin = message.type == "pin"
+                        
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                if (message.type == "pin") Icons.Default.PushPin else Icons.Default.LocationOn,
+                                if (isLocation) Icons.Default.LocationOn else Icons.Default.PushPin,
                                 contentDescription = null,
-                                tint = if (isMine) Color.White else Color(0xFFEF3347)
+                                tint = if (isMine) Color.White else Color(0xFFEF3347),
+                                modifier = Modifier.size(14.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = message.text,
+                                text = if (isPin && isPinDeletedBySender) "Pin no longer exists" else message.text,
                                 color = if (isMine) Color.White else Color.Black,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        if (message.type == "pin" && !isMine && isPinAlreadySaved) {
-                            Text("Saved to Map", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(
-                            onClick = {
-                                val lat = message.metadata["lat"]?.toDoubleOrNull()
-                                val lng = message.metadata["lng"]?.toDoubleOrNull()
-                                if (lat != null && lng != null) {
-                                    val route = if (message.type == "pin") {
-                                        Routes.mapWithLocation(
-                                            lat = lat,
-                                            lng = lng,
-                                            tempName = message.metadata["pinName"] ?: "Shared Pin",
-                                            tempDesc = message.metadata["description"],
-                                            tempColor = message.metadata["colorArgb"]?.toIntOrNull(),
-                                            tempEventId = message.metadata["associatedEventId"]
-                                        )
-                                    } else {
-                                        Routes.mapWithLocation(
-                                            lat = lat,
-                                            lng = lng,
-                                            tempName = "Shared Location",
-                                            tempDesc = "A location shared with you"
-                                        )
-                                    }
-                                    navController.navigate(route)
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isMine) Color.White.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.5f),
-                                contentColor = if (isMine) Color.White else Color.Black
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Text(
-                                text = if (message.type == "pin") "View/Add Pin on Map" else "View on Map",
+                                fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
                             )
+                        }
+
+                        // Remove 'near' for custom pin, only show for location shares
+                        if (!addressText.isNullOrEmpty() && isLocation) {
+                            Text(
+                                text = "Near $addressText",
+                                color = if (isMine) Color.White.copy(alpha = 0.8f) else Color.Gray,
+                                fontSize = 9.sp,
+                                modifier = Modifier.padding(start = 20.dp)
+                            )
+                        }
+
+                        if (!isPinDeletedBySender && isAlreadySaved) {
+                            Text(
+                                text = if (isMine) "Already on your map" else "Saved to Map", 
+                                color = if (isMine) Color.White.copy(alpha = 0.9f) else Color(0xFF4CAF50), 
+                                fontWeight = FontWeight.Bold, 
+                                fontSize = 9.sp,
+                                modifier = Modifier.padding(start = 20.dp)
+                            )
+                        }
+
+                        val shouldHideButton = (isPin && isPinDeletedBySender)
+
+                        if (!shouldHideButton) {
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Button(
+                                onClick = {
+                                    if (lat != null && lng != null) {
+                                        val route = if (isPin) {
+                                            Routes.mapWithLocation(
+                                                lat = lat,
+                                                lng = lng,
+                                                tempName = message.metadata["pinName"] ?: "Shared Pin",
+                                                tempDesc = message.metadata["description"],
+                                                tempColor = message.metadata["colorArgb"]?.toIntOrNull(),
+                                                tempEventId = message.metadata["associatedEventId"]
+                                            )
+                                        } else {
+                                            Routes.mapWithLocation(
+                                                lat = lat,
+                                                lng = lng,
+                                                tempName = if (isMine) "My Shared Location" else "Shared Location",
+                                                tempDesc = if (isMine) "A location you shared" else "A location shared with you"
+                                            )
+                                        }
+                                        navController.navigate(route)
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isMine) Color.White.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.3f),
+                                    contentColor = if (isMine) Color.White else Color.Black
+                                ),
+                                shape = RoundedCornerShape(4.dp),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                                modifier = Modifier.height(20.dp).wrapContentWidth()
+                            ) {
+                                Text(
+                                    text = if (isAlreadySaved || (isPin && isMine)) "View on Map" else "View/Add Pin on Map",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                     "event_invite" -> {
@@ -971,24 +1047,27 @@ private fun MessageBubble(
                             Icon(
                                 Icons.Default.Event,
                                 contentDescription = null,
-                                tint = if (isMine) Color.White else Color(0xFFEF3347)
+                                tint = if (isMine) Color.White else Color(0xFFEF3347),
+                                modifier = Modifier.size(14.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Event Invitation",
                                 color = if (isMine) Color.White else Color.Black,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
                             )
                         }
                         Text(
                             text = message.metadata["eventTitle"] ?: "Unknown Event",
                             color = if (isMine) Color.White else Color.Black,
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 10.sp
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
                         if (!isMine && invite?.status == "pending") {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Button(
                                     onClick = {
                                         invite?.let {
@@ -996,10 +1075,10 @@ private fun MessageBubble(
                                         }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                                    modifier = Modifier.height(32.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                    modifier = Modifier.height(20.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                                 ) {
-                                    Text("Accept", fontSize = 12.sp, color = Color.White)
+                                    Text("Accept", fontSize = 9.sp, color = Color.White)
                                 }
                                 Button(
                                     onClick = {
@@ -1008,14 +1087,14 @@ private fun MessageBubble(
                                         }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray),
-                                    modifier = Modifier.height(32.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                    modifier = Modifier.height(20.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                                 ) {
-                                    Text("Decline", fontSize = 12.sp, color = Color.Black)
+                                    Text("Decline", fontSize = 9.sp, color = Color.Black)
                                 }
                             }
                         } else if (!isMine && invite?.status == "accepted") {
-                            Text("Accepted", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("Accepted", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 9.sp)
                         }
 
                         Spacer(modifier = Modifier.height(4.dp))
@@ -1025,19 +1104,19 @@ private fun MessageBubble(
                                 containerColor = if (isMine) Color.White.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.5f),
                                 contentColor = if (isMine) Color.White else Color.Black
                             ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp)
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                            modifier = Modifier.height(20.dp)
                         ) {
-                            Text("Go to Calendar", fontSize = 12.sp)
+                            Text("Go to Calendar", fontSize = 9.sp)
                         }
                     }
                     else -> {
-                        Text(text = message.text, color = if (isMine) Color.White else Color.Black)
+                        Text(text = message.text, color = if (isMine) Color.White else Color.Black, fontSize = 12.sp)
                     }
                 }
             }
         }
-        Text(text = timeString, fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(top = 2.dp, start = 4.dp, end = 4.dp))
+        Text(text = timeString, fontSize = 9.sp, color = Color.Gray, modifier = Modifier.padding(top = 1.dp, start = 4.dp, end = 4.dp))
     }
 }
 

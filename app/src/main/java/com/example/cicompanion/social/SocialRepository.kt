@@ -893,6 +893,19 @@ object SocialRepository {
             }
     }
 
+    fun checkPinExists(
+        userId: String,
+        pinId: String,
+        onResult: (Boolean) -> Unit
+    ) {
+        usersCollection().document(userId)
+            .collection("customPins")
+            .document(pinId)
+            .get()
+            .addOnSuccessListener { onResult(it.exists()) }
+            .addOnFailureListener { onResult(false) }
+    }
+
     fun leaveEvent(
         userId: String,
         eventId: String,

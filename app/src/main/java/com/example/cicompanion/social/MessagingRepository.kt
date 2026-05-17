@@ -12,8 +12,6 @@ object MessagingRepository {
     private const val CONVERSATIONS_COLLECTION = "conversations"
     private const val MESSAGES_SUBCOLLECTION = "messages"
 
-    // Always keep participantIds in a stable sorted order so Firestore update rules do not fail
-    // when the other user replies.
     private fun buildParticipantIds(firstUserId: String, secondUserId: String): List<String> {
         return listOf(firstUserId, secondUserId).sorted()
     }
@@ -47,7 +45,7 @@ object MessagingRepository {
                 onError(exception.message ?: "Could not load user profile.")
             }
     }
-    // Check whether the conversation document already exists before attaching a message listener.
+
     fun checkConversationExists(
         conversationId: String,
         onResult: (Boolean) -> Unit,
@@ -152,10 +150,16 @@ object MessagingRepository {
 
         val participantIds = buildParticipantIds(currentUser.uid, friend.uid)
 
+        // Modified: always use messageText for preview if available, otherwise fallback to bracketed type.
+        val lastMessageText = when {
+            trimmedText.isNotBlank() -> trimmedText
+            else -> "[$type]"
+        }
+
         val summary = hashMapOf(
             "id" to conversationId,
-            "participantIds" to participantIds, // stable order
-            "lastMessageText" to if (type == "text") trimmedText else "[$type]",
+            "participantIds" to participantIds,
+            "lastMessageText" to lastMessageText,
             "lastMessageSenderId" to currentUser.uid,
             "lastMessageAt" to sentAt
         )
@@ -171,7 +175,6 @@ object MessagingRepository {
             metadata = metadata
         )
 
-        // MESSAGING batch keeps summary + first/new message together
         db.runBatch { batch ->
             batch.set(conversationRef, summary, SetOptions.merge())
             batch.set(messageRef, message)
@@ -184,7 +187,7 @@ object MessagingRepository {
                     ?: currentUser.email
                     ?: "Someone",
                 conversationId = conversationId,
-                messagePreview = if (type == "text") trimmedText.take(120) else "[$type]"
+                messagePreview = lastMessageText.take(120)
             )
             onSuccess()
         }.addOnFailureListener { exception ->

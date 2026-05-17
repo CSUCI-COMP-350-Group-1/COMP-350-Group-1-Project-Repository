@@ -2,6 +2,7 @@ package com.example.cicompanion.maps
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,63 +32,88 @@ fun MapTopControls(
     filteredLocations: List<CampusLocation>,
     onResultClick: (CampusLocation) -> Unit,
     filterType: LocationType?,
-    onFilterClick: (LocationType?) -> Unit
+    onFilterClick: (LocationType?) -> Unit,
+    onMenuClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Surface(
-        shadowElevation = 8.dp,
-        color = Color.White
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Column(modifier = Modifier.padding(bottom = 12.dp)) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                placeholder = { Text("Search campus...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = onClearSearch) {
-                            Icon(Icons.Default.Close, contentDescription = null, tint = Color.Gray)
+        // Floating search bar with menu button
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            shadowElevation = 4.dp,
+            color = Color.White,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Search campus...") },
+                    leadingIcon = { 
+                        IconButton(onClick = onMenuClick) {
+                            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.DarkGray)
                         }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Color.LightGray.copy(alpha = 0.3f),
-                    focusedBorderColor = CoralRed,
-                    focusedContainerColor = Color(0xFFF8F8F8),
-                    unfocusedContainerColor = Color(0xFFF8F8F8)
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = onClearSearch) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear", tint = Color.Gray)
+                            }
+                        } else {
+                            Icon(Icons.Default.Search, contentDescription = null, tint = Color.LightGray, modifier = Modifier.padding(end = 8.dp))
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(24.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedBorderColor = Color.Transparent,
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White
+                    )
                 )
-            )
 
-            if (showSearchResults && filteredLocations.isNotEmpty()) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                        .heightIn(max = 200.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
-                ) {
-                    LazyColumn {
+                if (showSearchResults && filteredLocations.isNotEmpty()) {
+                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 300.dp)
+                    ) {
                         items(filteredLocations) { location ->
                             ListItem(
-                                headlineContent = { Text(location.name, fontWeight = FontWeight.Medium) },
-                                supportingContent = { Text(location.type.name, fontSize = 12.sp, color = Color.Gray) },
-                                leadingContent = { Icon(location.icon, contentDescription = null, tint = location.color, modifier = Modifier.size(24.dp)) },
+                                headlineContent = { Text(location.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp) },
+                                supportingContent = { Text(location.type.name.lowercase().replaceFirstChar { it.uppercase() }, fontSize = 11.sp, color = Color.Gray) },
+                                leadingContent = { 
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = location.color.copy(alpha = 0.1f),
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                location.icon, 
+                                                contentDescription = null, 
+                                                tint = location.color, 
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                },
                                 modifier = Modifier.clickable { onResultClick(location) }
                             )
                         }
                     }
                 }
             }
-
-            CategoryFilterRow(selectedType = filterType, onFilterClick = onFilterClick)
         }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        CategoryFilterRow(selectedType = filterType, onFilterClick = onFilterClick)
     }
 }
 
@@ -95,8 +121,8 @@ fun MapTopControls(
 fun CategoryFilterRow(selectedType: LocationType?, onFilterClick: (LocationType?) -> Unit) {
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-        contentPadding = PaddingValues(horizontal = 16.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(bottom = 8.dp)
     ) {
         item {
             CustomFilterChip(
@@ -137,9 +163,10 @@ fun CustomFilterChip(
     Surface(
         onClick = onClick,
         color = if (selected) CoralRed else Color.White,
-        shape = RoundedCornerShape(12.dp),
-        border = if (selected) null else BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f)),
-        modifier = Modifier.height(36.dp)
+        shape = RoundedCornerShape(16.dp),
+        shadowElevation = 2.dp,
+        border = if (selected) null else BorderStroke(0.5.dp, Color.LightGray.copy(alpha = 0.5f)),
+        modifier = Modifier.height(32.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -149,7 +176,7 @@ fun CustomFilterChip(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(14.dp),
                     tint = if (selected) Color.White else Color.DarkGray
                 )
                 Spacer(Modifier.width(6.dp))
@@ -157,9 +184,9 @@ fun CustomFilterChip(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                 color = if (selected) Color.White else Color.DarkGray,
-                fontSize = 13.sp
+                fontSize = 12.sp
             )
         }
     }
@@ -180,8 +207,10 @@ fun MapOverlays(
     Box(modifier = Modifier.fillMaxSize()) {
         if (!isPinMode) {
             Column(
-                modifier = Modifier.align(Alignment.BottomStart).padding(20.dp).padding(bottom = 90.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 20.dp, bottom = 48.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 if (hasLocationPermission) {
                     FloatingActionButton(
@@ -189,23 +218,37 @@ fun MapOverlays(
                         shape = CircleShape,
                         containerColor = Color.White,
                         contentColor = CoralRed,
-                        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
+                        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp),
+                        modifier = Modifier
+                            .size(64.dp)
+                            .border(3.dp, CoralRed, CircleShape)
                     ) {
-                        Icon(painter = painterResource(id = android.R.drawable.ic_menu_mylocation), contentDescription = "My Location", modifier = Modifier.size(24.dp))
+                        if (isLoadingLocation) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 3.dp, color = CoralRed)
+                        } else {
+                            Icon(
+                                painter = painterResource(id = android.R.drawable.ic_menu_mylocation), 
+                                contentDescription = "My Location", 
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
                     }
                 }
 
                 FloatingActionButton(
                     onClick = onTogglePinMode,
                     shape = CircleShape,
-                    containerColor = Color.White,
-                    contentColor = CoralRed,
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
+                    containerColor = CoralRed,
+                    contentColor = Color.White,
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
+                    modifier = Modifier
+                        .size(64.dp)
+                        .border(3.dp, Color.White, CircleShape)
                 ) {
                     Icon(
                         imageVector = Icons.Default.AddLocationAlt,
                         contentDescription = "Custom Pin",
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(32.dp)
                     )
                 }
             }
@@ -225,7 +268,8 @@ fun MapOverlays(
                            else "Tap on map to place your pin",
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     color = Color.White,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
                 )
             }
 
@@ -242,31 +286,33 @@ fun MapOverlays(
                         Button(
                             onClick = onClearPin,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = CoralRed),
-                            shape = RoundedCornerShape(50),
-                            border = BorderStroke(1.dp, CoralRed)
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, CoralRed),
+                            contentPadding = PaddingValues(horizontal = 16.dp)
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Change Location")
+                            Text("Retry")
                         }
                         Button(
                             onClick = onConfirmPin,
                             colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
-                            shape = RoundedCornerShape(50)
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 24.dp)
                         ) {
                             Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Confirm Location")
+                            Text("Confirm")
                         }
                     }
                 }
 
                 // Exit pin mode button
                 Surface(
-                    onClick = onTogglePinMode,
+                    onClick = { onTogglePinMode() },
                     color = Color.White.copy(alpha = 0.9f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color.LightGray),
+                    shape = RoundedCornerShape(20.dp),
+                    shadowElevation = 2.dp,
                     modifier = Modifier.height(40.dp)
                 ) {
                     Row(

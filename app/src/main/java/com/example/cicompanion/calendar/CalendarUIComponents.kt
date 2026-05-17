@@ -1040,7 +1040,7 @@ fun EventMembersDialog(event: CalendarEvent, currentUserId: String, onDismiss: (
     var nicks by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var loading by remember { mutableStateOf(true) }
     var sel by remember { mutableStateOf(setOf<String>()) }
-    val isOwner = event.ownerId == currentUserId
+    val isOwner = !event.ownerId.isNullOrBlank() && event.ownerId == currentUserId
 
     LaunchedEffect(currentUserId) {
         SocialRepository.fetchNicknames(currentUserId, { fetchedNicks -> nicks = fetchedNicks }, {})
@@ -1053,27 +1053,46 @@ fun EventMembersDialog(event: CalendarEvent, currentUserId: String, onDismiss: (
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Event Members", fontWeight = FontWeight.Bold) },
+        title = { Text("Event Members", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge) },
         text = {
             if (loading) {
                 Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = BrandRedDark)
+                    CircularProgressIndicator(color = CoralRed)
                 }
             } else {
-                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item { Text("Host", style = MaterialTheme.typography.labelSmall, color = Color.Gray) }
-                    item { MemberRow(event.ownerId ?: "", currentUserId, nicks[event.ownerId], true) }
+                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    item { Text("Host", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold) }
+                    item { 
+                        MemberRow(
+                            uId = event.ownerId ?: "", 
+                            curId = currentUserId, 
+                            nick = nicks[event.ownerId], 
+                            isHostRow = true, 
+                            isOwnerViewer = isOwner,
+                            isMe = event.ownerId == currentUserId
+                        ) 
+                    }
                     if (members.any { it.uid != event.ownerId }) {
                         item {
                             Spacer(Modifier.height(8.dp))
-                            Text("Participants", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            Text("Participants", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold)
                         }
                         items(items = members.filter { it.uid != event.ownerId }) { m ->
-                            MemberRow(m.uid, currentUserId, nicks[m.uid], false, sel.contains(m.uid), {
-                                if (isOwner) {
-                                    if (sel.contains(m.uid)) sel -= m.uid else sel += m.uid
+                            val isMe = m.uid == currentUserId
+                            MemberRow(
+                                uId = m.uid, 
+                                curId = currentUserId, 
+                                nick = nicks[m.uid], 
+                                isHostRow = false, 
+                                isOwnerViewer = isOwner, 
+                                isSel = sel.contains(m.uid),
+                                isMe = isMe,
+                                onTog = {
+                                    if (isOwner) {
+                                        if (sel.contains(m.uid)) sel -= m.uid else sel += m.uid
+                                    }
                                 }
-                            })
+                            )
                         }
                     }
                 }
@@ -1081,46 +1100,72 @@ fun EventMembersDialog(event: CalendarEvent, currentUserId: String, onDismiss: (
         },
         confirmButton = {
             if (isOwner && sel.isNotEmpty()) {
-                Button(onClick = { onKick(sel.toList()) }, colors = ButtonDefaults.buttonColors(containerColor = BrandRedDark)) {
+                Button(onClick = { onKick(sel.toList()) }, colors = ButtonDefaults.buttonColors(containerColor = CoralRed)) {
                     Text("Remove Selected")
                 }
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text("Close", color = CoralRed, fontWeight = FontWeight.Bold)
             }
         }
     )
 }
 
 @Composable
-fun MemberRow(uId: String, curId: String, nick: String?, isOwn: Boolean, isSel: Boolean = false, onTog: () -> Unit = {}) {
+fun MemberRow(
+    uId: String, 
+    curId: String, 
+    nick: String?, 
+    isHostRow: Boolean, 
+    isOwnerViewer: Boolean, 
+    isMe: Boolean,
+    isSel: Boolean = false, 
+    onTog: () -> Unit = {}
+) {
     var p by remember { mutableStateOf<UserProfile?>(null) }
-    LaunchedEffect(uId) { SocialRepository.fetchUserProfile(uId, { profile -> p = fetchedProfile(profile) }, {}) }
+    LaunchedEffect(uId) { SocialRepository.fetchUserProfile(uId, { profile -> p = profile }, {}) }
+    
+    val baseName = nick ?: p?.displayName ?: "Loading..."
+    val finalName = if (isMe) "$baseName (You)" else baseName
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .clickable { onTog() }
-            .background(if (isSel) BrandRedDark.copy(alpha = 0.1f) else Color.Transparent)
-            .padding(8.dp),
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (isMe) CoralRed.copy(alpha = 0.12f) 
+                else if (isSel) CoralRed.copy(alpha = 0.05f) 
+                else Color.Transparent
+            )
+            .then(if (isMe) Modifier.border(1.dp, CoralRed.copy(alpha = 0.3f), RoundedCornerShape(12.dp)) else Modifier)
+            .then(if (isOwnerViewer && !isHostRow && !isMe) Modifier.clickable { onTog() } else Modifier)
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         UserAvatar(p?.photoUrl ?: "")
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text((nick ?: p?.displayName ?: "Loading...") + if (uId == curId) " (You)" else "", fontWeight = if (isOwn) FontWeight.Bold else FontWeight.Medium)
-            if (isOwn) Text("Host", style = MaterialTheme.typography.bodySmall, color = CustomEventOrange)
+            Text(
+                text = finalName, 
+                fontWeight = if (isHostRow || isMe) FontWeight.Bold else FontWeight.Medium,
+                color = if (isMe) CoralRed else Color.Black
+            )
+            if (isHostRow) {
+                Text("Host:", style = MaterialTheme.typography.bodySmall, color = CustomEventOrange)
+            }
         }
-        if (!isOwn) {
-            Checkbox(checked = isSel, onCheckedChange = { onTog() })
+        // Only show selection checkbox to the owner for participants other than themselves
+        if (isOwnerViewer && !isHostRow && !isMe) {
+            Checkbox(
+                checked = isSel, 
+                onCheckedChange = { onTog() },
+                colors = CheckboxDefaults.colors(checkedColor = CoralRed)
+            )
         }
     }
 }
-
-// Helper for MemberRow profile state update
-private fun fetchedProfile(profile: UserProfile?): UserProfile? = profile
 
 @Composable
 fun InviteDetailDialog(invite: EventInvite, onDismiss: () -> Unit, onAccept: () -> Unit, onDecline: () -> Unit) {

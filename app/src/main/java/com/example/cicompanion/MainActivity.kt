@@ -55,7 +55,6 @@ import kotlinx.coroutines.launch
 
 
 class MainActivity : ComponentActivity() {
-    // FOR PUSH NOTIFICATIONS runtime permission launcher for Android 13+
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
@@ -98,7 +97,6 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    // PUSH NOTIFICATIONS helper for Android 13+ notification permission
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
 
@@ -122,7 +120,6 @@ fun AppNavigation(notificationRoute: String? = null,
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // Create shared ViewModels here to sync across screens and persist during navigation
     val calendarViewModel: CalendarViewModel = viewModel()
     val homeViewModel: HomeViewModel = viewModel()
     val mapViewModel: MapViewModel = viewModel()
@@ -143,10 +140,15 @@ fun AppNavigation(notificationRoute: String? = null,
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val currentScreenTitle = screenTitleForRoute(currentRoute)
+    
+    val showDefaultTopBar = currentRoute != null && !currentRoute.startsWith(Routes.MAP)
+    val isMapScreen = currentRoute?.startsWith(Routes.MAP) == true
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = drawerState.isOpen,
+        // Tone down sidebar swipe: disable edge swipe to open on map screen to prevent interference.
+        // It remains functional via the menu button, and can be swiped closed if already open.
+        gesturesEnabled = if (isMapScreen) drawerState.isOpen else true,
         drawerContent = {
             DrawerProfileContent(
                 navController,
@@ -158,34 +160,33 @@ fun AppNavigation(notificationRoute: String? = null,
         Scaffold(
             containerColor = AppBackground,
             topBar = {
-                TopBar(
-                    title = currentScreenTitle,
-                    showBackButton =
-                        currentRoute == Routes.FRIENDS_AND_REQUESTS ||
-                                currentRoute == Routes.EDIT_PROFILE ||
-                                currentRoute?.startsWith(Routes.MESSAGE_THREAD_BASE) == true, // MESSAGING
-                    onHamburgerClick = {
-                        scope.launch { drawerState.open() }
-                    },
-                    onBackClick = {
-                        // MESSAGING  prefer normal back-stack behavior for thread screens
-                        val popped = navController.popBackStack()
-                        if (!popped) {
-                            navController.navigate(Routes.PROFILE) {
-                                popUpTo(Routes.PROFILE) { inclusive = false }
-                                launchSingleTop = true
+                if (showDefaultTopBar) {
+                    TopBar(
+                        title = currentScreenTitle,
+                        showBackButton =
+                            currentRoute == Routes.FRIENDS_AND_REQUESTS ||
+                                    currentRoute == Routes.EDIT_PROFILE ||
+                                    currentRoute?.startsWith(Routes.MESSAGE_THREAD_BASE) == true,
+                        onHamburgerClick = {
+                            scope.launch { drawerState.open() }
+                        },
+                        onBackClick = {
+                            val popped = navController.popBackStack()
+                            if (!popped) {
+                                navController.navigate(Routes.PROFILE) {
+                                    popUpTo(Routes.PROFILE) { inclusive = false }
+                                    launchSingleTop = true
+                                }
                             }
-                        }
-                    },
-                    onNotificationClick = {
-                        // navController.navigate(Routes.NOTIFICATIONS)
-                    },
-                    navController = navController
-                )
+                        },
+                        onNotificationClick = { },
+                        navController = navController
+                    )
+                }
             },
             bottomBar = { NavBar(navController) }
         ) { paddingValues ->
-            Box(modifier = Modifier.padding(paddingValues)) {
+            Box(modifier = Modifier.padding(if (showDefaultTopBar) paddingValues else androidx.compose.foundation.layout.PaddingValues(bottom = paddingValues.calculateBottomPadding()))) {
                 NavHost(navController = navController, startDestination = Routes.HOME) {
                     composable(Routes.HOME) {
                         HomeScreen(navController, calendarViewModel, homeViewModel)
@@ -217,21 +218,15 @@ fun AppNavigation(notificationRoute: String? = null,
                             tempName = tempName,
                             tempDesc = tempDesc,
                             tempColor = tempColor,
-                            tempEventId = tempEventId
+                            tempEventId = tempEventId,
+                            onMenuClick = { scope.launch { drawerState.open() } }
                         )
                     }
                     composable(Routes.CALENDAR) {
-                        CalendarScreen(
-                            navController = navController,
-                            calendarViewModel = calendarViewModel
-                        )
+                        CalendarScreen(navController, calendarViewModel)
                     }
                     composable(Routes.SCHEDULE) {
-                        CalendarScreen(
-                            navController = navController,
-                            calendarViewModel = calendarViewModel,
-                            initialTab = 1
-                        )
+                        CalendarScreen(navController, calendarViewModel, initialTab = 1)
                     }
                     composable(Routes.STUDY_ROOM) {
                         RoomListScreen(viewModel = viewModel(), navController = navController)
@@ -239,11 +234,9 @@ fun AppNavigation(notificationRoute: String? = null,
                     composable(Routes.SEARCH) {
                         SearchScreen(navController)
                     }
-
                     composable(Routes.PROFILE) {
                         ProfileScreen(navController)
                     }
-
                     composable(
                         route = "${Routes.PROFILE}/{userId}",
                         arguments = listOf(navArgument("userId") { type = NavType.StringType })
@@ -251,12 +244,10 @@ fun AppNavigation(notificationRoute: String? = null,
                         val userId = backStackEntry.arguments?.getString("userId")
                         ProfileScreen(navController, userId)
                     }
-
                     composable(Routes.SOCIAL) { backStackEntry ->
                         val sharedLocation = backStackEntry.arguments?.getString("shareLocation")
                         MessagesScreen(navController, sharedLocation)
                     }
-
                     composable(
                         route = Routes.MESSAGE_THREAD,
                         arguments = listOf(
@@ -276,15 +267,12 @@ fun AppNavigation(notificationRoute: String? = null,
                             initialMessage = initialMessage
                         )
                     }
-
                     composable(Routes.FRIENDS_AND_REQUESTS) {
                         FriendsAndRequestsScreen(navController, initialTab = 1)
                     }
-
                     composable(Routes.FRIEND_REQUESTS) {
                         FriendsAndRequestsScreen(navController, initialTab = 2)
                     }
-
                     composable(Routes.EDIT_PROFILE) {
                         EditProfileScreen(navController)
                     }

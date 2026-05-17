@@ -5,8 +5,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -14,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.cicompanion.calendar.data.repository.CourseCatalogRepository
 import com.example.cicompanion.calendar.model.CourseCatalogMajor
@@ -81,15 +85,36 @@ fun ScheduleTab(viewModel: CalendarViewModel) {
     Scaffold(
         containerColor = Color.White,
         floatingActionButton = {
-            FloatingActionButton(
+            ExtendedFloatingActionButton(
                 onClick = { showAddClassDialog = true },
                 containerColor = CoralRed,
                 contentColor = Color.White,
-                shape = androidx.compose.foundation.shape.CircleShape,
-                modifier = Modifier.padding(bottom = 8.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Class")
-            }
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(bottom = 8.dp),
+                icon = {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.School, contentDescription = null)
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .offset(x = 4.dp, y = 4.dp)
+                                .size(14.dp)
+                                .background(Color.White, CircleShape)
+                                .padding(1.dp)
+                                .background(CoralRed, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(10.dp)
+                            )
+                        }
+                    }
+                },
+                text = { Text("Add Class", fontWeight = FontWeight.Bold) }
+            )
         }
     ) { padding ->
         Column(
@@ -110,7 +135,7 @@ fun ScheduleTab(viewModel: CalendarViewModel) {
                         Icon(Icons.Outlined.School, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color.LightGray)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("No classes added yet.", color = Color.Gray)
-                        Text("Tap '+' to add your first class.", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                        Text("Tap 'Add Class' to add your first class.", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             } else {

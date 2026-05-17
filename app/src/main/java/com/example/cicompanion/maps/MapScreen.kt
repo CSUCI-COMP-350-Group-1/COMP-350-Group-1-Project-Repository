@@ -23,8 +23,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.cicompanion.calendar.CalendarViewModel
 import com.example.cicompanion.social.FirestoreManager
-import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.CoralRed
+import com.example.cicompanion.ui.Routes
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -36,6 +36,7 @@ import com.google.maps.android.compose.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import android.annotation.SuppressLint
+import kotlin.math.abs
 
 val campusLocations = listOf(
     CampusLocation(id = "loc_bell_tower", name = "Bell Tower", position = LatLng(34.16138604361421, -119.0432651672823), description = "Center of Campus", type = LocationType.BUILDING, icon = Icons.Default.Business, color = Color(0xFFD32F2F)),
@@ -112,14 +113,15 @@ val campusLocations = listOf(
 @Composable
 fun MapScreen(
     navController: NavHostController, 
-    calendarViewModel: com.example.cicompanion.calendar.CalendarViewModel,
+    calendarViewModel: CalendarViewModel,
     mapViewModel: MapViewModel = viewModel(),
     initialLat: Double? = null,
     initialLng: Double? = null,
     tempName: String? = null,
     tempDesc: String? = null,
     tempColor: Int? = null,
-    tempEventId: String? = null
+    tempEventId: String? = null,
+    onMenuClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -133,6 +135,7 @@ fun MapScreen(
     var showPinCreationDialog by remember { mutableStateOf(false) }
     var showEventPickerForSelection by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var showShareSheet by remember { mutableStateOf(false) }
 
     // search and filtering state
     var searchQuery by remember { mutableStateOf("") }
@@ -219,7 +222,6 @@ fun MapScreen(
             if (initialLat == null || initialLng == null) {
                 fetchLocation(fusedLocationProviderClient = fusedLocationClient, cameraState = cameraPositionState, shouldAnimate = false) { userLocation = it }
             } else {
-                // Just fetch but don't move camera if we have an initial position
                 try {
                     val location = fusedLocationClient.lastLocation.await()
                     location?.let { userLocation = LatLng(it.latitude, it.longitude) }
@@ -243,213 +245,244 @@ fun MapScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            if (!mapViewModel.isPinMode) {
-                MapTopControls(
-                    searchQuery = searchQuery,
-                    onSearchChange = {
-                        searchQuery = it
-                        showSearchResults = it.isNotEmpty()
-                    },
-                    showSearchResults = showSearchResults,
-                    onClearSearch = {
-                        searchQuery = ""
-                        showSearchResults = false
-                    },
-                    filteredLocations = filteredLocations,
-                    onResultClick = { location ->
-                        searchQuery = location.name
-                        showSearchResults = false
-                        selectedLocation = location
-                    },
-                    filterType = filterType,
-                    onFilterClick = { filterType = it }
+    Box(modifier = Modifier.fillMaxSize()) {
+        MapContent(
+            cameraPositionState = cameraPositionState,
+            hasLocationPermission = hasLocationPermission,
+            userLocation = userLocation,
+            selectedLocation = selectedLocation,
+            onLocationClick = { location ->
+                if (!mapViewModel.isPinMode) selectedLocation = location
+            },
+            onMapClick = { latLng ->
+                if (mapViewModel.isPinMode) {
+                    mapViewModel.setTempPin(latLng)
+                } else {
+                    selectedLocation = null
+                    showSearchResults = false
+                }
+            },
+            displayLocations = filteredLocations,
+            events = calendarViewModel.events,
+            isPinMode = mapViewModel.isPinMode,
+            tempPinLocation = mapViewModel.tempPinLocation
+        )
+
+        if (!mapViewModel.isPinMode) {
+            MapTopControls(
+                searchQuery = searchQuery,
+                onSearchChange = {
+                    searchQuery = it
+                    showSearchResults = it.isNotEmpty()
+                },
+                showSearchResults = showSearchResults,
+                onClearSearch = {
+                    searchQuery = ""
+                    showSearchResults = false
+                },
+                filteredLocations = filteredLocations,
+                onResultClick = { location ->
+                    searchQuery = location.name
+                    showSearchResults = false
+                    selectedLocation = location
+                },
+                filterType = filterType,
+                onFilterClick = { filterType = it },
+                onMenuClick = onMenuClick,
+                modifier = Modifier.statusBarsPadding()
+            )
+        }
+
+        MapOverlays(
+            hasLocationPermission = hasLocationPermission,
+            isLoadingLocation = isLoadingLocation,
+            isPinMode = mapViewModel.isPinMode,
+            isEditing = mapViewModel.editingPinId != null,
+            onLocationRequest = {
+                scope.launch {
+                    isLoadingLocation = true
+                    fetchLocation(fusedLocationProviderClient = fusedLocationClient, cameraState = cameraPositionState, shouldAnimate = true) {
+                        userLocation = it
+                        isLoadingLocation = false
+                    }
+                }
+            },
+            onTogglePinMode = {
+                if (mapViewModel.isPinMode) mapViewModel.exitPinMode()
+                else mapViewModel.togglePinMode()
+            },
+            onConfirmPin = { showPinCreationDialog = true },
+            onClearPin = { mapViewModel.clearTempPin() },
+            tempPinSet = mapViewModel.tempPinLocation != null
+        )
+
+        // Info card for selected location
+        AnimatedVisibility(
+            visible = selectedLocation != null && !mapViewModel.isPinMode,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            selectedLocation?.let { location ->
+                LocationInfoCard(
+                    location = location,
+                    onClose = { selectedLocation = null },
+                    onDetailsClick = { showDetailsSheet = true }
                 )
             }
         }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = paddingValues.calculateTopPadding()),
-            contentAlignment = Alignment.Center
-        ) {
-            MapContent(
-                cameraPositionState = cameraPositionState,
-                hasLocationPermission = hasLocationPermission,
-                userLocation = userLocation,
-                selectedLocation = selectedLocation,
-                onLocationClick = { location ->
-                    if (!mapViewModel.isPinMode) selectedLocation = location
-                },
-                onMapClick = { latLng ->
-                    if (mapViewModel.isPinMode) {
-                        mapViewModel.setTempPin(latLng)
-                    } else {
-                        selectedLocation = null
-                        showSearchResults = false
-                    }
-                },
-                displayLocations = filteredLocations,
-                events = calendarViewModel.events,
-                isPinMode = mapViewModel.isPinMode,
-                tempPinLocation = mapViewModel.tempPinLocation
-            )
 
-            MapOverlays(
-                hasLocationPermission = hasLocationPermission,
-                isLoadingLocation = isLoadingLocation,
-                isPinMode = mapViewModel.isPinMode,
-                isEditing = mapViewModel.editingPinId != null,
-                onLocationRequest = {
-                    scope.launch {
-                        isLoadingLocation = true
-                        fetchLocation(fusedLocationProviderClient = fusedLocationClient, cameraState = cameraPositionState, shouldAnimate = true) {
-                            userLocation = it
-                            isLoadingLocation = false
-                        }
-                    }
-                },
-                onTogglePinMode = {
-                    if (mapViewModel.isPinMode) mapViewModel.exitPinMode()
-                    else mapViewModel.togglePinMode()
-                },
-                onConfirmPin = { showPinCreationDialog = true },
-                onClearPin = { mapViewModel.clearTempPin() },
-                tempPinSet = mapViewModel.tempPinLocation != null
-            )
-
-            // Info card for selected location
-            AnimatedVisibility(
-                visible = selectedLocation != null && !mapViewModel.isPinMode,
-                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-                modifier = Modifier.align(Alignment.BottomCenter)
+        if (showDetailsSheet && selectedLocation != null) {
+            val location = selectedLocation!!
+            val locationEvents = calendarViewModel.events.filter { 
+                (it.calendarId == "custom" || it.isPinned) && isEventAtLocation(it, location)
+            }
+            
+            val isAlreadySaved = remember(location, mapViewModel.customPins) {
+                mapViewModel.customPins.any { 
+                    abs(it.latitude - location.position.latitude) < 0.00001 && 
+                    abs(it.longitude - location.position.longitude) < 0.00001 
+                }
+            }
+            
+            ModalBottomSheet(
+                onDismissRequest = { showDetailsSheet = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = Color.White,
+                dragHandle = null
             ) {
-                selectedLocation?.let { location ->
-                    LocationInfoCard(
-                        location = location,
-                        onClose = { selectedLocation = null },
-                        onDetailsClick = { showDetailsSheet = true }
-                    )
-                }
-            }
-
-            if (showDetailsSheet && selectedLocation != null) {
-                val location = selectedLocation!!
-                val locationEvents = calendarViewModel.events.filter { 
-                    (it.calendarId == "custom" || it.isPinned) && isEventAtLocation(it, location)
-                }
-                
-                ModalBottomSheet(
-                    onDismissRequest = { showDetailsSheet = false },
-                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                    containerColor = Color.White
-                ) {
-                    LocationDetailsContent(
-                        location = location,
-                        events = locationEvents,
-                        onGoToEvent = { event ->
-                            calendarViewModel.onDateSelected(event.start.toLocalDate())
-                            resetMapState()
-                            navController.navigate(Routes.CALENDAR)
-                        },
-                        onDeletePin = {
-                            showDeleteConfirmation = true
-                        },
-                        onTogglePin = {
-                            mapViewModel.togglePinLocation(location)
-                            selectedLocation = selectedLocation?.copy(isPinned = !location.isPinned)
-                        },
-                        onSendMessage = {
-                            navController.navigate("${Routes.SOCIAL}?shareLocation=${location.name}")
-                        },
-                        onAssociateEvent = {
-                            showEventPickerForSelection = true
-                        },
-                        onEditPin = {
-                            val pin = mapViewModel.customPins.find { it.id == location.id }
-                            if (pin != null) {
-                                showDetailsSheet = false
-                                mapViewModel.startEditingLocation(pin.id)
-                            }
-                        },
-                        onSaveSharedPin = {
-                            scope.launch {
-                                val newPin = CustomPin(
-                                    id = java.util.UUID.randomUUID().toString(),
-                                    userId = FirebaseAuth.getInstance().currentUser?.uid ?: "",
-                                    name = location.name,
-                                    latitude = location.position.latitude,
-                                    longitude = location.position.longitude,
-                                    description = location.description,
-                                    colorArgb = location.color.toArgb(),
-                                    associatedEventId = location.associatedEventId
-                                )
-                                FirestoreManager.saveCustomPin(newPin)
-                                selectedLocation = null
-                                showDetailsSheet = false
-                            }
-                        }
-                    )
-                }
-            }
-
-            if (showDeleteConfirmation && selectedLocation != null) {
-                AlertDialog(
-                    onDismissRequest = { showDeleteConfirmation = false },
-                    title = { Text("Delete Custom Pin", fontWeight = FontWeight.Bold) },
-                    text = { Text("Are you sure you want to remove '${selectedLocation!!.name}' from your map? This action cannot be undone.") },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                mapViewModel.deletePin(selectedLocation!!.id)
-                                showDeleteConfirmation = false
-                                showDetailsSheet = false
-                                selectedLocation = null
-                                Toast.makeText(context, "Pin removed.", Toast.LENGTH_SHORT).show()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = CoralRed)
-                        ) {
-                            Text("Delete", color = Color.White)
+                LocationDetailsContent(
+                    location = location,
+                    events = locationEvents,
+                    onGoToEvent = { event ->
+                        calendarViewModel.onDateSelected(event.start.toLocalDate())
+                        resetMapState()
+                        navController.navigate(Routes.CALENDAR)
+                    },
+                    onDeletePin = {
+                        showDeleteConfirmation = true
+                    },
+                    onTogglePin = {
+                        mapViewModel.togglePinLocation(location)
+                        selectedLocation = selectedLocation?.copy(isPinned = !location.isPinned)
+                    },
+                    onShareClick = {
+                        showShareSheet = true
+                    },
+                    onAssociateEvent = {
+                        showEventPickerForSelection = true
+                    },
+                    onEditPin = {
+                        val pin = mapViewModel.customPins.find { it.id == location.id }
+                        if (pin != null) {
+                            showDetailsSheet = false
+                            mapViewModel.startEditingLocation(pin.id)
                         }
                     },
-                    dismissButton = {
-                        TextButton(
-                            onClick = { showDeleteConfirmation = false }
-                        ) {
-                            Text("Cancel", color = Color.Gray)
+                    onSaveSharedPin = {
+                        if (isAlreadySaved) {
+                            Toast.makeText(context, "This pin is already saved.", Toast.LENGTH_SHORT).show()
+                            return@LocationDetailsContent
                         }
-                    }
-                )
-            }
-
-            if (showPinCreationDialog) {
-                PinCreationDialog(
-                    customEvents = calendarViewModel.events.filter { it.calendarId == "custom" },
-                    editingPin = mapViewModel.editingPin,
-                    onDismiss = {
-                        showPinCreationDialog = false
+                        scope.launch {
+                            val newPin = CustomPin(
+                                id = java.util.UUID.randomUUID().toString(),
+                                userId = FirebaseAuth.getInstance().currentUser?.uid ?: "",
+                                name = location.name,
+                                latitude = location.position.latitude,
+                                longitude = location.position.longitude,
+                                description = location.description,
+                                colorArgb = location.color.toArgb(),
+                                associatedEventId = location.associatedEventId
+                            )
+                            FirestoreManager.saveCustomPin(newPin)
+                            selectedLocation = null
+                            showDetailsSheet = false
+                            Toast.makeText(context, "Pin saved to your map.", Toast.LENGTH_SHORT).show()
+                        }
                     },
-                    onConfirm = { name, desc, color, eventId ->
-                        mapViewModel.savePin(name, desc, color, eventId)
-                        showPinCreationDialog = false
+                    isAlreadySaved = isAlreadySaved
+                )
+            }
+        }
+
+        if (showShareSheet && selectedLocation != null) {
+            ModalBottomSheet(
+                onDismissRequest = { showShareSheet = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = Color.White,
+                dragHandle = null
+            ) {
+                ShareLocationSheetContent(
+                    location = selectedLocation!!,
+                    onDismiss = { showShareSheet = false },
+                    onSuccess = {
+                        showShareSheet = false
+                        Toast.makeText(context, "Location shared with friends!", Toast.LENGTH_SHORT).show()
                     }
                 )
             }
+        }
 
-            if (showEventPickerForSelection && selectedLocation != null) {
-                EventSelectionDialog(
-                    customEvents = calendarViewModel.events.filter { it.calendarId == "custom" },
-                    currentEventId = selectedLocation?.associatedEventId,
-                    onDismiss = { showEventPickerForSelection = false },
-                    onConfirm = { eventId ->
-                        mapViewModel.associateEvent(selectedLocation!!.id, eventId)
-                        selectedLocation = selectedLocation?.copy(associatedEventId = eventId)
-                        showEventPickerForSelection = false
+        if (showDeleteConfirmation && selectedLocation != null) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirmation = false },
+                title = { Text("Delete Custom Pin", fontWeight = FontWeight.Bold) },
+                text = { Text("Are you sure you want to remove '${selectedLocation!!.name}' from your map? This action cannot be undone.") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            mapViewModel.deletePin(selectedLocation!!.id)
+                            showDeleteConfirmation = false
+                            showDetailsSheet = false
+                            selectedLocation = null
+                            Toast.makeText(context, "Pin removed.", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = CoralRed)
+                    ) {
+                        Text("Delete", color = Color.White)
                     }
-                )
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showDeleteConfirmation = false }
+                    ) {
+                        Text("Cancel", color = Color.Gray)
+                    }
+                }
+            )
+        }
+
+        if (showPinCreationDialog) {
+            PinCreationDialog(
+                customEvents = calendarViewModel.events.filter { it.calendarId == "custom" },
+                editingPin = mapViewModel.editingPin,
+                onDismiss = {
+                    showPinCreationDialog = false
+                },
+                onConfirm = { name, desc, color, eventId ->
+                    mapViewModel.savePin(name, desc, color, eventId)
+                    showPinCreationDialog = false
+                }
+            )
+        }
+
+        if (showEventPickerForSelection && selectedLocation != null) {
+            EventSelectionDialog(
+                customEvents = calendarViewModel.events.filter { it.calendarId == "custom" },
+                currentEventId = selectedLocation?.associatedEventId,
+                onDismiss = { showEventPickerForSelection = false },
+                onConfirm = { eventId ->
+                    mapViewModel.associateEvent(selectedLocation!!.id, eventId)
+                    selectedLocation = selectedLocation?.copy(associatedEventId = eventId)
+                    showEventPickerForSelection = false
+                }
+            )
+        }
+        
+        mapViewModel.errorMessage?.let { error ->
+            LaunchedEffect(error) {
+                Toast.makeText(context, error, Toast.LENGTH_LONG).show()
             }
         }
     }

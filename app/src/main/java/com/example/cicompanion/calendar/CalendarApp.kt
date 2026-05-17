@@ -107,18 +107,45 @@ fun CalendarApp(viewModel: CalendarViewModel) {
         containerColor = Color.White,
         floatingActionButton = {
             if (currentUser != null) {
-                FloatingActionButton(
+                ExtendedFloatingActionButton(
                     onClick = { 
                         if (viewModel.mode == CalendarMode.SCHEDULE) showAddClassDialog = true
                         else showAddEventDialog = true
                     },
                     containerColor = CoralRed,
                     contentColor = Color.White,
-                    shape = CircleShape,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add")
-                }
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    icon = {
+                        val baseIcon = if (viewModel.mode == CalendarMode.SCHEDULE) Icons.Default.School else Icons.Default.CalendarMonth
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(baseIcon, contentDescription = null)
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .offset(x = 4.dp, y = 4.dp)
+                                    .size(14.dp)
+                                    .background(Color.White, CircleShape)
+                                    .padding(1.dp)
+                                    .background(CoralRed, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(10.dp)
+                                )
+                            }
+                        }
+                    },
+                    text = { 
+                        Text(
+                            text = if (viewModel.mode == CalendarMode.SCHEDULE) "Add Class" else "Add Event",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                )
             }
         }
     ) { padding ->
