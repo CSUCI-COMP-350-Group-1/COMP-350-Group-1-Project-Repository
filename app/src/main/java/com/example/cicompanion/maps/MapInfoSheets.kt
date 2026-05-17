@@ -20,11 +20,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.cicompanion.calendar.model.CalendarEvent
+import com.example.cicompanion.social.ConversationSummary
 import com.example.cicompanion.social.MessagingRepository
 import com.example.cicompanion.social.SocialRepository
 import com.example.cicompanion.social.UserProfile
@@ -32,6 +35,7 @@ import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.BrandOrange
 import com.example.cicompanion.ui.theme.CoralRed
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.ListenerRegistration
 
 private val FaintGray = Color(0xFFF5F5F5)
 
@@ -269,18 +273,29 @@ fun ShareLocationSheetContent(
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
+    var groups by remember { mutableStateOf<List<ConversationSummary>>(emptyList()) }
     var selectedFriends by remember { mutableStateOf(setOf<String>()) }
+    var selectedGroups by remember { mutableStateOf(setOf<String>()) }
     var isLoading by remember { mutableStateOf(true) }
     var isSending by remember { mutableStateOf(false) }
     val currentUser = FirebaseAuth.getInstance().currentUser
     val contentPadding = PaddingValues(horizontal = 20.dp)
 
-    LaunchedEffect(Unit) {
+    DisposableEffect(Unit) {
+        var registration: ListenerRegistration? = null
         currentUser?.let { user ->
             SocialRepository.fetchAcceptedFriends(
                 currentUserId = user.uid,
                 onSuccess = {
                     friends = it
+                },
+                onError = { }
+            )
+
+            registration = MessagingRepository.listenToConversations(
+                currentUserId = user.uid,
+                onUpdate = { allConversations ->
+                    groups = allConversations.filter { it.isGroup }
                     isLoading = false
                 },
                 onError = {
@@ -288,11 +303,19 @@ fun ShareLocationSheetContent(
                 }
             )
         }
+        onDispose {
+            registration?.remove()
+        }
     }
 
     val filteredFriends = remember(searchQuery, friends) {
         friends.filter { it.displayName.contains(searchQuery, ignoreCase = true) || it.email.contains(searchQuery, ignoreCase = true) }
     }
+    val filteredGroups = remember(searchQuery, groups) {
+        groups.filter { it.groupName.contains(searchQuery, ignoreCase = true) }
+    }
+
+    val friendsMap = remember(friends) { friends.associateBy { it.uid } }
 
     Column(
         modifier = Modifier
@@ -322,7 +345,7 @@ fun ShareLocationSheetContent(
                     color = Color.Black
                 )
                 Text(
-                    text = "Send \"${location.name}\" to friends",
+                    text = "Send \"${location.name}\" to friends or groups",
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.Gray
                 )
@@ -338,7 +361,7 @@ fun ShareLocationSheetContent(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Search friends...") },
+            placeholder = { Text("Search friends or groups...") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
             modifier = Modifier.padding(contentPadding).fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
@@ -351,34 +374,94 @@ fun ShareLocationSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Friends List
+        // Targets List
         Box(modifier = Modifier.weight(1f).padding(contentPadding)) {
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = CoralRed)
-            } else if (friends.isEmpty()) {
-                Text("No friends found to share with.", modifier = Modifier.align(Alignment.Center), color = Color.Gray)
+            } else if (friends.isEmpty() && groups.isEmpty()) {
+                Text("No friends or groups found to share with.", modifier = Modifier.align(Alignment.Center), color = Color.Gray)
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(filteredFriends) { friend ->
-                        val isSelected = selectedFriends.contains(friend.uid)
-                        Surface(
-                            onClick = {
-                                selectedFriends = if (isSelected) selectedFriends - friend.uid else selectedFriends + friend.uid
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) CoralRed.copy(alpha = 0.05f) else Color.Transparent,
-                            border = if (isSelected) BorderStroke(1.dp, CoralRed.copy(alpha = 0.2f)) else null
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = if (isSelected) CoralRed else Color.LightGray.copy(alpha = 0.2f),
-                                    modifier = Modifier.size(44.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
+                    // Group Chats Section
+                    if (filteredGroups.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Group Chats",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Gray,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                        items(filteredGroups) { group ->
+                            val isSelected = selectedGroups.contains(group.id)
+                            
+                            val groupDisplayName = if (group.groupName.isNotBlank()) {
+                                group.groupName
+                            } else {
+                                group.participantIds
+                                    .filter { it != currentUser?.uid }
+                                    .map { id -> friendsMap[id]?.displayName ?: "Someone" }
+                                    .joinToString(", ")
+                            }
+
+                            ShareTargetItem(
+                                title = groupDisplayName,
+                                subtitle = "${group.participantIds.size} members",
+                                isSelected = isSelected,
+                                onToggle = {
+                                    selectedGroups = if (isSelected) selectedGroups - group.id else selectedGroups + group.id
+                                },
+                                icon = {
+                                    val initial = if (group.groupName.isNotBlank()) group.groupName.trim().take(1).uppercase() else ""
+                                    if (initial.isNotBlank()) {
+                                        Text(
+                                            text = initial,
+                                            color = if (isSelected) Color.White else Color.DarkGray,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    } else {
+                                        Icon(
+                                            Icons.Default.Group,
+                                            contentDescription = null,
+                                            tint = if (isSelected) Color.White else Color.DarkGray,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    }
+
+                    // Friends Section
+                    if (filteredFriends.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Friends",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Gray,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                        items(filteredFriends) { friend ->
+                            val isSelected = selectedFriends.contains(friend.uid)
+                            ShareTargetItem(
+                                title = friend.displayName.ifBlank { friend.email },
+                                subtitle = if (friend.displayName.isNotBlank()) friend.email else "",
+                                isSelected = isSelected,
+                                onToggle = {
+                                    selectedFriends = if (isSelected) selectedFriends - friend.uid else selectedFriends + friend.uid
+                                },
+                                icon = {
+                                    if (!friend.photoUrl.isNullOrBlank()) {
+                                        AsyncImage(
+                                            model = friend.photoUrl,
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
                                         Text(
                                             text = (friend.displayName.takeIf { it.isNotBlank() } ?: friend.email).take(1).uppercase(),
                                             color = if (isSelected) Color.White else Color.DarkGray,
@@ -386,25 +469,7 @@ fun ShareLocationSheetContent(
                                         )
                                     }
                                 }
-                                Spacer(Modifier.width(16.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = friend.displayName.takeIf { it.isNotBlank() } ?: friend.email,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (isSelected) CoralRed else Color.Black
-                                    )
-                                    if (friend.displayName.isNotBlank()) {
-                                        Text(friend.email, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                                    }
-                                }
-                                Checkbox(
-                                    checked = isSelected,
-                                    onCheckedChange = {
-                                        selectedFriends = if (it) selectedFriends + friend.uid else selectedFriends - friend.uid
-                                    },
-                                    colors = CheckboxDefaults.colors(checkedColor = CoralRed)
-                                )
-                            }
+                            )
                         }
                     }
                 }
@@ -416,10 +481,19 @@ fun ShareLocationSheetContent(
         // Send Button
         Button(
             onClick = {
-                if (currentUser != null && selectedFriends.isNotEmpty()) {
+                if (currentUser != null && (selectedFriends.isNotEmpty() || selectedGroups.isNotEmpty())) {
                     isSending = true
                     val selectedFriendProfiles = friends.filter { selectedFriends.contains(it.uid) }
+                    val selectedGroupConversations = groups.filter { selectedGroups.contains(it.id) }
+                    
+                    val totalToSent = selectedFriendProfiles.size + selectedGroupConversations.size
                     var sentCount = 0
+                    
+                    val onFinish = {
+                        sentCount++
+                        if (sentCount == totalToSent) onSuccess()
+                    }
+
                     selectedFriendProfiles.forEach { friend ->
                         MessagingRepository.sendMessage(
                             currentUser = currentUser,
@@ -433,19 +507,31 @@ fun ShareLocationSheetContent(
                                 "desc" to location.description,
                                 "color" to location.color.toArgb().toString()
                             ),
-                            onSuccess = {
-                                sentCount++
-                                if (sentCount == selectedFriendProfiles.size) onSuccess()
-                            },
-                            onError = {
-                                sentCount++
-                                if (sentCount == selectedFriendProfiles.size) onSuccess()
-                            }
+                            onSuccess = onFinish,
+                            onError = { onFinish() }
+                        )
+                    }
+
+                    selectedGroupConversations.forEach { group ->
+                        MessagingRepository.sendMessageToConversation(
+                            currentUser = currentUser,
+                            conversation = group,
+                            messageText = "Check out this location: ${location.name}",
+                            type = "location",
+                            metadata = mapOf(
+                                "lat" to location.position.latitude.toString(),
+                                "lng" to location.position.longitude.toString(),
+                                "name" to location.name,
+                                "desc" to location.description,
+                                "color" to location.color.toArgb().toString()
+                            ),
+                            onSuccess = onFinish,
+                            onError = { onFinish() }
                         )
                     }
                 }
             },
-            enabled = selectedFriends.isNotEmpty() && !isSending,
+            enabled = (selectedFriends.isNotEmpty() || selectedGroups.isNotEmpty()) && !isSending,
             modifier = Modifier.padding(contentPadding).fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = CoralRed)
@@ -453,12 +539,68 @@ fun ShareLocationSheetContent(
             if (isSending) {
                 CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
             } else {
+                val count = selectedFriends.size + selectedGroups.size
                 Text(
-                    text = if (selectedFriends.isEmpty()) "Select Friends" else "Send to ${selectedFriends.size} Friend${if (selectedFriends.size > 1) "s" else ""}",
+                    text = if (count == 0) "Select Recipients" else "Send to $count Recipient${if (count > 1) "s" else ""}",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ShareTargetItem(
+    title: String,
+    subtitle: String,
+    isSelected: Boolean,
+    onToggle: () -> Unit,
+    icon: @Composable () -> Unit
+) {
+    Surface(
+        onClick = onToggle,
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) CoralRed.copy(alpha = 0.05f) else Color.Transparent,
+        border = if (isSelected) BorderStroke(1.dp, CoralRed.copy(alpha = 0.2f)) else null
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = if (isSelected) CoralRed else Color.LightGray.copy(alpha = 0.2f),
+                modifier = Modifier.size(44.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    icon()
+                }
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isSelected) CoralRed else Color.Black,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Checkbox(
+                checked = isSelected,
+                onCheckedChange = { onToggle() },
+                colors = CheckboxDefaults.colors(checkedColor = CoralRed)
+            )
         }
     }
 }

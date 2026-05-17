@@ -6,15 +6,16 @@ import android.content.pm.PackageManager
 import android.location.Geocoder
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -24,7 +25,10 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -34,10 +38,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.maps.CustomPin
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
+import com.example.cicompanion.ui.theme.BrandOrange
+import com.example.cicompanion.ui.theme.CoralRed
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.firebase.auth.FirebaseAuth
@@ -48,6 +55,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
+
+private val FaintGray = Color(0xFFF5F5F5)
 
 @Composable
 private fun rememberAuthUser(): FirebaseUser? {
@@ -66,8 +75,6 @@ private fun rememberAuthUser(): FirebaseUser? {
     return currentUser
 }
 
-// GROUP MESSAGING CHANGE
-// one display name helper used by list, header, and message bubbles
 private fun displayUserName(
     userId: String,
     currentUser: FirebaseUser?,
@@ -75,10 +82,7 @@ private fun displayUserName(
     nicknames: Map<String, String>
 ): String {
     if (userId == currentUser?.uid) {
-        return currentUser.displayName
-            ?.takeIf { it.isNotBlank() }
-            ?: currentUser.email
-            ?: "You"
+        return "You"
     }
 
     return nicknames[userId]
@@ -87,19 +91,22 @@ private fun displayUserName(
         ?: "Member"
 }
 
-// GROUP MESSAGING
-// if no custom group name exists, show all participant names/nicknames.
 private fun conversationTitle(
     conversation: ConversationSummary,
     currentUser: FirebaseUser?,
     profilesById: Map<String, UserProfile>,
     nicknames: Map<String, String>
 ): String {
-    return conversation.groupName
-        .takeIf { it.isNotBlank() }
-        ?: conversation.participantIds.joinToString(", ") { userId ->
-            displayUserName(userId, currentUser, profilesById, nicknames)
-        }
+    if (conversation.groupName.isNotBlank()) return conversation.groupName
+    
+    val otherIds = conversation.participantIds.filter { it != currentUser?.uid }
+    if (otherIds.isEmpty()) return "Solo Chat"
+    
+    val names = otherIds.map { id -> displayUserName(id, currentUser, profilesById, nicknames) }
+    return when {
+        names.size <= 2 -> names.joinToString(" & ")
+        else -> "${names.take(2).joinToString(", ")} & ${names.size - 2} more"
+    }
 }
 
 private fun conversationSubtitle(
@@ -108,11 +115,13 @@ private fun conversationSubtitle(
     profilesById: Map<String, UserProfile>,
     nicknames: Map<String, String>
 ): String {
-    return conversation.participantIds.joinToString(", ") { userId ->
-        displayUserName(userId, currentUser, profilesById, nicknames)
+    val otherIds = conversation.participantIds.filter { it != currentUser?.uid }
+    return otherIds.joinToString(", ") { id -> 
+        displayUserName(id, currentUser, profilesById, nicknames)
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessagesScreen(navController: NavHostController, sharedLocation: String? = null) {
     val currentUser = rememberAuthUser()
@@ -125,9 +134,6 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
     var showCreateGroupDialog by remember { mutableStateOf(false) }
     var isCreatingGroup by remember { mutableStateOf(false) }
 
-
-
-
     if (showCreateGroupDialog && currentUser != null) {
         val signedInUser = currentUser
         CreateGroupChatDialog(
@@ -139,9 +145,6 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
             },
             onCreate = { selectedFriendIds, groupName ->
                 isCreatingGroup = true
-                // GROUP MESSAGING
-                // create the group conversation before navigating
-                // so shared group name can sync immediately
                 MessagingRepository.createGroupConversation(
                     currentUser = signedInUser,
                     selectedFriendIds = selectedFriendIds,
@@ -159,7 +162,6 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
             }
         )
     }
-
 
     LaunchedEffect(currentUser?.uid) {
         if (currentUser == null) {
@@ -207,9 +209,6 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
     val friendsById = remember(friends) { friends.associateBy { it.uid } }
     val currentUserId = currentUser?.uid.orEmpty()
 
-    // GROUP MESSAGING
-    // Direct chats require the other user to be your friend.
-    // Group chats are shown if you are in the group and at least one other group member is your friend.
     val activeConversations = remember(rawConversations, friendsById, currentUserId) {
         if (currentUserId.isBlank()) {
             emptyList()
@@ -222,7 +221,7 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
 
                 currentUserId in conversation.participantIds &&
                         if (conversation.isGroup) {
-                            otherParticipantIds.any { friendId -> friendsById.containsKey(friendId) }
+                            true
                         } else {
                             otherParticipantIds.size == 1 &&
                                     friendsById.containsKey(otherParticipantIds.first())
@@ -232,82 +231,80 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
     }
 
     Scaffold(
-        containerColor = AppBackground
+        containerColor = AppBackground,
+        topBar = {
+            TopAppBar(
+                title = { Text("Social", fontWeight = FontWeight.ExtraBold) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppBackground),
+                actions = {
+                    IconButton(onClick = { navController.navigate(Routes.FRIENDS_AND_REQUESTS) }) {
+                        Icon(Icons.Default.PersonAdd, contentDescription = "Friends", tint = Color.Black)
+                    }
+                    IconButton(onClick = { showCreateGroupDialog = true }) {
+                        Icon(Icons.Default.GroupAdd, contentDescription = "New Group", tint = Color.Black)
+                    }
+                }
+            )
+        }
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
-                .background(AppBackground)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
         ) {
             if (sharedLocation != null) {
                 Surface(
-                    color = Color(0xFFFFF9C4),
+                    color = CoralRed.copy(alpha = 0.1f),
                     shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, CoralRed.copy(alpha = 0.3f)),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
                 ) {
-                    Text(
-                        text = "Sharing location: $sharedLocation. Pick a friend to send to.",
-                        modifier = Modifier.padding(12.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.PushPin, contentDescription = null, tint = CoralRed, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Sharing location: \"$sharedLocation\". Pick a chat to send to.",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = CoralRed
+                        )
+                    }
                 }
             }
 
-            Button(
-                onClick = { navController.navigate(Routes.FRIENDS_AND_REQUESTS) },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFEF3347),
-                    contentColor = Color.White
-                )
-            ) {
-                Text("Manage Friends")
-            }
-
-
-            Button(
-                onClick = { showCreateGroupDialog = true },
-                enabled = friends.size >= 2,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFEF3347),
-                    contentColor = Color.White,
-                    disabledContainerColor = Color(0xFFEF3347).copy(alpha = 0.35f),
-                    disabledContentColor = Color.White.copy(alpha = 0.75f)
-                )
-            ) {
-                Icon(Icons.Default.Group, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("New Group Chat")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
             Text(
-                text = "Start a Chat",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                text = "Friends",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray,
+                modifier = Modifier.padding(bottom = 8.dp)
             )
-
-            Spacer(modifier = Modifier.height(8.dp))
 
             when {
                 isLoadingFriends -> {
-                    Box(modifier = Modifier.fillMaxWidth().height(96.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color(0xFFEF3347))
+                    Box(modifier = Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = CoralRed, modifier = Modifier.size(24.dp))
                     }
                 }
                 friends.isEmpty() -> {
-                    EmptyCard("Add a friend first to start messaging.")
+                    Surface(
+                        onClick = { navController.navigate(Routes.FRIENDS_AND_REQUESTS) },
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.PersonSearch, contentDescription = null, tint = Color.Gray)
+                            Spacer(Modifier.width(12.dp))
+                            Text("Find friends to start chatting", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
                 }
                 else -> {
                     LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
                         contentPadding = PaddingValues(vertical = 4.dp)
                     ) {
                         items(friends, key = { it.uid }) { friend ->
@@ -325,27 +322,34 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Text(
                 text = "Recent Messages",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray,
+                modifier = Modifier.padding(bottom = 8.dp)
             )
 
             if (errorMessage != null) {
+                Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error)
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (activeConversations.isEmpty()) {
-                EmptyCard("No conversations yet.")
+            if (activeConversations.isEmpty() && !isLoadingFriends) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(64.dp))
+                        Spacer(Modifier.height(12.dp))
+                        Text("No conversations yet", color = Color.Gray)
+                    }
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
                     items(
                         items = activeConversations,
@@ -358,24 +362,13 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
 
                         val friend = friendsById[friendUserId]
 
-                        // GROUP MESSAGING
-                        // group conversations display their shared name,
-                        // or back to all participant names/nicknames.
-                        val title = if (conversation.isGroup) {
-                            conversationTitle(
-                                conversation = conversation,
-                                currentUser = currentUser,
-                                profilesById = friendsById,
-                                nicknames = nicknames
-                            )
-                        } else {
-                            nicknames[friendUserId]
-                                ?: friend?.let { SocialRepository.displayNameOrEmail(it) }
-                                ?: "Friend"
-                        }
+                        val title = conversationTitle(
+                            conversation = conversation,
+                            currentUser = currentUser,
+                            profilesById = friendsById,
+                            nicknames = nicknames
+                        )
 
-                        // GROUP MESSAGING
-                        // group subtitle shows members direct subtitle shows email
                         val subtitle = if (conversation.isGroup) {
                             conversationSubtitle(
                                 conversation = conversation,
@@ -387,56 +380,33 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                             friend?.email.orEmpty()
                         }
 
-                        val messageDisplayPreview = when {
+                        val previewText = when {
                             conversation.lastMessageText.contains("[location]", ignoreCase = true) -> {
-                                if (conversation.lastMessageSenderId == currentUser?.uid) {
-                                    "You sent a location"
-                                } else {
-                                    "Sent a location"
-                                }
+                                if (conversation.lastMessageSenderId == currentUser?.uid) "You sent a location" else "Sent a location"
                             }
-
                             conversation.lastMessageText.contains("[pin]", ignoreCase = true) ||
                                     conversation.lastMessageText.contains("custom pin:", ignoreCase = true) -> {
-                                if (conversation.lastMessageSenderId == currentUser?.uid) {
-                                    "You shared a pin"
-                                } else {
-                                    "Shared a pin"
-                                }
+                                if (conversation.lastMessageSenderId == currentUser?.uid) "You shared a pin" else "Shared a pin"
                             }
-
                             conversation.lastMessageText.contains("[event_invite]", ignoreCase = true) -> {
-                                if (conversation.lastMessageSenderId == currentUser?.uid) {
-                                    "You sent an event invitation"
-                                } else {
-                                    "Sent an event invitation"
-                                }
+                                if (conversation.lastMessageSenderId == currentUser?.uid) "You sent an event invite" else "Sent an event invite"
                             }
-
                             else -> conversation.lastMessageText
                         }
 
                         ConversationCard(
-                            friendName = title,
-                            friendEmail = subtitle,
-                            preview = messageDisplayPreview,
+                            title = title,
+                            subtitle = subtitle,
+                            preview = previewText,
                             photoUrl = if (conversation.isGroup) "" else friend?.photoUrl,
+                            isGroup = conversation.isGroup,
                             timestamp = conversation.lastMessageAt,
                             onClick = {
-                                val initialMsg = if (sharedLocation != null) {
-                                    "Check out this custom pin: $sharedLocation"
-                                } else {
-                                    null
-                                }
-
+                                val initialMsg = if (sharedLocation != null) "Check out this custom pin: $sharedLocation" else null
                                 if (conversation.isGroup) {
-                                    navController.navigate(
-                                        Routes.groupMessageThread(conversation.id, initialMsg)
-                                    )
+                                    navController.navigate(Routes.groupMessageThread(conversation.id, initialMsg))
                                 } else {
-                                    navController.navigate(
-                                        Routes.messageThread(conversation.id, friendUserId, initialMsg)
-                                    )
+                                    navController.navigate(Routes.messageThread(conversation.id, friendUserId, initialMsg))
                                 }
                             }
                         )
@@ -448,6 +418,7 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
 }
 
 @SuppressLint("MissingPermission")
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessageThreadScreen(
     navController: NavHostController,
@@ -459,29 +430,15 @@ fun MessageThreadScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // GROUP MESSAGING
-    // true when this screen was opened for a group chat
     val isGroupThread = friendUserId == Routes.GROUP_THREAD_USER_ID
 
-    // GROUP MESSAGING
-    // live conversation document, used for group name, members, and sending.
     var conversation by remember { mutableStateOf<ConversationSummary?>(null) }
-
-    // GROUP MESSAGING
-    // profiles/nicknames for group member display.
     var memberProfilesById by remember { mutableStateOf<Map<String, UserProfile>>(emptyMap()) }
     var nicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-
-    // GROUP MESSAGING:
-    // used to allow group sending if current user is friends with at least one group member.
     var friendStatuses by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-
-    // GROUP MESSAGING C
-    // rename dialog for group chats.
     var showEditGroupNameDialog by remember { mutableStateOf(false) }
 
     var friend by remember { mutableStateOf<UserProfile?>(null) }
-    var nickname by remember { mutableStateOf<String?>(null) }
     var messages by remember { mutableStateOf<List<DirectMessage>>(emptyList()) }
     var messageText by rememberSaveable { mutableStateOf(initialMessage ?: "") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -504,32 +461,17 @@ fun MessageThreadScreen(
         if (isGranted) {
             fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
                 .addOnSuccessListener { location ->
-                    if (location != null && friend != null && currentUser != null) {
-                        MessagingRepository.sendMessage(
-                            currentUser = currentUser,
-                            friend = friend!!,
-                            messageText = "My current location",
-                            type = "location",
-                            metadata = mapOf(
-                                "lat" to location.latitude.toString(),
-                                "lng" to location.longitude.toString()
-                            ),
-                            onSuccess = { conversationExists = true },
-                            onError = { errorMessage = it }
-                        )
+                    if (location != null && currentUser != null) {
+                        val threadMessage = "My current location"
+                        val meta = mapOf("lat" to location.latitude.toString(), "lng" to location.longitude.toString())
+                        
+                        if (isGroupThread && conversation != null) {
+                            MessagingRepository.sendMessageToConversation(currentUser, conversation!!, threadMessage, "location", meta, {}, { _ -> })
+                        } else if (friend != null) {
+                            MessagingRepository.sendMessage(currentUser, friend!!, threadMessage, "location", meta, {}, { _ -> })
+                        }
                     }
                 }
-        }
-    }
-
-    LaunchedEffect(currentUser?.uid) {
-        if (currentUser == null) {
-            friend = null
-            messages = emptyList()
-            messageText = ""
-            errorMessage = null
-            isSending = false
-            conversationExists = false
         }
     }
 
@@ -539,25 +481,18 @@ fun MessageThreadScreen(
     }
 
     val currentConversation = conversation
-
-// GROUP MESSAGING
-// A group member can send if:
-// 1. they are actually in the group, and
-// 2. they are friends with at least one other member of the group.
     val groupHasAtLeastOneFriend = currentConversation
         ?.participantIds
-        ?.filter { userId -> userId != currentUser.uid }
-        ?.any { userId -> friendStatuses[userId] == "accepted" }
+        ?.filter { it != currentUser.uid }
+        ?.any { friendStatuses[it] == "accepted" }
         ?: false
 
     val canSendMessages = if (isGroupThread) {
-        currentConversation?.participantIds?.contains(currentUser.uid) == true &&
-                groupHasAtLeastOneFriend
+        currentConversation?.participantIds?.contains(currentUser.uid) == true && groupHasAtLeastOneFriend
     } else {
         isFriend
     }
 
-    // GROUP MESSAGING CHANG:
     fun sendThreadMessage(
         text: String,
         type: String = "text",
@@ -565,300 +500,98 @@ fun MessageThreadScreen(
         onSuccess: () -> Unit = {}
     ) {
         if (isGroupThread) {
-            val targetConversation = conversation
-            if (targetConversation == null) {
-                errorMessage = "Group chat is still loading."
-                isSending = false
-                return
-            }
-
-            MessagingRepository.sendMessageToConversation(
-                currentUser = currentUser,
-                conversation = targetConversation,
-                messageText = text,
-                type = type,
-                metadata = metadata,
-                onSuccess = {
-                    conversationExists = true
-                    errorMessage = null
-                    isSending = false
-                    onSuccess()
-                },
-                onError = {
-                    errorMessage = it
-                    isSending = false
-                }
-            )
+            val targetConversation = conversation ?: return
+            MessagingRepository.sendMessageToConversation(currentUser, targetConversation, text, type, metadata, {
+                conversationExists = true; errorMessage = null; isSending = false; onSuccess()
+            }, { errorMessage = it; isSending = false })
         } else {
-            val targetFriend = friend
-            if (targetFriend == null) {
-                errorMessage = "Chat is still loading."
-                isSending = false
-                return
-            }
-
-            MessagingRepository.sendMessage(
-                currentUser = currentUser,
-                friend = targetFriend,
-                messageText = text,
-                type = type,
-                metadata = metadata,
-                onSuccess = {
-                    conversationExists = true
-                    errorMessage = null
-                    isSending = false
-                    onSuccess()
-                },
-                onError = {
-                    errorMessage = it
-                    isSending = false
-                }
-            )
+            val targetFriend = friend ?: return
+            MessagingRepository.sendMessage(currentUser, targetFriend, text, type, metadata, {
+                conversationExists = true; errorMessage = null; isSending = false; onSuccess()
+            }, { errorMessage = it; isSending = false })
         }
     }
 
-    // GROUP MESSAGING CHANGE:
-    // Load group member profiles so group title can fall back to names/nicknames.
     LaunchedEffect(currentUser.uid, currentConversation?.participantIds, isGroupThread) {
-        if (!isGroupThread) {
-            memberProfilesById = emptyMap()
-            return@LaunchedEffect
-        }
-
+        if (!isGroupThread) { memberProfilesById = emptyMap(); return@LaunchedEffect }
         val participantIds = currentConversation?.participantIds.orEmpty()
-        if (participantIds.isEmpty()) {
-            memberProfilesById = emptyMap()
-            return@LaunchedEffect
-        }
-
-        MessagingRepository.fetchUserProfiles(
-            userIds = participantIds,
-            onSuccess = { profiles ->
-                memberProfilesById = profiles
-                errorMessage = null
-            },
-            onError = { errorMessage = it }
-        )
+        if (participantIds.isEmpty()) return@LaunchedEffect
+        MessagingRepository.fetchUserProfiles(participantIds, { memberProfilesById = it; errorMessage = null }, { errorMessage = it })
     }
 
     LaunchedEffect(currentUser.uid, friendUserId, isGroupThread) {
-        SocialRepository.fetchAllFriendRequestStatuses(
-            currentUserId = currentUser.uid,
-            onSuccess = { statuses ->
-                friendStatuses = statuses
+        SocialRepository.fetchAllFriendRequestStatuses(currentUser.uid, { statuses ->
+            friendStatuses = statuses
+            if (!isGroupThread) isFriend = statuses[friendUserId] == "accepted"
+        }, { friendStatuses = emptyMap(); if (!isGroupThread) isFriend = false })
 
-                // GROUP MESSAGING CHANGE:
-                // Direct chats still require friendship with the other user.
-                // Group chats are handled by canSendMessages
-                if (!isGroupThread) {
-                    isFriend = statuses[friendUserId] == "accepted"
-                }
-            },
-            onError = {
-                friendStatuses = emptyMap()
-                if (!isGroupThread) {
-                    isFriend = false
-                }
-            }
-        )
+        SocialRepository.fetchNicknames(currentUser.uid, { map ->
+            nicknames = map
+            if (!isGroupThread) friend = friend // trigger re-eval
+        }, { })
 
-        SocialRepository.fetchNicknames(
-            currentUserId = currentUser.uid,
-            onSuccess = { map ->
-                nicknames = map
-                nickname = if (isGroupThread) null else map[friendUserId]
-            },
-            onError = {
-                // Ignore nickname load error.
-            }
-        )
-
-        if (isGroupThread) {
-            // GROUP MESSAGING CHANGE:
-            // Do not try to fetch user profile for the fake route id "group".
-            friend = null
-            nickname = null
-            isFriend = true
-        } else {
-            MessagingRepository.fetchUserProfile(
-                userId = friendUserId,
-                onSuccess = {
-                    friend = it
-                    errorMessage = null
-                },
-                onError = { errorMessage = it }
-            )
+        if (!isGroupThread) {
+            MessagingRepository.fetchUserProfile(friendUserId, { friend = it; errorMessage = null }, { errorMessage = it })
         }
     }
 
-    // GROUP MESSAGING CHANGE:
-    // Group chats need a live conversation listener so group-name changes sync
-    // Direct chats keep the old existence-check flow so new 1-on-1 chats do not crash or act like group chats.
     DisposableEffect(conversationId, isGroupThread) {
-        if (!isGroupThread) {
-            onDispose { }
-        } else {
-            val registration = MessagingRepository.listenToConversation(
-                conversationId = conversationId,
-                onUpdate = { updatedConversation ->
-                    conversation = updatedConversation
-                    conversationExists = updatedConversation != null
-                    errorMessage = null
-                },
-                onError = { errorMessage = it }
-            )
-
-            onDispose {
-                registration.remove()
-            }
+        if (!isGroupThread) onDispose { } else {
+            val reg = MessagingRepository.listenToConversation(conversationId, { conversation = it; conversationExists = it != null; errorMessage = null }, { errorMessage = it })
+            onDispose { reg.remove() }
         }
     }
 
     LaunchedEffect(conversationId, isGroupThread) {
-        if (isGroupThread) {
-            return@LaunchedEffect
-        }
-
-        // Direct messages use the original direct-chat behavior.
-        MessagingRepository.checkConversationExists(
-            conversationId = conversationId,
-            onResult = { exists ->
-                conversationExists = exists
-                errorMessage = null
-            },
-            onError = { errorMessage = it }
-        )
+        if (isGroupThread) return@LaunchedEffect
+        MessagingRepository.checkConversationExists(conversationId, { conversationExists = it; errorMessage = null }, { errorMessage = it })
     }
 
     DisposableEffect(conversationId, conversationExists) {
-        if (!conversationExists) {
-            onDispose { }
-        } else {
-            val registration = MessagingRepository.listenToMessages(
-                conversationId = conversationId,
-                onUpdate = {
-                    messages = it
-                    errorMessage = null
-                },
-                onError = { errorMessage = it }
-            )
-            onDispose {
-                registration.remove()
-            }
+        if (!conversationExists) onDispose { } else {
+            val reg = MessagingRepository.listenToMessages(conversationId, { messages = it; errorMessage = null }, { errorMessage = it })
+            onDispose { reg.remove() }
         }
     }
 
     DisposableEffect(currentUser.uid) {
         val pinsReg = SocialRepository.listenToCustomPins(currentUser.uid, { userPins = it }, {})
         val eventsReg = SocialRepository.listenToCustomEvents(currentUser.uid, { userEvents = it }, {})
-        onDispose {
-            pinsReg.remove()
-            eventsReg.remove()
-        }
+        onDispose { pinsReg.remove(); eventsReg.remove() }
     }
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.lastIndex)
-        }
-    }
+    LaunchedEffect(messages.size) { if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex) }
 
-    // GROUP MESSAGING CHANGE:
-    // EventInvite documents are still one recipient perdocument.
-    // For group chats, create one invite per group member, then send one group chat message.
-    fun sendEventInviteToThread(
-        event: CalendarEvent,
-        onSuccess: () -> Unit = {}
-    ) {
+    fun sendEventInviteToThread(event: CalendarEvent, onSuccess: () -> Unit = {}) {
         if (isGroupThread) {
-            val targetConversation = conversation
-            if (targetConversation == null) {
-                errorMessage = "Group chat is still loading."
-                return
-            }
-
-            val recipientIds = targetConversation.participantIds
-                .filter { userId -> userId != currentUser.uid }
-
-            if (recipientIds.isEmpty()) {
-                errorMessage = "No group members found."
-                return
-            }
-
+            val targetConversation = conversation ?: return
+            val recipientIds = targetConversation.participantIds.filter { it != currentUser.uid }
+            if (recipientIds.isEmpty()) return
             var completedCount = 0
             var failed = false
-
             recipientIds.forEach { targetUserId ->
-                SocialRepository.sendEventInvite(
-                    currentUser = currentUser,
-                    targetUserId = targetUserId,
-                    event = event,
-                    onSuccess = {
-                        completedCount++
-
-                        if (!failed && completedCount == recipientIds.size) {
-                            sendThreadMessage(
-                                text = "Sent an invite for: ${event.title}",
-                                type = "event_invite",
-                                metadata = mapOf(
-                                    "eventId" to event.id,
-                                    "eventTitle" to event.title
-                                ),
-                                onSuccess = onSuccess
-                            )
-                        }
-                    },
-                    onError = { error ->
-                        if (!failed) {
-                            failed = true
-                            errorMessage = error
-                        }
+                SocialRepository.sendEventInvite(currentUser, targetUserId, event, {
+                    completedCount++
+                    if (!failed && completedCount == recipientIds.size) {
+                        sendThreadMessage("Sent an invite for: ${event.title}", "event_invite", mapOf("eventId" to event.id, "eventTitle" to event.title), onSuccess)
                     }
-                )
+                }, { if (!failed) { failed = true; errorMessage = it } })
             }
         } else {
-            // Direct chat behavior stays the same: one invite to the one friend.
-            SocialRepository.sendEventInvite(
-                currentUser = currentUser,
-                targetUserId = friendUserId,
-                event = event,
-                onSuccess = {
-                    sendThreadMessage(
-                        text = "Sent you an invite for: ${event.title}",
-                        type = "event_invite",
-                        metadata = mapOf(
-                            "eventId" to event.id,
-                            "eventTitle" to event.title
-                        ),
-                        onSuccess = onSuccess
-                    )
-                },
-                onError = { errorMessage = it }
-            )
+            SocialRepository.sendEventInvite(currentUser, friendUserId, event, {
+                sendThreadMessage("Sent you an invite for: ${event.title}", "event_invite", mapOf("eventId" to event.id, "eventTitle" to event.title), onSuccess)
+            }, { errorMessage = it })
         }
     }
 
     if (showPinPicker) {
-        ItemPickerDialog(
-            title = "Select a Pin",
+        ItemPickerBottomSheet(
+            title = "Share a Pin",
             items = userPins,
             itemName = { it.name },
+            itemIcon = Icons.Default.PushPin,
             onItemSelected = { pin ->
-                // GROUP MESSAGING CHANGE:
-                // custom pins now work in direct and group chats.
-                sendThreadMessage(
-                    text = "Pin: ${pin.name}",
-                    type = "pin",
-                    metadata = mapOf(
-                        "pinId" to pin.id,
-                        "pinName" to pin.name,
-                        "lat" to pin.latitude.toString(),
-                        "lng" to pin.longitude.toString(),
-                        "description" to pin.description,
-                        "colorArgb" to pin.colorArgb.toString(),
-                        "associatedEventId" to (pin.associatedEventId ?: "")
-                    )
-                )
+                sendThreadMessage("Pin: ${pin.name}", "pin", mapOf("pinId" to pin.id, "pinName" to pin.name, "lat" to pin.latitude.toString(), "lng" to pin.longitude.toString(), "description" to pin.description, "colorArgb" to pin.colorArgb.toString(), "associatedEventId" to (pin.associatedEventId ?: "")))
                 showPinPicker = false
             },
             onDismiss = { showPinPicker = false }
@@ -866,47 +599,25 @@ fun MessageThreadScreen(
     }
 
     if (showEventPicker) {
-        ItemPickerDialog(
-            title = "Select an Event",
+        ItemPickerBottomSheet(
+            title = "Share an Event",
             items = userEvents.filter { it.ownerId == currentUser.uid },
             itemName = { it.title },
+            itemIcon = Icons.Default.Event,
             onItemSelected = { event ->
-                // GROUP MESSAGING CHANG
-                // Works for both direct and group chats
-                // Direct chat sends one invite
-                // Group chat sends one invite per group member, then one group message
-                sendEventInviteToThread(
-                    event = event,
-                    onSuccess = {
-                        conversationExists = true
-                        errorMessage = null
-                    }
-                )
-
+                sendEventInviteToThread(event) { conversationExists = true; errorMessage = null }
                 showEventPicker = false
             },
             onDismiss = { showEventPicker = false }
         )
     }
 
-    // GROUP MESSAGING CHANGE:
-    // Any member can rename the group. The name is stored on the conversation document,
-    // so every group member sees the new name live
     if (showEditGroupNameDialog && isGroupThread && currentConversation != null) {
         EditGroupNameDialog(
             initialName = currentConversation.groupName,
             onDismiss = { showEditGroupNameDialog = false },
             onSave = { newName ->
-                MessagingRepository.updateGroupName(
-                    conversationId = conversationId,
-                    currentUserId = currentUser.uid,
-                    newGroupName = newName,
-                    onSuccess = {
-                        showEditGroupNameDialog = false
-                        errorMessage = null
-                    },
-                    onError = { errorMessage = it }
-                )
+                MessagingRepository.updateGroupName(conversationId, currentUser.uid, newName, { showEditGroupNameDialog = false; errorMessage = null }, { errorMessage = it })
             }
         )
     }
@@ -916,65 +627,38 @@ fun MessageThreadScreen(
         bottomBar = {
             if (canSendMessages) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.White)
-                        .padding(12.dp),
+                    modifier = Modifier.fillMaxWidth().background(Color.White).padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box {
                         IconButton(onClick = { showAttachmentMenu = !showAttachmentMenu }) {
-                            Icon(Icons.Default.Add, contentDescription = "Add attachment", tint = Color(0xFFEF3347))
+                            Icon(Icons.Default.Add, contentDescription = "Add", tint = CoralRed)
                         }
-                        DropdownMenu(
-                            expanded = showAttachmentMenu,
-                            onDismissRequest = { showAttachmentMenu = false }
-                        ) {
+                        DropdownMenu(expanded = showAttachmentMenu, onDismissRequest = { showAttachmentMenu = false }) {
                             DropdownMenuItem(
-                                text = { Text("Ping Current Location") },
+                                text = { Text("My Location") },
                                 onClick = {
                                     showAttachmentMenu = false
                                     if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                                        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
-                                            .addOnSuccessListener { location ->
-                                                if (location != null) {
-                                                    // GROUP MESSAGING CHANGE:
-                                                    // location sharing now works in direct and group chats
-                                                    sendThreadMessage(
-                                                        text = "My current location",
-                                                        type = "location",
-                                                        metadata = mapOf(
-                                                            "lat" to location.latitude.toString(),
-                                                            "lng" to location.longitude.toString()
-                                                        )
-                                                    )
-                                                }
-                                            }
-                                    } else {
-                                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-                                    }
+                                        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null).addOnSuccessListener { location ->
+                                            if (location != null) sendThreadMessage("My current location", "location", mapOf("lat" to location.latitude.toString(), "lng" to location.longitude.toString()))
+                                        }
+                                    } else locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                                 },
                                 leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) }
                             )
                             DropdownMenuItem(
-                                text = { Text("Send Custom Pin") },
-                                onClick = {
-                                    showAttachmentMenu = false
-                                    showPinPicker = true
-                                },
+                                text = { Text("Share Pin") },
+                                onClick = { showAttachmentMenu = false; showPinPicker = true },
                                 leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) }
                             )
                             DropdownMenuItem(
                                 text = { Text("Share Event") },
-                                onClick = {
-                                    showAttachmentMenu = false
-                                    showEventPicker = true
-                                },
+                                onClick = { showAttachmentMenu = false; showEventPicker = true },
                                 leadingIcon = { Icon(Icons.Default.Event, contentDescription = null) }
                             )
                         }
                     }
-
                     OutlinedTextField(
                         value = messageText,
                         onValueChange = { messageText = it },
@@ -983,211 +667,75 @@ fun MessageThreadScreen(
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp)
                     )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
+                    Spacer(Modifier.width(8.dp))
                     IconButton(
-                        onClick = {
-                            isSending = true
-
-                            // GROUP MESSAGING CHANGE:
-                            // Use the shared direct/group send helper.
-                            // Group chats do not have a single friend object.
-                            sendThreadMessage(
-                                text = messageText,
-                                onSuccess = {
-                                    messageText = ""
-                                    isSending = false
-                                }
-                            )
-                        },
+                        onClick = { isSending = true; sendThreadMessage(messageText, onSuccess = { messageText = ""; isSending = false }) },
                         enabled = messageText.isNotBlank() && !isSending && canSendMessages
                     ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Send",
-                            tint = Color(0xFFEF3347)
-                        )
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = CoralRed)
                     }
                 }
             } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.White)
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+                Surface(color = Color.White, modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = if (isGroupThread) {
-                            "You must be friends with at least one group member to send messages."
-                        } else {
-                            "You must be friends to send messages."
-                        },
+                        text = if (isGroupThread) "You must be friends with a member to chat." else "You must be friends to chat.",
                         color = Color.Gray,
-                        style = MaterialTheme.typography.bodyMedium
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-                .background(AppBackground)
-                .padding(16.dp)
-        ) {
+        Column(modifier = Modifier.padding(innerPadding).fillMaxSize().background(AppBackground).padding(16.dp)) {
             val currentFriend = friend
-
-// GROUP MESSAGING CHANGE:
-// Direct chat title uses friend/nickname.
-// Group chat title uses groupName, or falls back to participant names/nicknames.
             val displayName = if (isGroupThread && currentConversation != null) {
-                conversationTitle(
-                    conversation = currentConversation,
-                    currentUser = currentUser,
-                    profilesById = memberProfilesById,
-                    nicknames = nicknames
-                )
+                conversationTitle(currentConversation, currentUser, memberProfilesById, nicknames)
             } else {
-                nickname ?: currentFriend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Chat"
+                nicknames[friendUserId] ?: currentFriend?.let { SocialRepository.displayNameOrEmail(it) } ?: "Chat"
             }
 
-            val subtitle = if (isGroupThread && currentConversation != null) {
-                conversationSubtitle(
-                    conversation = currentConversation,
-                    currentUser = currentUser,
-                    profilesById = memberProfilesById,
-                    nicknames = nicknames
-                )
+            val subtitleText = if (isGroupThread && currentConversation != null) {
+                conversationSubtitle(currentConversation, currentUser, memberProfilesById, nicknames)
             } else {
-                when {
-                    !nickname.isNullOrBlank() && currentFriend != null ->
-                        "(${SocialRepository.displayNameOrEmail(currentFriend)})"
-
-                    currentFriend != null && currentFriend.email.isNotBlank() ->
-                        currentFriend.email
-
-                    else -> ""
-                }
+                currentFriend?.email.orEmpty()
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                UserAvatar(photoUrl = if (isGroupThread) "" else currentFriend?.photoUrl ?: "")
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    if (subtitle.isNotBlank()) {
-                        Text(
-                            text = subtitle,
-                            color = Color.Gray,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (isGroupThread) {
-                    // GROUP MESSAGING group members can rename the shared group chat
-                    Button(
-                        onClick = { showEditGroupNameDialog = true },
-                        modifier = Modifier
-                            .height(36.dp)
-                            .padding(start = 8.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFEF3347),
-                            contentColor = Color.White
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) {
-                        Text(
-                            text = "Rename",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Surface(shape = CircleShape, color = BrandOrange.copy(alpha = 0.1f), modifier = Modifier.size(44.dp)) {
+                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Groups, null, tint = BrandOrange) }
                     }
                 } else {
-                    Button(
-                        onClick = {
-                            navController.navigate("${Routes.PROFILE}/$friendUserId")
-                        },
-                        modifier = Modifier
-                            .height(36.dp)
-                            .padding(start = 8.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFEF3347),
-                            contentColor = Color.White
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) {
-                        Text(
-                            text = "View Profile",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    UserAvatar(photoUrl = currentFriend?.photoUrl ?: "")
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (subtitleText.isNotBlank()) Text(subtitleText, color = Color.Gray, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (isGroupThread) {
+                    TextButton(onClick = { showEditGroupNameDialog = true }) { Text("Rename", color = CoralRed, fontWeight = FontWeight.Bold) }
+                } else {
+                    TextButton(onClick = { navController.navigate("${Routes.PROFILE}/$friendUserId") }) { Text("Profile", color = CoralRed, fontWeight = FontWeight.Bold) }
                 }
             }
-
             if (errorMessage != null && conversationExists) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = errorMessage!!,
-                    color = MaterialTheme.colorScheme.error
-                )
+                Text(errorMessage!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
+            Spacer(Modifier.height(16.dp))
             if (messages.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("No messages yet. Say hello!", color = Color.Gray)
-                }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No messages yet.", color = Color.Gray) }
             } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(messages, key = { it.id }) { message ->
                         MessageBubble(
                             message = message,
                             isMine = message.senderId == currentUser.uid,
                             navController = navController,
                             ownedPins = userPins,
-                            onPinSaved = {
-                                // already handled by listener
-                            },
-                            // GROUP MESSAGING CHANGE: only show sender names in group chats.
-                            senderName = if (isGroupThread) {
-                                displayUserName(
-                                    userId = message.senderId,
-                                    currentUser = currentUser,
-                                    profilesById = memberProfilesById,
-                                    nicknames = nicknames
-                                )
-                            } else {
-                                null
-                            },
+                            senderName = if (isGroupThread) displayUserName(message.senderId, currentUser, memberProfilesById, nicknames) else null,
                             currentUserId = currentUser.uid
                         )
                     }
@@ -1198,90 +746,78 @@ fun MessageThreadScreen(
 }
 
 @Composable
-private fun FriendPickerCard(
-    user: UserProfile,
-    nickname: String?,
-    onClick: () -> Unit
-) {
+private fun FriendPickerCard(user: UserProfile, nickname: String?, onClick: () -> Unit) {
     Column(
-        modifier = Modifier
-            .width(80.dp)
-            .clickable { onClick() },
+        modifier = Modifier.width(64.dp).clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        UserAvatar(photoUrl = user.photoUrl)
-        Spacer(modifier = Modifier.height(4.dp))
+        UserAvatar(photoUrl = user.photoUrl, size = 56.dp)
+        Spacer(Modifier.height(4.dp))
         Text(
-            text = nickname ?: SocialRepository.displayNameOrEmail(user),
+            text = nickname ?: SocialRepository.displayNameOrEmail(user).split(" ").firstOrNull() ?: "Friend",
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            fontWeight = FontWeight.Medium
         )
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun <T> ItemPickerDialog(
+private fun <T> ItemPickerBottomSheet(
     title: String,
     items: List<T>,
     itemName: (T) -> String,
+    itemIcon: ImageVector,
     onItemSelected: (T) -> Unit,
     onDismiss: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
     val filteredItems = remember(searchQuery, items) {
-        if (searchQuery.isBlank()) items
-        else items.filter { itemName(it).contains(searchQuery, ignoreCase = true) }
+        if (searchQuery.isBlank()) items else items.filter { itemName(it).contains(searchQuery, ignoreCase = true) }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color(0xFFEF3347))
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFFEF3347),
-                        unfocusedBorderColor = Color.LightGray
-                    ),
-                    singleLine = true
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (filteredItems.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
-                        Text("No items found.", textAlign = TextAlign.Center, color = Color.Gray)
-                    }
-                } else {
-                    LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
-                        items(filteredItems) { item ->
-                            Text(
-                                text = itemName(item),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onItemSelected(item) }
-                                    .padding(vertical = 12.dp, horizontal = 8.dp)
-                            )
-                            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Search items...") },
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.Gray) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CoralRed),
+                singleLine = true
+            )
+            Spacer(Modifier.height(16.dp))
+            if (filteredItems.isEmpty()) {
+                Box(Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+                    Text("No items found.", color = Color.Gray)
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.heightIn(max = 400.dp)) {
+                    items(filteredItems) { item ->
+                        Surface(
+                            onClick = { onItemSelected(item) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = FaintGray
+                        ) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(itemIcon, null, tint = CoralRed, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(16.dp))
+                                Text(itemName(item), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                Icon(Icons.Default.ChevronRight, null, tint = Color.LightGray)
+                            }
                         }
                     }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-                    Text("Cancel", color = Color.Gray)
                 }
             }
         }
@@ -1301,230 +837,124 @@ private fun CreateGroupChatDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New Group Chat") },
+        title = { Text("New Group Chat", fontWeight = FontWeight.Bold) },
         text = {
             Column {
-                // GROUP MESSAGING optional name, blank falls back to participant names.
                 OutlinedTextField(
                     value = groupName,
                     onValueChange = { groupName = it.take(80) },
                     label = { Text("Group name (optional)") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Select at least 2 friends",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+                Spacer(Modifier.height(16.dp))
+                Text("Select Members", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.Gray)
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                     items(friends, key = { it.uid }) { friend ->
                         val checked = friend.uid in selectedFriendIds
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    if (checked) selectedFriendIds.remove(friend.uid)
-                                    else selectedFriendIds.add(friend.uid)
-                                }
-                                .padding(vertical = 8.dp),
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                if (checked) selectedFriendIds.remove(friend.uid) else selectedFriendIds.add(friend.uid)
+                            }.padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Checkbox(
-                                checked = checked,
-                                onCheckedChange = { isChecked ->
-                                    if (isChecked) selectedFriendIds.add(friend.uid)
-                                    else selectedFriendIds.remove(friend.uid)
-                                }
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            UserAvatar(photoUrl = friend.photoUrl)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = nicknames[friend.uid]
-                                        ?.takeIf { it.isNotBlank() }
-                                        ?: SocialRepository.displayNameOrEmail(friend),
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                if (friend.email.isNotBlank()) {
-                                    Text(
-                                        text = friend.email,
-                                        color = Color.Gray,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
+                            Checkbox(checked = checked, onCheckedChange = { 
+                                if (it) selectedFriendIds.add(friend.uid) else selectedFriendIds.remove(friend.uid)
+                            }, colors = CheckboxDefaults.colors(checkedColor = CoralRed))
+                            UserAvatar(photoUrl = friend.photoUrl, size = 32.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Text(nicknames[friend.uid] ?: SocialRepository.displayNameOrEmail(friend), fontWeight = FontWeight.Medium)
                         }
                     }
                 }
             }
         },
         confirmButton = {
-            Button(
-                onClick = { onCreate(selectedFriendIds.toList(), groupName) },
-                enabled = selectedFriendIds.size >= 2 && !isCreating,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFEF3347),
-                    contentColor = Color.White
-                )
-            ) {
+            Button(onClick = { onCreate(selectedFriendIds.toList(), groupName) }, enabled = selectedFriendIds.size >= 2 && !isCreating, colors = ButtonDefaults.buttonColors(containerColor = CoralRed)) {
                 Text(if (isCreating) "Creating..." else "Create")
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isCreating) {
-                Text("Cancel")
-            }
-        }
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !isCreating) { Text("Cancel") } }
     )
 }
 
 @Composable
-private fun EditGroupNameDialog(
-    initialName: String,
-    onDismiss: () -> Unit,
-    onSave: (String) -> Unit
-) {
+private fun EditGroupNameDialog(initialName: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
     var groupName by rememberSaveable(initialName) { mutableStateOf(initialName) }
-
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Group Chat Name") },
+        title = { Text("Rename Group") },
         text = {
-            Column {
-                // GROUP MESSAGING
-                // saving blank clears the custom name and restores
-                // the automatic participant names/nicknames fallback.
-                OutlinedTextField(
-                    value = groupName,
-                    onValueChange = { groupName = it.take(80) },
-                    label = { Text("Group name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            OutlinedTextField(value = groupName, onValueChange = { groupName = it.take(80) }, label = { Text("Group name") }, singleLine = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
         },
         confirmButton = {
-            Button(
-                onClick = { onSave(groupName) },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFEF3347),
-                    contentColor = Color.White
-                )
-            ) {
-                Text("Save")
-            }
+            Button(onClick = { onSave(groupName) }, colors = ButtonDefaults.buttonColors(containerColor = CoralRed)) { Text("Save") }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
-}
-
-@Composable
-private fun FriendPickerCard(user: UserProfile, onClick: () -> Unit) {
-    ElevatedButton(onClick = onClick, shape = RoundedCornerShape(12.dp)) {
-        Text(text = SocialRepository.displayNameOrEmail(user), maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
 }
 
 @Composable
 private fun ConversationCard(
-    friendName: String,
-    friendEmail: String,
+    title: String,
+    subtitle: String,
     photoUrl: String?,
     preview: String,
     timestamp: Long,
-    onClick: () -> Unit) {
-    Card(
+    isGroup: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
         onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 0.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        color = Color.White,
+        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.2f))
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
-        ) {
-            UserAvatar(
-                photoUrl = photoUrl ?: "",
-            )
-
-            Spacer(modifier = Modifier.width(16.dp))
-
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (isGroup) {
+                Surface(shape = CircleShape, color = BrandOrange.copy(alpha = 0.1f), modifier = Modifier.size(52.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Groups, null, tint = BrandOrange, modifier = Modifier.size(28.dp)) }
+                }
+            } else {
+                UserAvatar(photoUrl = photoUrl ?: "", size = 52.dp)
+            }
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = friendName,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                if (friendEmail.isNotBlank()) {
-                    Text(
-                        text = friendEmail,
-                        color = Color.Gray,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = preview,
-                        color = Color.DarkGray,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-
+                    Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                     if (timestamp > 0L) {
-                        Text(
-                            text = " • ${formatShortTimeAgo(timestamp)}",
-                            color = Color.Gray,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(start = 4.dp)
-                        )
+                        Text(" • ${formatShortTimeAgo(timestamp)}", color = Color.Gray, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 4.dp))
                     }
                 }
+                Text(subtitle, color = Color.Gray, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(preview, color = Color.DarkGray, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            Icon(Icons.Default.ChevronRight, null, tint = Color.LightGray, modifier = Modifier.size(20.dp))
+        }
+    }
+}
 
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = Color.LightGray,
-                modifier = Modifier.size(20.dp)
-            )
+@Composable
+fun UserAvatar(photoUrl: String?, size: androidx.compose.ui.unit.Dp = 40.dp) {
+    if (!photoUrl.isNullOrBlank()) {
+        AsyncImage(
+            model = photoUrl,
+            contentDescription = "Profile Photo",
+            modifier = Modifier.size(size).clip(CircleShape).background(Color.LightGray),
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Surface(
+            modifier = Modifier.size(size),
+            shape = CircleShape,
+            color = Color.LightGray.copy(alpha = 0.3f)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Person, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(size * 0.6f))
+            }
         }
     }
 }
@@ -1535,32 +965,22 @@ private fun MessageBubble(
     isMine: Boolean,
     navController: NavHostController,
     ownedPins: List<CustomPin> = emptyList(),
-    onPinSaved: () -> Unit = {},
     senderName: String? = null,
-
-    // GROUP MESSAGING CHANGE:
-    // Needed so group event invites can find the invite document for this user.
     currentUserId: String = ""
 ) {
     val context = LocalContext.current
     val timeString = remember(message.sentAt) {
-        val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
-        sdf.format(Date(message.sentAt))
+        SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(message.sentAt))
     }
     
     var invite by remember { mutableStateOf<EventInvite?>(null) }
-    var inviteError by remember { mutableStateOf<String?>(null) }
     var addressText by remember { mutableStateOf<String?>(null) }
     
-    // Check if the coordinate in the metadata is already saved as a pin by the current user
     val isAlreadySaved = remember(message.id, ownedPins) {
         val lat = message.metadata["lat"]?.toDoubleOrNull()
         val lng = message.metadata["lng"]?.toDoubleOrNull()
         (message.type == "pin" || message.type == "location") && lat != null && lng != null &&
-        ownedPins.any { 
-            abs(it.latitude - lat) < 0.00001 && 
-            abs(it.longitude - lng) < 0.00001 
-        }
+        ownedPins.any { abs(it.latitude - lat) < 0.00001 && abs(it.longitude - lng) < 0.00001 }
     }
 
     var isPinDeletedBySender by remember { mutableStateOf(false) }
@@ -1568,19 +988,10 @@ private fun MessageBubble(
     if (message.type == "event_invite" && !isMine) {
         LaunchedEffect(message.id, currentUserId) {
             val eventId = message.metadata["eventId"].orEmpty()
-
-            // GROUP MESSAGING CHANGE:
-            // Direct messages use receiverId.
-            // Group messages have receiverId blank, so use the signed-in user's uid.
             val inviteRecipientId = message.receiverId.ifBlank { currentUserId }
-
             if (eventId.isNotBlank() && inviteRecipientId.isNotBlank()) {
                 val inviteId = "${message.senderId}_${inviteRecipientId}_${eventId}"
-                SocialRepository.fetchEventInvite(
-                    inviteId,
-                    { invite = it },
-                    { inviteError = it }
-                )
+                SocialRepository.fetchEventInvite(inviteId, { invite = it }, { })
             }
         }
     }
@@ -1589,14 +1000,11 @@ private fun MessageBubble(
         LaunchedEffect(message.metadata["pinId"]) {
             val pinId = message.metadata["pinId"]
             if (pinId != null) {
-                SocialRepository.checkPinExists(message.senderId, pinId) { exists ->
-                    isPinDeletedBySender = !exists
-                }
+                SocialRepository.checkPinExists(message.senderId, pinId) { exists -> isPinDeletedBySender = !exists }
             }
         }
     }
 
-    // Geocoding for rough area implementation
     val lat = message.metadata["lat"]?.toDoubleOrNull()
     val lng = message.metadata["lng"]?.toDoubleOrNull()
     if ((message.type == "location" || message.type == "pin") && lat != null && lng != null) {
@@ -1607,12 +1015,11 @@ private fun MessageBubble(
                     val addresses = geocoder.getFromLocation(lat, lng, 1)
                     if (!addresses.isNullOrEmpty()) {
                         val addr = addresses[0]
-                        val area = when {
+                        addressText = when {
                             !addr.featureName.isNullOrEmpty() && addr.featureName != addr.thoroughfare -> addr.featureName
                             !addr.thoroughfare.isNullOrEmpty() -> addr.thoroughfare
                             else -> addr.locality
                         }
-                        addressText = area
                     }
                 } catch (_: Exception) {}
             }
@@ -1620,216 +1027,88 @@ private fun MessageBubble(
     }
 
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = if (isMine) Alignment.End else Alignment.Start) {
-        // GROUP MESSAGING:
-        // show sender name above incoming group messages.
         if (!isMine && !senderName.isNullOrBlank()) {
-            Text(
-                text = senderName,
-                color = Color.Gray,
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
-            )
+            Text(text = senderName, color = Color.Gray, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 4.dp, bottom = 2.dp))
         }
         Card(
             shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = if (isMine) Color(0xFFEF3347) else Color.White),
+            colors = CardDefaults.cardColors(containerColor = if (isMine) CoralRed else Color.White),
             border = if (isMine) null else BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f)),
-            modifier = Modifier.widthIn(max = 300.dp)
+            modifier = Modifier.widthIn(max = 280.dp)
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 when (message.type) {
                     "location", "pin" -> {
                         val isLocation = message.type == "location"
-                        val isPin = message.type == "pin"
-                        
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                if (isLocation) Icons.Default.LocationOn else Icons.Default.PushPin,
-                                contentDescription = null,
-                                tint = if (isMine) Color.White else Color(0xFFEF3347),
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isPin && isPinDeletedBySender) "Pin no longer exists" else message.text,
-                                color = if (isMine) Color.White else Color.Black,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
-                            )
+                            Icon(if (isLocation) Icons.Default.LocationOn else Icons.Default.PushPin, null, tint = if (isMine) Color.White else CoralRed, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(if (message.type == "pin" && isPinDeletedBySender) "Pin no longer exists" else message.text, color = if (isMine) Color.White else Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
-
-                        // Remove 'near' for custom pin, only show for location shares
                         if (!addressText.isNullOrEmpty() && isLocation) {
-                            Text(
-                                text = "Near $addressText",
-                                color = if (isMine) Color.White.copy(alpha = 0.8f) else Color.Gray,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(start = 28.dp, top = 2.dp)
-                            )
+                            Text("Near $addressText", color = if (isMine) Color.White.copy(alpha = 0.8f) else Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(start = 26.dp, top = 2.dp))
                         }
-
                         if (!isPinDeletedBySender && isAlreadySaved) {
-                            Text(
-                                text = if (isMine) "Already on your map" else "Saved to Map", 
-                                color = if (isMine) Color.White.copy(alpha = 0.9f) else Color(0xFF4CAF50), 
-                                fontWeight = FontWeight.Bold, 
-                                fontSize = 12.sp, 
-                                modifier = Modifier.padding(start = 28.dp, top = 2.dp)
-                            )
+                            Text(if (isMine) "Already on map" else "Saved to Map", color = if (isMine) Color.White.copy(alpha = 0.9f) else Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.padding(start = 26.dp, top = 2.dp))
                         }
-
-                        val shouldHideButton = (isPin && isPinDeletedBySender)
-
-                        if (!shouldHideButton) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Button(
+                        if (!(message.type == "pin" && isPinDeletedBySender)) {
+                            Spacer(Modifier.height(8.dp))
+                            Surface(
                                 onClick = {
                                     if (lat != null && lng != null) {
-                                        val route = if (isPin) {
-                                            Routes.mapWithLocation(
-                                                lat = lat,
-                                                lng = lng,
-                                                tempName = message.metadata["pinName"] ?: "Shared Pin",
-                                                tempDesc = message.metadata["description"],
-                                                tempColor = message.metadata["colorArgb"]?.toIntOrNull(),
-                                                tempEventId = message.metadata["associatedEventId"]
-                                            )
-                                        } else {
-                                            Routes.mapWithLocation(
-                                                lat = lat,
-                                                lng = lng,
-                                                tempName = if (isMine) "My Shared Location" else "Shared Location",
-                                                tempDesc = if (isMine) "A location you shared" else "A location shared with you"
-                                            )
-                                        }
+                                        val route = if (message.type == "pin") Routes.mapWithLocation(lat, lng, message.metadata["pinName"] ?: "Shared Pin", message.metadata["description"], message.metadata["colorArgb"]?.toIntOrNull(), message.metadata["associatedEventId"])
+                                        else Routes.mapWithLocation(lat, lng, if (isMine) "My Shared Location" else "Shared Location", if (isMine) "A location you shared" else "A location shared with you")
                                         navController.navigate(route)
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isMine) Color.White.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.3f),
-                                    contentColor = if (isMine) Color.White else Color.Black
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                                modifier = Modifier.height(34.dp).wrapContentWidth()
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isMine) Color.White.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.3f)
                             ) {
-                                Text(
-                                    text = if (isAlreadySaved || (isPin && isMine)) "View on Map" else "View/Add Pin on Map",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Text(if (isAlreadySaved || (message.type == "pin" && isMine)) "View on Map" else "View/Add Pin", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isMine) Color.White else Color.Black, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
                             }
                         }
                     }
                     "event_invite" -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.Event,
-                                contentDescription = null,
-                                tint = if (isMine) Color.White else Color(0xFFEF3347),
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Event Invitation",
-                                color = if (isMine) Color.White else Color.Black,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
-                            )
+                            Icon(Icons.Default.Event, null, tint = if (isMine) Color.White else CoralRed, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Event Invite", color = if (isMine) Color.White else Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
-                        Text(
-                            text = message.metadata["eventTitle"] ?: "Unknown Event",
-                            color = if (isMine) Color.White else Color.Black,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontSize = 15.sp,
-                            modifier = Modifier.padding(start = 30.dp)
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-
+                        Text(message.metadata["eventTitle"] ?: "Event", color = if (isMine) Color.White else Color.Black, style = MaterialTheme.typography.bodyMedium, fontSize = 14.sp, modifier = Modifier.padding(start = 28.dp))
                         if (!isMine && invite?.status == "pending") {
-                            Row(modifier = Modifier.padding(start = 30.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Button(
-                                    onClick = {
-                                        invite?.let {
-                                            SocialRepository.acceptEventInvite(it, { invite = it.copy(status = "accepted") }, {})
-                                        }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                                    modifier = Modifier.height(34.dp),
-                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                                    shape = RoundedCornerShape(10.dp)
-                                ) {
-                                    Text("Accept", fontSize = 13.sp, color = Color.White)
-                                }
-                                Button(
-                                    onClick = {
-                                        invite?.let {
-                                            SocialRepository.declineEventInvite(it, { invite = null }, {})
-                                        }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray),
-                                    modifier = Modifier.height(34.dp),
-                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                                    shape = RoundedCornerShape(10.dp)
-                                ) {
-                                    Text("Decline", fontSize = 13.sp, color = Color.Black)
-                                }
+                            Row(Modifier.padding(start = 28.dp, top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = { invite?.let { SocialRepository.acceptEventInvite(it, { invite = it.copy(status = "accepted") }, {}) } }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)), shape = RoundedCornerShape(8.dp), modifier = Modifier.height(32.dp), contentPadding = PaddingValues(horizontal = 12.dp)) { Text("Accept", fontSize = 12.sp) }
+                                Button(onClick = { invite?.let { SocialRepository.declineEventInvite(it, { invite = null }, {}) } }, colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray), shape = RoundedCornerShape(8.dp), modifier = Modifier.height(32.dp), contentPadding = PaddingValues(horizontal = 12.dp)) { Text("Decline", fontSize = 12.sp, color = Color.Black) }
                             }
                         } else if (!isMine && invite?.status == "accepted") {
-                            Text("Accepted", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(start = 30.dp))
+                            Text("Accepted", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(start = 28.dp, top = 4.dp))
                         }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Button(
-                            onClick = { navController.navigate(Routes.CALENDAR) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isMine) Color.White.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.5f),
-                                contentColor = if (isMine) Color.White else Color.Black
-                            ),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                            modifier = Modifier.height(34.dp).wrapContentWidth().padding(start = 30.dp),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Text("Go to Calendar", fontSize = 14.sp)
-                        }
+                        Spacer(Modifier.height(8.dp))
+                        Surface(onClick = { navController.navigate(Routes.CALENDAR) }, shape = RoundedCornerShape(8.dp), color = if (isMine) Color.White.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.3f), modifier = Modifier.padding(start = 28.dp)) { Text("Go to Calendar", fontSize = 12.sp, color = if (isMine) Color.White else Color.Black, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) }
                     }
                     else -> {
-                        Text(text = message.text, color = if (isMine) Color.White else Color.Black, fontSize = 16.sp)
+                        Text(text = message.text, color = if (isMine) Color.White else Color.Black, fontSize = 15.sp)
                     }
                 }
             }
         }
-        Text(text = timeString, fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp, start = 8.dp, end = 8.dp))
+        Text(text = timeString, fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(top = 2.dp, start = 4.dp, end = 4.dp))
     }
 }
 
-private fun formatShortTimeAgo(timestamp: Long): String {if (timestamp <= 0L) return ""
+private fun formatShortTimeAgo(timestamp: Long): String {
+    if (timestamp <= 0L) return ""
     val diff = System.currentTimeMillis() - timestamp
     val seconds = diff / 1000
     val minutes = seconds / 60
     val hours = minutes / 60
     val days = hours / 24
-
     return when {
         minutes < 1 -> "now"
         minutes < 60 -> "${minutes}m"
         hours < 24 -> "${hours}h"
         days < 7 -> "${days}d"
-        else -> {
-            val date = java.util.Date(timestamp)
-            java.text.SimpleDateFormat("MMM d", java.util.Locale.getDefault()).format(date)
-        }
-    }
-}
-
-@Composable
-private fun EmptyCard(text: String) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Mail, contentDescription = null, tint = Color.Gray)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(text = text, color = Color.Gray)
-        }
+        else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(timestamp))
     }
 }
 
@@ -1838,11 +1117,4 @@ private fun SignedOutMessagingMessage() {
     Box(modifier = Modifier.fillMaxSize().background(AppBackground), contentAlignment = Alignment.Center) {
         Text("Please sign in to view your messages.")
     }
-}
-
-fun Color.toArgb(): Int {
-    return (this.alpha * 255.0f + 0.5f).toInt() shl 24 or
-            ((this.red * 255.0f + 0.5f).toInt() shl 16) or
-            ((this.green * 255.0f + 0.5f).toInt() shl 8) or
-            (this.blue * 255.0f + 0.5f).toInt()
 }

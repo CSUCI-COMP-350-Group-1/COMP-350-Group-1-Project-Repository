@@ -418,7 +418,7 @@ fun MapScreen(
                     onDismiss = { showShareSheet = false },
                     onSuccess = {
                         showShareSheet = false
-                        Toast.makeText(context, "Location shared with friends!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Location shared successfully!", Toast.LENGTH_SHORT).show()
                     }
                 )
             }
