@@ -44,7 +44,7 @@ fun EditProfileScreen(navController: NavHostController) {
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.onPrimary
+        containerColor = MaterialTheme.colorScheme.surface
     ) { innerPadding ->
         Column(
             modifier = Modifier
