@@ -763,7 +763,9 @@ fun PinCreationDialog(
             }
         },
         dismissButton = {
+            @Suppress("DEPRECATION")
             TextButton(onClick = onDismiss) {
+                @Suppress("DEPRECATION")
                 Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
@@ -796,14 +798,19 @@ fun LocationDetailsContent(
     onSaveSharedPin: () -> Unit = {}
 ) {
     val isTemp = location.id == "shared_temp"
+    val detailsContentModifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 24.dp)
 
+    @Suppress("DEPRECATION")
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(24.dp)
+            .padding(top = 24.dp, bottom = 32.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row( modifier = detailsContentModifier,
+            verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -829,6 +836,7 @@ fun LocationDetailsContent(
                 )
 
                 Spacer(modifier = Modifier.height(2.dp))
+                @Suppress("DEPRECATION")
                 if (isTemp) {
                     Text(
                         text = "Clicking empty space on the map or another point will remove this pin.",
@@ -846,14 +854,18 @@ fun LocationDetailsContent(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        if (location.description.isNotEmpty()) {
+    if (location.description.isNotEmpty()) {
+        Column(modifier = detailsContentModifier) {
+            @Suppress("DEPRECATION")
             Text(
                 text = "About",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
+
             Spacer(modifier = Modifier.height(8.dp))
+
             @Suppress("DEPRECATION")
             Text(
                 text = location.description,
@@ -861,11 +873,13 @@ fun LocationDetailsContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 24.sp
             )
-            Spacer(modifier = Modifier.height(24.dp))
         }
 
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = detailsContentModifier,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (isTemp) {
@@ -885,7 +899,7 @@ fun LocationDetailsContent(
                     Button(
                         onClick = onDeletePin,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.1f), 
+                            containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
                             contentColor = MaterialTheme.colorScheme.error
                         ),
                         modifier = Modifier.weight(1f),
@@ -893,12 +907,13 @@ fun LocationDetailsContent(
                     ) {
                         Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
+                        @Suppress("DEPRECATION")
                         Text("Delete")
                     }
                     Button(
                         onClick = onSendMessage,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), 
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                             contentColor = MaterialTheme.colorScheme.primary
                         ),
                         modifier = Modifier.weight(1f),
@@ -918,7 +933,7 @@ fun LocationDetailsContent(
             Button(
                 onClick = onAssociateEvent,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = detailsContentModifier,
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -939,19 +954,30 @@ fun LocationDetailsContent(
             }
 
             if (visibleEvents.isNotEmpty()) {
-                @Suppress("DEPRECATION")
-                Text(
-                    text = if (location.isCustom && location.associatedEventId != null) "Linked Event" else "Events at this Location",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                visibleEvents.forEach { event ->
-                    MapEventItem(
-                        event = event,
-                        onMoreClick = { onGoToEvent(event) }
+
+                Column(modifier = detailsContentModifier) {
+                    @Suppress("DEPRECATION")
+                    Text(
+                        text = if (location.isCustom && location.associatedEventId != null) {
+                            "Linked Event"
+                        } else {
+                            "Events at this Location"
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                visibleEvents.forEach { event ->
+                    Box(modifier = detailsContentModifier) {
+                        MapEventItem(
+                            event = event,
+                            onMoreClick = { onGoToEvent(event) }
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
@@ -961,10 +987,10 @@ fun LocationDetailsContent(
                 text = "No upcoming events here.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 8.dp)
+                modifier = detailsContentModifier.padding(vertical = 8.dp)
             )
         }
-        
+
         Spacer(modifier = Modifier.height(32.dp))
     }
 }
@@ -1176,6 +1202,7 @@ fun CustomFilterChip(
                 )
                 Spacer(Modifier.width(6.dp))
             }
+            @Suppress("DEPRECATION")
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
@@ -1247,6 +1274,7 @@ fun MapContent(
                 }
             }
         } else {
+            // Draw shared temporary pin if exists
             selectedLocation?.let { location ->
                 if (location.id == "shared_temp") {
                     MarkerComposable(
@@ -1270,8 +1298,9 @@ fun MapContent(
                 }
                 val eventCount = locationEvents.size
                 val hasPinnedEvent = locationEvents.any { it.isPinned }
+                val hasBookmarkedEvent = false // locationEvents.any { it.isBookmarked }
 
-                key(location.id, location.name, isSelected, eventCount, hasPinnedEvent, location.isCustom, location.isPinned) {
+                key(location.id, location.name, isSelected, eventCount, hasPinnedEvent, hasBookmarkedEvent, location.isCustom, location.isPinned) {
                     MarkerComposable(
                         state = rememberMarkerState(position = location.position),
                         zIndex = if (isSelected) 100f else 1f,
@@ -1282,7 +1311,7 @@ fun MapContent(
                         }
                     ) {
                         if (isSelected) {
-                            SelectedPointerIcon(location, eventCount, hasPinnedEvent, false)
+                            SelectedPointerIcon(location, eventCount, hasPinnedEvent, hasBookmarkedEvent)
                         } else {
                             if (location.isCustom) {
                                 CustomPinMarkerIcon(location.color, location.isPinned, eventCount)
@@ -1292,7 +1321,7 @@ fun MapContent(
                                     color = location.color,
                                     eventCount = eventCount,
                                     hasPinnedEvent = hasPinnedEvent,
-                                    hasBookmarkedEvent = false,
+                                    hasBookmarkedEvent = hasBookmarkedEvent, // self-assignment?
                                     isCustom = location.isCustom,
                                     isPinned = location.isPinned
                                 )
@@ -1365,6 +1394,27 @@ fun CustomPinMarkerIcon(color: Color, isPinned: Boolean, eventCount: Int, isEdit
                 modifier = Modifier.size(14.dp)
             )
         }
+
+        // Badge for associated events
+        if (eventCount > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-4).dp, y = 4.dp)
+                    .size(18.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .border(1.5.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+//                @Suppress("DEPRECATION")
+//                Text(
+//                    text = eventCount.toString(),
+//                    color = Color.White,
+//                    fontSize = 10.sp,
+//                    fontWeight = FontWeight.Bold
+//                )
+            }
+        }
     }
 }
 
@@ -1419,6 +1469,26 @@ fun SelectedPointerIcon(
                 )
             }
         }
+
+        if (eventCount > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-8).dp, y = 8.dp)
+                    .size(18.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .border(1.5.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+//                @Suppress("DEPRECATION")
+//                Text(
+//                    text = eventCount.toString(),
+//                    color = Color.White,
+//                    fontSize = 10.sp,
+//                    fontWeight = FontWeight.Bold
+//                )
+            }
+        }
     }
 }
 
@@ -1453,6 +1523,26 @@ fun LandmarkIcon(
                 tint = Color.White, // THIS HARDCODING IS OKAY!
                 modifier = Modifier.size(18.dp)
             )
+        }
+
+        if (eventCount > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-2).dp, y = 2.dp)
+                    .size(16.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .border(1.5.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+//                @Suppress("DEPRECATION")
+//                Text(
+//                    text = eventCount.toString(),
+//                    color = Color.White,
+//                    fontSize = 9.sp,
+//                    fontWeight = FontWeight.Bold
+//                )
+            }
         }
     }
 }
@@ -1577,6 +1667,7 @@ fun MapOverlays(
                 color = MaterialTheme.colorScheme.primary,
                 shadowElevation = 8.dp
             ) {
+                @Suppress("DEPRECATION")
                 Text(
                     text = if (isEditing) "Move the pin or confirm location."
                            else if (tempPinSet) "Pin placed! Confirm to continue."
@@ -1600,7 +1691,7 @@ fun MapOverlays(
                         Button(
                             onClick = onClearPin,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.surface, 
+                                containerColor = MaterialTheme.colorScheme.surface,
                                 contentColor = MaterialTheme.colorScheme.primary
                             ),
                             shape = RoundedCornerShape(50),
@@ -1638,6 +1729,7 @@ fun MapOverlays(
                     ) {
                         Icon(Icons.Default.Close, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
+                        @Suppress("DEPRECATION")
                         Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 }
