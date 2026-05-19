@@ -313,7 +313,8 @@ fun MapScreen(
             },
             onConfirmPin = { showPinCreationDialog = true },
             onClearPin = { mapViewModel.clearTempPin() },
-            tempPinSet = mapViewModel.tempPinLocation != null
+            tempPinSet = mapViewModel.tempPinLocation != null,
+            isLoggedIn = mapViewModel.isLoggedIn
         )
 
         // Info card for selected location
@@ -384,18 +385,7 @@ fun MapScreen(
                             Toast.makeText(context, "This pin is already saved.", Toast.LENGTH_SHORT).show()
                             return@LocationDetailsContent
                         }
-                        scope.launch {
-                            val newPin = CustomPin(
-                                id = java.util.UUID.randomUUID().toString(),
-                                userId = FirebaseAuth.getInstance().currentUser?.uid ?: "",
-                                name = location.name,
-                                latitude = location.position.latitude,
-                                longitude = location.position.longitude,
-                                description = location.description,
-                                colorArgb = location.color.toArgb(),
-                                associatedEventId = location.associatedEventId
-                            )
-                            FirestoreManager.saveCustomPin(newPin)
+                        mapViewModel.saveSharedPin(location) {
                             selectedLocation = null
                             showDetailsSheet = false
                             Toast.makeText(context, "Pin saved to your map.", Toast.LENGTH_SHORT).show()

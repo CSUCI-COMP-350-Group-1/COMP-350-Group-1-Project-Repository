@@ -202,7 +202,8 @@ fun MapOverlays(
     onTogglePinMode: () -> Unit,
     onConfirmPin: () -> Unit,
     onClearPin: () -> Unit,
-    tempPinSet: Boolean
+    tempPinSet: Boolean,
+    isLoggedIn: Boolean = true
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         if (!isPinMode) {
@@ -235,21 +236,23 @@ fun MapOverlays(
                     }
                 }
 
-                FloatingActionButton(
-                    onClick = onTogglePinMode,
-                    shape = CircleShape,
-                    containerColor = CoralRed,
-                    contentColor = Color.White,
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
-                    modifier = Modifier
-                        .size(64.dp)
-                        .border(3.dp, Color.White, CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AddLocationAlt,
-                        contentDescription = "Custom Pin",
-                        modifier = Modifier.size(32.dp)
-                    )
+                if (isLoggedIn) {
+                    FloatingActionButton(
+                        onClick = onTogglePinMode,
+                        shape = CircleShape,
+                        containerColor = CoralRed,
+                        contentColor = Color.White,
+                        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
+                        modifier = Modifier
+                            .size(64.dp)
+                            .border(3.dp, Color.White, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AddLocationAlt,
+                            contentDescription = "Custom Pin",
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
                 }
             }
         }

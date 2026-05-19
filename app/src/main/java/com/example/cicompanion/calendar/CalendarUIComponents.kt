@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -25,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -32,6 +32,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.calendar.model.CourseCatalogCourse
 import com.example.cicompanion.calendar.model.CourseCatalogMajor
@@ -45,6 +47,7 @@ import com.example.cicompanion.utils.HtmlUtils
 import com.google.firebase.auth.FirebaseAuth
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
@@ -125,21 +128,22 @@ fun CompactTimeChip(
     time: LocalTime,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    isSelected: Boolean = false
+    isSelected: Boolean = false,
+    isError: Boolean = false
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("h:mm a") }
     Surface(
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        color = if (isSelected) CoralRed.copy(alpha = 0.1f) else Color.Gray.copy(alpha = 0.05f),
-        border = BorderStroke(1.dp, if (isSelected) CoralRed else Color.LightGray.copy(alpha = 0.3f))
+        color = if (isError) Color.Red.copy(alpha = 0.1f) else if (isSelected) CoralRed.copy(alpha = 0.1f) else Color.Gray.copy(alpha = 0.05f),
+        border = BorderStroke(1.dp, if (isError) Color.Red else if (isSelected) CoralRed else Color.LightGray.copy(alpha = 0.3f))
     ) {
         Column(
             modifier = Modifier.padding(vertical = 6.dp, horizontal = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = if (isSelected) CoralRed else Color.Gray, fontSize = 10.sp)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = if (isError) Color.Red else if (isSelected) CoralRed else Color.Gray, fontSize = 10.sp)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
@@ -148,14 +152,14 @@ fun CompactTimeChip(
                     Icons.Outlined.Schedule,
                     contentDescription = null,
                     modifier = Modifier.size(12.dp),
-                    tint = if (isSelected) CoralRed else Color.Gray
+                    tint = if (isError) Color.Red else if (isSelected) CoralRed else Color.Gray
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
                     text = time.format(formatter),
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Bold,
-                    color = if (isSelected) CoralRed else Color.DarkGray
+                    color = if (isError) Color.Red else if (isSelected) CoralRed else Color.DarkGray
                 )
             }
         }
@@ -207,7 +211,8 @@ fun WheelTimePicker(
             items = (1..12).toList(),
             initialIndex = hour - 1,
             onItemSelected = { hour = it },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            isLooping = true
         )
         Text(":", style = MaterialTheme.typography.headlineMedium)
         WheelPicker(
@@ -215,13 +220,15 @@ fun WheelTimePicker(
             initialIndex = minute,
             onItemSelected = { minute = it },
             format = { String.format(Locale.US, "%02d", it) },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            isLooping = true
         )
         WheelPicker(
             items = listOf("AM", "PM"),
             initialIndex = if (amPm == "AM") 0 else 1,
             onItemSelected = { amPm = it },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            isLooping = false
         )
     }
 }
@@ -232,24 +239,29 @@ fun <T> WheelPicker(
     initialIndex: Int,
     onItemSelected: (T) -> Unit,
     modifier: Modifier = Modifier,
-    format: (T) -> String = { it.toString() }
+    format: (T) -> String = { it.toString() },
+    isLooping: Boolean = false
 ) {
-    val safeInitialIndex = initialIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0))
+    if (items.isEmpty()) return
+    
+    val totalItemCount = if (isLooping) 10000 else items.size
+    val safeInitialIndex = if (isLooping) {
+        val mid = 5000
+        mid - (mid % items.size) + initialIndex
+    } else {
+        initialIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0))
+    }
+
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = safeInitialIndex)
     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
     val itemHeight = 40.dp
     val selectedIndex by remember { derivedStateOf { listState.firstVisibleItemIndex } }
 
-    LaunchedEffect(safeInitialIndex, items.size) {
-        if (items.isNotEmpty() && listState.firstVisibleItemIndex != safeInitialIndex) {
-            listState.scrollToItem(safeInitialIndex)
-        }
-    }
-
     LaunchedEffect(listState.isScrollInProgress) {
         if (!listState.isScrollInProgress) {
-            if (selectedIndex in items.indices) {
-                onItemSelected(items[selectedIndex])
+            val actualIndex = selectedIndex % items.size
+            if (actualIndex in items.indices) {
+                onItemSelected(items[actualIndex])
             }
         }
     }
@@ -272,13 +284,14 @@ fun <T> WheelPicker(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            items(items.size) { index ->
+            items(totalItemCount) { index ->
+                val item = items[index % items.size]
                 Box(
                     modifier = Modifier.height(itemHeight).fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = format(items[index]),
+                        text = format(item),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
                         color = if (selectedIndex == index) CoralRed else Color.Gray
@@ -429,7 +442,7 @@ fun DetailRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: Strin
 }
 
 @Composable
-fun AddClassDialog(
+fun AddClassContent(
     majors: List<CourseCatalogMajor>,
     editingClass: SelectedClass? = null,
     onDismiss: () -> Unit,
@@ -438,7 +451,7 @@ fun AddClassDialog(
     var selectedMajor by remember { mutableStateOf<CourseCatalogMajor?>(null) }
     var selectedCourse by remember { mutableStateOf<CourseCatalogCourse?>(null) }
     val selectedDays = remember { mutableStateListOf<Int>() }
-    
+
     var startTime by remember { mutableStateOf(LocalTime.of(9, 0)) }
     var endTime by remember { mutableStateOf(LocalTime.of(10, 15)) }
 
@@ -467,7 +480,7 @@ fun AddClassDialog(
             val major = majors.firstOrNull { it.code == editingClass.majorCode }
             val course = major?.courses?.firstOrNull { it.code == editingClass.courseCode }
                 ?: CourseCatalogCourse(editingClass.courseCode, editingClass.courseTitle, editingClass.typicallyOffered)
-            
+
             selectedMajor = major
             selectedCourse = course
             selectedDays.clear()
@@ -491,171 +504,180 @@ fun AddClassDialog(
         }
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        modifier = Modifier.fillMaxWidth(0.95f),
-        shape = RoundedCornerShape(24.dp),
-        containerColor = Color.White,
-        title = {
-            Text(
-                text = if (editingClass == null) "New Class" else "Edit Class",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = CoralRed
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // Course Selection Row
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(modifier = Modifier.weight(1f).clickable { showMajorPicker = true }) {
-                        OutlinedTextField(
-                            value = selectedMajor?.code ?: "",
-                            onValueChange = {},
-                            readOnly = true,
-                            enabled = false,
-                            label = { Text("Major", fontSize = 10.sp) },
-                            placeholder = { Text("Select") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(18.dp)) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                disabledBorderColor = CoralRed.copy(alpha = 0.5f),
-                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                disabledTrailingIconColor = Color.Gray
-                            )
-                        )
-                    }
-                    Box(modifier = Modifier.weight(1.5f).clickable { if (selectedMajor != null) showCoursePicker = true }) {
-                        OutlinedTextField(
-                            value = selectedCourse?.code ?: "",
-                            onValueChange = {},
-                            readOnly = true,
-                            enabled = false,
-                            label = { Text("Course", fontSize = 10.sp) },
-                            placeholder = { Text("Select") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(18.dp)) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                disabledBorderColor = if (selectedMajor != null) CoralRed.copy(alpha = 0.5f) else Color.Gray.copy(alpha = 0.3f),
-                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                disabledTrailingIconColor = Color.Gray
-                            )
-                        )
-                    }
-                }
+    val timeError = startTime.isAfter(endTime) || startTime == endTime
+    val timeError2 = hasSecondTimeRange && (startTime2.isAfter(endTime2) || startTime2 == endTime2)
 
-                selectedCourse?.let {
-                    Text(
-                        text = it.title,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = CoralRed,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 4.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 32.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = if (editingClass == null) "New Class" else "Edit Class",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = CoralRed
+        )
 
-                DayChipRows(
-                    selectedDays = selectedDays,
-                    onToggleDay = { dayValue ->
-                        if (dayValue in selectedDays) selectedDays.remove(dayValue)
-                        else selectedDays.add(dayValue)
-                    }
-                )
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CompactTimeChip(label = "Start", time = startTime, isSelected = true, onClick = { showStartTimePicker = true }, modifier = Modifier.weight(1f))
-                    CompactTimeChip(label = "End", time = endTime, isSelected = true, onClick = { showEndTimePicker = true }, modifier = Modifier.weight(1f))
-                }
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = termLabelText,
-                        onValueChange = { termLabelText = it },
-                        label = { Text("Term", fontSize = 10.sp) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = locationText,
-                        onValueChange = { locationText = it },
-                        label = { Text("Location", fontSize = 10.sp) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true
-                    )
-                }
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DatePickerField(label = "Start Date", value = startDateText, modifier = Modifier.weight(1f), onDateSelected = { startDateText = it })
-                    DatePickerField(label = "End Date", value = endDateText, modifier = Modifier.weight(1f), onDateSelected = { endDateText = it })
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Add Secondary/Lab Range", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.weight(1f))
-                    Switch(
-                        checked = hasSecondTimeRange, 
-                        onCheckedChange = { hasSecondTimeRange = it },
-                        colors = SwitchDefaults.colors(checkedTrackColor = CoralRed),
-                        modifier = Modifier.scale(0.8f)
-                    )
-                }
-
-                if (hasSecondTimeRange) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DayChipRows(
-                            selectedDays = selectedDays2,
-                            onToggleDay = { dayValue ->
-                                if (dayValue in selectedDays2) selectedDays2.remove(dayValue)
-                                else selectedDays2.add(dayValue)
-                            }
-                        )
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            CompactTimeChip(label = "Start 2", time = startTime2, isSelected = true, onClick = { showStartTimePicker2 = true }, modifier = Modifier.weight(1f))
-                            CompactTimeChip(label = "End 2", time = endTime2, isSelected = true, onClick = { showEndTimePicker2 = true }, modifier = Modifier.weight(1f))
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(
-                                value = location2Text,
-                                onValueChange = { location2Text = it },
-                                label = { Text("2nd Loc", fontSize = 10.sp) },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp),
-                                singleLine = true
-                            )
-                            OutlinedTextField(
-                                value = notes2Text,
-                                onValueChange = { notes2Text = it },
-                                label = { Text("2nd Notes", fontSize = 10.sp) },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp),
-                                singleLine = true
-                            )
-                        }
-                    }
-                }
-
+        // Course Selection Row
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(modifier = Modifier.weight(1f).clickable { showMajorPicker = true }) {
                 OutlinedTextField(
-                    value = notesText,
-                    onValueChange = { notesText = it },
-                    label = { Text("General Notes", fontSize = 10.sp) },
+                    value = selectedMajor?.code ?: "",
+                    onValueChange = {},
+                    readOnly = true,
+                    enabled = false,
+                    label = { Text("Major", fontSize = 10.sp) },
+                    placeholder = { Text("Select") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    maxLines = 1
+                    trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(18.dp)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = CoralRed.copy(alpha = 0.5f),
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledTrailingIconColor = Color.Gray
+                    )
                 )
             }
-        },
-        confirmButton = {
+            Box(modifier = Modifier.weight(1.5f).clickable { if (selectedMajor != null) showCoursePicker = true }) {
+                OutlinedTextField(
+                    value = selectedCourse?.code ?: "",
+                    onValueChange = {},
+                    readOnly = true,
+                    enabled = false,
+                    label = { Text("Course", fontSize = 10.sp) },
+                    placeholder = { Text("Select") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(18.dp)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = if (selectedMajor != null) CoralRed.copy(alpha = 0.5f) else Color.Gray.copy(alpha = 0.3f),
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledTrailingIconColor = Color.Gray
+                    )
+                )
+            }
+        }
+
+        selectedCourse?.let {
+            Text(
+                text = it.title,
+                style = MaterialTheme.typography.bodySmall,
+                color = CoralRed,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 4.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        DayChipRows(
+            selectedDays = selectedDays,
+            onToggleDay = { dayValue ->
+                if (dayValue in selectedDays) selectedDays.remove(dayValue)
+                else selectedDays.add(dayValue)
+            }
+        )
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CompactTimeChip(label = "Start", time = startTime, isSelected = true, onClick = { showStartTimePicker = true }, modifier = Modifier.weight(1f))
+            CompactTimeChip(label = "End", time = endTime, isSelected = true, isError = timeError, onClick = { showEndTimePicker = true }, modifier = Modifier.weight(1f))
+        }
+        
+        if (timeError) {
+            Text("End time must be after start time.", color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(start = 4.dp))
+        }
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = termLabelText,
+                onValueChange = { termLabelText = it },
+                label = { Text("Term", fontSize = 10.sp) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = locationText,
+                onValueChange = { locationText = it },
+                label = { Text("Location", fontSize = 10.sp) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true
+            )
+        }
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DatePickerField(label = "Start Date", value = startDateText, modifier = Modifier.weight(1f), onDateSelected = { startDateText = it })
+            DatePickerField(label = "End Date", value = endDateText, modifier = Modifier.weight(1f), onDateSelected = { endDateText = it })
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Add Secondary/Lab Range", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            Switch(
+                checked = hasSecondTimeRange,
+                onCheckedChange = { hasSecondTimeRange = it },
+                colors = SwitchDefaults.colors(checkedTrackColor = CoralRed),
+                modifier = Modifier.scale(0.8f)
+            )
+        }
+
+        if (hasSecondTimeRange) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                DayChipRows(
+                    selectedDays = selectedDays2,
+                    onToggleDay = { dayValue ->
+                        if (dayValue in selectedDays2) selectedDays2.remove(dayValue)
+                        else selectedDays2.add(dayValue)
+                    }
+                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CompactTimeChip(label = "Start 2", time = startTime2, isSelected = true, onClick = { showStartTimePicker2 = true }, modifier = Modifier.weight(1f))
+                    CompactTimeChip(label = "End 2", time = endTime2, isSelected = true, isError = timeError2, onClick = { showEndTimePicker2 = true }, modifier = Modifier.weight(1f))
+                }
+                if (timeError2) {
+                    Text("End time 2 must be after start time 2.", color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(start = 4.dp))
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = location2Text,
+                        onValueChange = { location2Text = it },
+                        label = { Text("2nd Loc", fontSize = 10.sp) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = notes2Text,
+                        onValueChange = { notes2Text = it },
+                        label = { Text("2nd Notes", fontSize = 10.sp) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                }
+            }
+        }
+
+        OutlinedTextField(
+            value = notesText,
+            onValueChange = { notesText = it },
+            label = { Text("General Notes", fontSize = 10.sp) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            maxLines = 1
+        )
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
+                Text("Cancel", color = Color.Gray)
+            }
             Button(
                 onClick = {
                     if (selectedMajor != null && selectedCourse != null && selectedDays.isNotEmpty()) {
@@ -688,20 +710,15 @@ fun AddClassDialog(
                         onConfirm(newClass)
                     }
                 },
+                modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
-                enabled = selectedMajor != null && selectedCourse != null && selectedDays.isNotEmpty() && 
-                          startTime.isBefore(endTime) && (!hasSecondTimeRange || startTime2.isBefore(endTime2)),
+                enabled = selectedMajor != null && selectedCourse != null && selectedDays.isNotEmpty() && !timeError && (!hasSecondTimeRange || !timeError2),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(if (editingClass == null) "Add" else "Save", color = Color.White, fontWeight = FontWeight.Bold)
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = Color.Gray)
-            }
         }
-    )
+    }
 
     if (showMajorPicker) {
         CatalogItemPickerDialog(
@@ -953,71 +970,121 @@ fun IncomingInvitesSection(invites: List<EventInvite>, onAccept: (EventInvite) -
 }
 
 @Composable
-fun FriendPickerDialog(eventId: String? = null, onDismiss: () -> Unit, onInvite: (UserProfile) -> Unit) {
+fun FriendPickerDialog(
+    eventId: String? = null,
+    onDismiss: () -> Unit,
+    onInvite: (UserProfile) -> Unit
+) {
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var nicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var loading by remember { mutableStateOf(true) }
-    var query by remember { mutableStateOf("") }
-    val user = FirebaseAuth.getInstance().currentUser
+    var isLoading by remember { mutableStateOf(true) }
+    var searchQuery by remember { mutableStateOf("") }
+    val currentUser = FirebaseAuth.getInstance().currentUser
 
     LaunchedEffect(eventId) {
-        if (user != null) {
-            SocialRepository.fetchNicknames(user.uid, { nicks -> nicknames = nicks }, {})
-            SocialRepository.fetchAcceptedFriends(user.uid, { all ->
-                if (eventId != null) {
-                    SocialRepository.fetchInvitedUserIds(eventId, { inv ->
-                        friends = all.filter { !inv.contains(it.uid) }
-                        loading = false
-                    }, {
-                        friends = all
-                        loading = false
-                    })
-                } else {
-                    friends = all
-                    loading = false
-                }
-            }, {
-                loading = false
-            })
+        if (currentUser != null) {
+            SocialRepository.fetchNicknames(currentUser.uid, { nicknames = it }, {})
+            
+            SocialRepository.fetchAcceptedFriends(
+                currentUserId = currentUser.uid,
+                onSuccess = { allFriends ->
+                    if (eventId != null) {
+                        SocialRepository.fetchInvitedUserIds(eventId,
+                            onSuccess = { invitedIds ->
+                                friends = allFriends.filter { friend -> !invitedIds.contains(friend.uid) }
+                                isLoading = false
+                            },
+                            onError = {
+                                friends = allFriends
+                                isLoading = false
+                            }
+                        )
+                    } else {
+                        friends = allFriends
+                        isLoading = false
+                    }
+                },
+                onError = { isLoading = false }
+            )
         }
     }
 
-    val filtered = friends.filter { it.displayName.contains(query, true) || it.email.contains(query, true) || (nicknames[it.uid] ?: "").contains(query, true) }
+    val filteredFriends = remember(friends, nicknames, searchQuery) {
+        if (searchQuery.isBlank()) friends
+        else friends.filter { friend ->
+            val nickname = nicknames[friend.uid] ?: ""
+            friend.displayName.contains(searchQuery, ignoreCase = true) ||
+            friend.email.contains(searchQuery, ignoreCase = true) ||
+            nickname.contains(searchQuery, ignoreCase = true)
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = CoralRed, fontWeight = FontWeight.Bold)
+            }
+        },
         title = { Text("Invite a Friend", fontWeight = FontWeight.Bold) },
         text = {
-            Column {
+            Column(modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
                 OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     placeholder = { Text("Search friends...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.Gray) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp)
                 )
-                if (loading) {
-                    Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+
+                if (isLoading) {
+                    Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = CoralRed)
                     }
+                } else if (friends.isEmpty()) {
+                    Text(if (eventId != null) "All eligible friends are already invited." else "You don't have any friends to invite.", 
+                        textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                } else if (filteredFriends.isEmpty()) {
+                    Text("No friends match \"$searchQuery\"", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 } else {
-                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
-                        items(items = filtered) { friend ->
+                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                        items(filteredFriends, key = { it.uid }) { friend ->
+                            val nickname = nicknames[friend.uid]
+                            val baseName = SocialRepository.displayNameOrEmail(friend)
+                            val displayLabel = nickname ?: baseName
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
                                     .clickable { onInvite(friend) }
-                                    .padding(8.dp),
+                                    .padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 UserAvatar(photoUrl = friend.photoUrl)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
-                                    Text(nicknames[friend.uid] ?: friend.displayName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                                    Text(friend.email, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                    Text(
+                                        text = displayLabel,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    if (nickname != null) {
+                                        Text(
+                                            text = "($baseName)",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color.Gray
+                                        )
+                                    }
+                                    Text(
+                                        text = friend.email,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.Gray
+                                    )
                                 }
                             }
                         }
@@ -1025,172 +1092,548 @@ fun FriendPickerDialog(eventId: String? = null, onDismiss: () -> Unit, onInvite:
                 }
             }
         },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = CoralRed, fontWeight = FontWeight.Bold)
-            }
-        }
+        containerColor = Color.White,
+        shape = RoundedCornerShape(28.dp)
     )
 }
 
 @Composable
-fun EventMembersDialog(event: CalendarEvent, currentUserId: String, onDismiss: () -> Unit, onKick: (List<String>) -> Unit) {
+fun EventMembersDialog(
+    event: CalendarEvent,
+    currentUserId: String,
+    onDismiss: () -> Unit,
+    onKick: (List<String>) -> Unit
+) {
     var members by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
-    var nicks by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var loading by remember { mutableStateOf(true) }
-    var sel by remember { mutableStateOf(setOf<String>()) }
-    val isOwner = !event.ownerId.isNullOrBlank() && event.ownerId == currentUserId
+    var nicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var selectedUsers by remember { mutableStateOf(setOf<String>()) }
+    val isOwner = event.ownerId == currentUserId
+
+    val otherMembers = remember(members, event.ownerId) {
+        members.filter { it.uid != event.ownerId }
+    }
 
     LaunchedEffect(currentUserId) {
-        SocialRepository.fetchNicknames(currentUserId, { fetchedNicks -> nicks = fetchedNicks }, {})
+        SocialRepository.fetchNicknames(currentUserId, { nicknames = it }, {})
     }
 
     DisposableEffect(event.id) {
-        val reg = SocialRepository.listenToEventMembers(event.id, { fetchedMembers -> members = fetchedMembers; loading = false }, { loading = false })
-        onDispose { reg.remove() }
+        val registration = SocialRepository.listenToEventMembers(
+            eventId = event.id,
+            onMembersChanged = { newMembers ->
+                members = newMembers
+                isLoading = false
+            },
+            onError = { isLoading = false }
+        )
+        onDispose { registration.remove() }
     }
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Event Members", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge) },
-        text = {
-            if (loading) {
-                Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = CoralRed)
-                }
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    item { Text("Host", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold) }
-                    item { 
-                        MemberRow(
-                            uId = event.ownerId ?: "", 
-                            curId = currentUserId, 
-                            nick = nicks[event.ownerId], 
-                            isHostRow = true, 
-                            isOwnerViewer = isOwner,
-                            isMe = event.ownerId == currentUserId
-                        ) 
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .wrapContentHeight()
+                .padding(vertical = 24.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = Color.White,
+            tonalElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            text = "Event Members",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = BrandRedDark
+                        )
+                        Text(
+                            text = "${members.size + 1} members total",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
+                        )
                     }
-                    if (members.any { it.uid != event.ownerId }) {
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .background(Color.Gray.copy(alpha = 0.1f), CircleShape)
+                            .size(36.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray, modifier = Modifier.size(20.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                if (isLoading) {
+                    Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = BrandRedDark, strokeWidth = 3.dp)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 450.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Leader Section
                         item {
-                            Spacer(Modifier.height(8.dp))
-                            Text("Participants", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold)
-                        }
-                        items(items = members.filter { it.uid != event.ownerId }) { m ->
-                            val isMe = m.uid == currentUserId
-                            MemberRow(
-                                uId = m.uid, 
-                                curId = currentUserId, 
-                                nick = nicks[m.uid], 
-                                isHostRow = false, 
-                                isOwnerViewer = isOwner, 
-                                isSel = sel.contains(m.uid),
-                                isMe = isMe,
-                                onTog = {
-                                    if (isOwner) {
-                                        if (sel.contains(m.uid)) sel -= m.uid else sel += m.uid
-                                    }
-                                }
+                            MemberGroupHeader(text = "Host")
+                            PremiumMemberRow(
+                                userId = event.ownerId ?: "",
+                                isOwner = true,
+                                currentUserId = currentUserId,
+                                eventId = event.id,
+                                nickname = nicknames[event.ownerId]
                             )
                         }
+                        
+                        // Others Section
+                        if (otherMembers.isNotEmpty() || !isOwner) {
+                            item {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                MemberGroupHeader(text = "Participants")
+                            }
+                        }
+
+                        if (otherMembers.isEmpty() && !isOwner) {
+                            item { 
+                                EmptyMembersPlaceholder()
+                            }
+                        } else {
+                            items(otherMembers, key = { it.uid }) { member ->
+                                PremiumMemberRow(
+                                    userId = member.uid,
+                                    displayName = SocialRepository.displayNameOrEmail(member),
+                                    photoUrl = member.photoUrl,
+                                    isOwner = false,
+                                    canKick = isOwner,
+                                    isSelected = selectedUsers.contains(member.uid),
+                                    onToggleSelect = {
+                                        selectedUsers = if (selectedUsers.contains(member.uid)) {
+                                            selectedUsers - member.uid
+                                        } else {
+                                            selectedUsers + member.uid
+                                        }
+                                    },
+                                    currentUserId = currentUserId,
+                                    eventId = event.id,
+                                    nickname = nicknames[member.uid]
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (isOwner && otherMembers.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    val canKickSelected = selectedUsers.isNotEmpty()
+                    
+                    Button(
+                        onClick = { if (canKickSelected) onKick(selectedUsers.toList()) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .shadow(if (canKickSelected) 8.dp else 0.dp, RoundedCornerShape(16.dp)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (canKickSelected) BrandRedDark else Color.Gray.copy(alpha = 0.2f),
+                            contentColor = if (canKickSelected) Color.White else Color.Gray
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        enabled = canKickSelected
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (canKickSelected) {
+                                Icon(Icons.Default.PersonRemove, contentDescription = null)
+                                Spacer(Modifier.width(12.dp))
+                                Text("Remove selected (${selectedUsers.size})", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            } else {
+                                Text("Select members to remove", fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
-        },
-        confirmButton = {
-            if (isOwner && sel.isNotEmpty()) {
-                Button(onClick = { onKick(sel.toList()) }, colors = ButtonDefaults.buttonColors(containerColor = CoralRed)) {
-                    Text("Remove Selected")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close", color = CoralRed, fontWeight = FontWeight.Bold)
-            }
         }
+    }
+}
+
+@Composable
+fun MemberGroupHeader(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        color = Color.Gray,
+        letterSpacing = 1.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
     )
 }
 
 @Composable
-fun MemberRow(
-    uId: String, 
-    curId: String, 
-    nick: String?, 
-    isHostRow: Boolean, 
-    isOwnerViewer: Boolean, 
-    isMe: Boolean,
-    isSel: Boolean = false, 
-    onTog: () -> Unit = {}
-) {
-    var p by remember { mutableStateOf<UserProfile?>(null) }
-    LaunchedEffect(uId) { SocialRepository.fetchUserProfile(uId, { profile -> p = profile }, {}) }
-    
-    val baseName = nick ?: p?.displayName ?: "Loading..."
-    val finalName = if (isMe) "$baseName (You)" else baseName
-
-    Row(
+fun EmptyMembersPlaceholder() {
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (isMe) CoralRed.copy(alpha = 0.12f) 
-                else if (isSel) CoralRed.copy(alpha = 0.05f) 
-                else Color.Transparent
-            )
-            .then(if (isMe) Modifier.border(1.dp, CoralRed.copy(alpha = 0.3f), RoundedCornerShape(12.dp)) else Modifier)
-            .then(if (isOwnerViewer && !isHostRow && !isMe) Modifier.clickable { onTog() } else Modifier)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 32.dp),
+        contentAlignment = Alignment.Center
     ) {
-        UserAvatar(p?.photoUrl ?: "")
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = finalName, 
-                fontWeight = if (isHostRow || isMe) FontWeight.Bold else FontWeight.Medium,
-                color = if (isMe) CoralRed else Color.Black
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                Icons.Outlined.Group, 
+                contentDescription = null, 
+                modifier = Modifier.size(48.dp), 
+                tint = Color.Gray.copy(alpha = 0.3f)
             )
-            if (isHostRow) {
-                Text("Host:", style = MaterialTheme.typography.bodySmall, color = CustomEventOrange)
-            }
-        }
-        // Only show selection checkbox to the owner for participants other than themselves
-        if (isOwnerViewer && !isHostRow && !isMe) {
-            Checkbox(
-                checked = isSel, 
-                onCheckedChange = { onTog() },
-                colors = CheckboxDefaults.colors(checkedColor = CoralRed)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "No other members yet",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray
             )
         }
     }
 }
 
 @Composable
-fun InviteDetailDialog(invite: EventInvite, onDismiss: () -> Unit, onAccept: () -> Unit, onDecline: () -> Unit) {
+fun PremiumMemberRow(
+    userId: String,
+    displayName: String = "Loading...",
+    photoUrl: String = "",
+    isOwner: Boolean,
+    canKick: Boolean = false,
+    isSelected: Boolean = false,
+    onToggleSelect: () -> Unit = {},
+    currentUserId: String,
+    eventId: String,
+    nickname: String? = null
+) {
+    var profile by remember { mutableStateOf<UserProfile?>(null) }
+    
+    LaunchedEffect(userId) {
+        if (userId.isNotEmpty()) {
+            SocialRepository.fetchUserProfile(userId, { profile = it }, {})
+        }
+    }
+
+    val baseName = profile?.let { SocialRepository.displayNameOrEmail(it) } ?: displayName
+    val displayLabel = nickname ?: baseName
+    val photo = profile?.photoUrl ?: photoUrl
+    val isSelectable = canKick && !isOwner && userId != currentUserId
+    val isMe = userId == currentUserId
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(enabled = isSelectable) { onToggleSelect() },
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) BrandRedDark.copy(alpha = 0.05f) else Color.Transparent
+        ),
+        border = if (isSelected) BorderStroke(1.dp, BrandRedDark.copy(alpha = 0.3f)) else null
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                UserAvatar(photoUrl = photo)
+                if (isOwner) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(18.dp)
+                            .background(Color.White, CircleShape)
+                            .padding(2.dp)
+                            .background(CustomEventOrange, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Star, contentDescription = null, tint = Color.White, modifier = Modifier.size(10.dp))
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (isMe) "$displayLabel (You)" else displayLabel,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (isOwner || isMe) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isMe) BrandRedDark else Color.DarkGray
+                )
+                if (nickname != null && baseName != "Loading...") {
+                    Text(
+                        text = "($baseName)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                }
+                if (isOwner) {
+                    Text("Event Host", style = MaterialTheme.typography.bodySmall, color = CustomEventOrange)
+                } else if (isMe) {
+                    Text("You", style = MaterialTheme.typography.bodySmall, color = BrandRedDark.copy(alpha = 0.7f))
+                }
+            }
+
+            if (isSelectable) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggleSelect() },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = BrandRedDark,
+                        uncheckedColor = Color.Gray.copy(alpha = 0.5f)
+                    )
+                )
+            } else if (isOwner) {
+                Icon(
+                    Icons.Default.Shield, 
+                    contentDescription = "Admin", 
+                    tint = CustomEventOrange.copy(alpha = 0.6f),
+                    modifier = Modifier.size(20.dp).padding(end = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AddEventContent(
+    selectedDate: LocalDate,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, String, LocalTime, LocalTime, List<UserProfile>) -> Unit
+) {
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var location by remember { mutableStateOf("") }
+    var startTime by remember { mutableStateOf(LocalTime.of(9, 0)) }
+    var endTime by remember { mutableStateOf(LocalTime.of(10, 0)) }
+    var invitedFriends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
+    var showFriendPicker by remember { mutableStateOf(false) }
+    var showStartTimePicker by remember { mutableStateOf(false) }
+    var showEndTimePicker by remember { mutableStateOf(false) }
+
+    val timeError = startTime.isAfter(endTime) || startTime == endTime
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 32.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text("New Event", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = CoralRed)
+        
+        OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
+        
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CompactTimeChip(label = "Start", time = startTime, isSelected = true, onClick = { showStartTimePicker = true }, modifier = Modifier.weight(1f))
+            CompactTimeChip(label = "End", time = endTime, isSelected = true, isError = timeError, onClick = { showEndTimePicker = true }, modifier = Modifier.weight(1f))
+        }
+        if (timeError) {
+            Text("End time must be after start time.", color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(start = 4.dp))
+        }
+
+        OutlinedTextField(value = location, onValueChange = { location = it }, label = { Text("Location") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
+        OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), minLines = 1)
+        
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text("Invites (${invitedFriends.size})", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                TextButton(onClick = { showFriendPicker = true }) { Text("+ Add Friends", color = SharedEventBlue, fontSize = 12.sp) }
+            }
+            invitedFriends.forEach { friend ->
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
+                    UserAvatar(photoUrl = friend.photoUrl)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(friend.displayName, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(onClick = { invitedFriends = invitedFriends.filter { it.uid != friend.uid } }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray) }
+                }
+            }
+        }
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
+                Text("Cancel", color = Color.Gray)
+            }
+            Button(
+                onClick = { onConfirm(title, description, location, startTime, endTime, invitedFriends) },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
+                enabled = title.isNotBlank() && !timeError,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Save Event")
+            }
+        }
+    }
+
+    if (showStartTimePicker) TimePickerDialog(startTime, { showStartTimePicker = false }, { startTime = it; showStartTimePicker = false })
+    if (showEndTimePicker) TimePickerDialog(endTime, { showEndTimePicker = false }, { endTime = it; showEndTimePicker = false })
+    if (showFriendPicker) {
+        FriendPickerDialog(onDismiss = { showFriendPicker = false }, onInvite = { friend -> if (!invitedFriends.any { it.uid == friend.uid }) invitedFriends += friend; showFriendPicker = false })
+    }
+}
+
+@Composable
+fun EditEventContent(
+    event: CalendarEvent,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, String, LocalTime, LocalTime) -> Unit
+) {
+    var title by remember { mutableStateOf(event.title) }
+    var desc by remember { mutableStateOf(event.description ?: "") }
+    var loc by remember { mutableStateOf(event.location ?: "") }
+    var start by remember { mutableStateOf(event.start.toLocalTime()) }
+    var end by remember { mutableStateOf(event.endExclusive.toLocalTime()) }
+    var showStart by remember { mutableStateOf(false) }
+    var showEnd by remember { mutableStateOf(false) }
+
+    val timeError = start.isAfter(end) || start == end
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 32.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text("Edit Event", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = CoralRed)
+        
+        OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
+        
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CompactTimeChip("Start", start, { showStart = true }, modifier = Modifier.weight(1f), isSelected = true)
+            CompactTimeChip("End", end, { showEnd = true }, modifier = Modifier.weight(1f), isSelected = true, isError = timeError)
+        }
+        if (timeError) {
+            Text("End time must be after start time.", color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(start = 4.dp))
+        }
+
+        OutlinedTextField(value = loc, onValueChange = { loc = it }, label = { Text("Location") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
+        OutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), minLines = 2)
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
+                Text("Cancel", color = Color.Gray)
+            }
+            Button(
+                onClick = { onConfirm(title, desc, loc, start, end) },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
+                enabled = title.isNotBlank() && !timeError,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Save Changes")
+            }
+        }
+    }
+
+    if (showStart) TimePickerDialog(start, { showStart = false }, { start = it; showStart = false })
+    if (showEnd) TimePickerDialog(end, { showEnd = false }, { end = it; showEnd = false })
+}
+
+@Composable
+fun InviteDetailDialog(
+    invite: EventInvite,
+    onDismiss: () -> Unit,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(invite.eventTitle, fontWeight = FontWeight.Bold) },
+        shape = RoundedCornerShape(24.dp),
+        title = { 
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Event, contentDescription = null, tint = CoralRed)
+                Spacer(Modifier.width(12.dp))
+                Text(invite.eventTitle, fontWeight = FontWeight.Bold)
+            }
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("From: ${invite.fromDisplayName}", fontWeight = FontWeight.Bold, color = SharedEventBlue)
-                Text("When: ${invite.eventStart.substring(0, 10)} at ${invite.eventStart.substring(11, 16)}")
-                if (!invite.eventLocation.isNullOrBlank()) Text("Where: ${invite.eventLocation}")
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("From: ", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    Text(invite.fromDisplayName, style = MaterialTheme.typography.bodyMedium, color = SharedEventBlue)
+                }
+                
+                val start = ZonedDateTime.parse(invite.eventStart)
+                val end = ZonedDateTime.parse(invite.eventEnd)
+                val dayFormatter = DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy")
+                val timeFormatter = DateTimeFormatter.ofPattern("h:mm a")
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+                    Spacer(Modifier.width(8.dp))
+                    Text(start.format(dayFormatter), style = MaterialTheme.typography.bodySmall)
+                }
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+                    Spacer(Modifier.width(8.dp))
+                    Text("${start.format(timeFormatter)} - ${end.format(timeFormatter)}", style = MaterialTheme.typography.bodySmall)
+                }
+                
+                if (!invite.eventLocation.isNullOrBlank()) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Icon(Icons.Outlined.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+                        Spacer(Modifier.width(8.dp))
+                        Text(invite.eventLocation!!, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                
                 if (!invite.eventDescription.isNullOrBlank()) {
-                    HorizontalDivider()
-                    Text(HtmlUtils.stripHtml(invite.eventDescription!!))
+                    HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                    Text(HtmlUtils.stripHtml(invite.eventDescription!!), style = MaterialTheme.typography.bodyMedium)
+                }
+                
+                if (invite.isPinnedByLeader) {
+                    Spacer(Modifier.height(4.dp))
+                    Surface(
+                        color = PinnedEventPurple.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(8.dp)
+                        ) {
+                            Icon(Icons.Outlined.PushPin, contentDescription = null, tint = PinnedEventPurple, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("The leader has this event pinned", style = MaterialTheme.typography.labelSmall, color = PinnedEventPurple, fontWeight = FontWeight.Medium)
+                        }
+                    }
                 }
             }
         },
         confirmButton = {
-            Button(onClick = onAccept, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))) {
-                Text("Accept")
+            Button(onClick = onAccept, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)), shape = RoundedCornerShape(12.dp)) {
+                Text("Accept", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDecline) {
-                Text("Decline", color = CoralRed)
+                Text("Decline", color = CoralRed, fontWeight = FontWeight.Bold)
             }
         }
     )

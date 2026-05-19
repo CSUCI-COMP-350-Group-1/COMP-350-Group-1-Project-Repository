@@ -47,13 +47,6 @@ import java.util.Locale
 import java.util.UUID
 import com.example.cicompanion.firebase.EventInviteNotificationSender
 
-data class DayEventInfo(
-    val hasCsuci: Boolean = false, 
-    val hasCustom: Boolean = false,
-    val hasPinned: Boolean = false,
-    val hasShared: Boolean = false
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarApp(viewModel: CalendarViewModel) {
@@ -95,13 +88,9 @@ fun CalendarApp(viewModel: CalendarViewModel) {
         }
     }
 
-    val selectedDateEvents = remember(viewModel.events, viewModel.selectedDate) {
-        buildSelectedDateEvents(viewModel.events, viewModel.selectedDate)
-    }
-
-    val dayEventInfoMap = remember(viewModel.events, currentUser?.uid) {
-        buildDayEventInfoMap(viewModel.events, currentUser?.uid)
-    }
+    // Optimization: Read from ViewModel's derived states to reduce recompositions in the main composable
+    val selectedDateEvents by viewModel.selectedDateEventsByPriority
+    val dayEventInfoMap by viewModel.dayEventInfoMap
 
     Scaffold(
         containerColor = Color.White,
@@ -171,11 +160,22 @@ fun CalendarApp(viewModel: CalendarViewModel) {
             EventDetailsContent(
                 event = eventToShowDetails!!,
                 onDismiss = { eventToShowDetails = null },
-                onDelete = { eventToDelete = eventToShowDetails; eventToShowDetails = null },
-                onEdit = { eventToEdit = eventToShowDetails; eventToShowDetails = null },
+                onDelete = { 
+                    eventToDelete = eventToShowDetails
+                    eventToShowDetails = null 
+                },
+                onEdit = { 
+                    eventToEdit = eventToShowDetails
+                    eventToShowDetails = null 
+                },
                 onTogglePin = { viewModel.togglePinEvent(eventToShowDetails!!) },
-                onInvite = { eventToInvite = eventToShowDetails },
-                onShowMembers = { eventMembersToShow = eventToShowDetails },
+                onInvite = { 
+                    eventToInvite = eventToShowDetails
+                    // Reverting logic: open dialog instead of nested sheet to ensure it works
+                },
+                onShowMembers = { 
+                    eventMembersToShow = eventToShowDetails
+                },
                 notificationsEnabled = viewModel.isEventNotificationEnabled(eventToShowDetails!!),
                 onNotificationToggle = { enabled -> viewModel.setEventNotificationEnabled(eventToShowDetails!!, enabled) }
             )
@@ -193,75 +193,83 @@ fun CalendarApp(viewModel: CalendarViewModel) {
     }
 
     if (showAddEventDialog) {
-        AddEventDialog(
-            selectedDate = viewModel.selectedDate,
-            onDismiss = { showAddEventDialog = false },
-            onConfirm = { title, desc, loc, start, end, invitedFriends ->
-                val startZdt = ZonedDateTime.of(viewModel.selectedDate, start, ZonedDateTime.now().zone)
-                val endZdt = ZonedDateTime.of(viewModel.selectedDate, end, ZonedDateTime.now().zone)
-                val newEvent = CalendarEvent(
-                    id = UUID.randomUUID().toString(),
-                    calendarId = "custom",
-                    title = title,
-                    description = desc,
-                    location = loc,
-                    htmlLink = null,
-                    start = startZdt,
-                    endExclusive = endZdt,
-                    isAllDay = false,
-                    ownerId = currentUser?.uid,
-                    isShared = invitedFriends.isNotEmpty()
-                )
-                viewModel.addCustomEvent(newEvent)
-                currentUser?.let { user ->
-                    invitedFriends.forEach { friend ->
-                        SocialRepository.sendEventInvite(user, friend.uid, newEvent, onSuccess = {
-                            EventInviteNotificationSender.sendEventInviteNotification(friend.uid, user.displayName ?: user.email ?: "Someone", newEvent.title, newEvent.id)
-                        }, onError = { })
+        ModalBottomSheet(onDismissRequest = { showAddEventDialog = false }, sheetState = sheetState, containerColor = Color.White) {
+            AddEventContent(
+                selectedDate = viewModel.selectedDate,
+                onDismiss = { showAddEventDialog = false },
+                onConfirm = { title, desc, loc, start, end, invitedFriends ->
+                    val startZdt = ZonedDateTime.of(viewModel.selectedDate, start, ZonedDateTime.now().zone)
+                    val endZdt = ZonedDateTime.of(viewModel.selectedDate, end, ZonedDateTime.now().zone)
+                    val newEvent = CalendarEvent(
+                        id = UUID.randomUUID().toString(),
+                        calendarId = "custom",
+                        title = title,
+                        description = desc,
+                        location = loc,
+                        htmlLink = null,
+                        start = startZdt,
+                        endExclusive = endZdt,
+                        isAllDay = false,
+                        ownerId = currentUser?.uid,
+                        isShared = invitedFriends.isNotEmpty()
+                    )
+                    viewModel.addCustomEvent(newEvent)
+                    currentUser?.let { user ->
+                        invitedFriends.forEach { friend ->
+                            SocialRepository.sendEventInvite(user, friend.uid, newEvent, onSuccess = {
+                                EventInviteNotificationSender.sendEventInviteNotification(friend.uid, user.displayName ?: user.email ?: "Someone", newEvent.title, newEvent.id)
+                            }, onError = { })
+                        }
                     }
+                    showAddEventDialog = false
                 }
-                showAddEventDialog = false
-            }
-        )
+            )
+        }
     }
 
     if (showAddClassDialog) {
-        AddClassDialog(
-            majors = majors,
-            onDismiss = { showAddClassDialog = false },
-            onConfirm = { selectedClass ->
-                viewModel.saveSelectedClass(selectedClass) { success ->
-                    if (success) {
-                        showAddClassDialog = false
-                        Toast.makeText(context, "Class added!", Toast.LENGTH_SHORT).show()
+        ModalBottomSheet(onDismissRequest = { showAddClassDialog = false }, sheetState = sheetState, containerColor = Color.White) {
+            AddClassContent(
+                majors = majors,
+                onDismiss = { showAddClassDialog = false },
+                onConfirm = { selectedClass ->
+                    viewModel.saveSelectedClass(selectedClass) { success ->
+                        if (success) {
+                            showAddClassDialog = false
+                            Toast.makeText(context, "Class added!", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
-            }
-        )
+            )
+        }
     }
 
     eventToEdit?.let { event ->
-        EditEventDialog(
-            event = event,
-            onDismiss = { eventToEdit = null },
-            onConfirm = { title, description, location, startTime, endTime ->
-                val startZdt = ZonedDateTime.of(event.start.toLocalDate(), startTime, event.start.zone)
-                val endZdt = ZonedDateTime.of(event.start.toLocalDate(), endTime, event.endExclusive.zone)
-                viewModel.updateCustomEvent(event, event.copy(title = title, description = description, location = location, start = startZdt, endExclusive = endZdt))
-                eventToEdit = null
-            }
-        )
+        ModalBottomSheet(onDismissRequest = { eventToEdit = null }, sheetState = sheetState, containerColor = Color.White) {
+            EditEventContent(
+                event = event,
+                onDismiss = { eventToEdit = null },
+                onConfirm = { title, description, location, startTime, endTime ->
+                    val startZdt = ZonedDateTime.of(event.start.toLocalDate(), startTime, event.start.zone)
+                    val endZdt = ZonedDateTime.of(event.start.toLocalDate(), endTime, event.endExclusive.zone)
+                    viewModel.updateCustomEvent(event, event.copy(title = title, description = description, location = location, start = startZdt, endExclusive = endZdt))
+                    eventToEdit = null
+                }
+            )
+        }
     }
 
     classToEdit?.let { item ->
-        AddClassDialog(
-            majors = majors, 
-            editingClass = item, 
-            onDismiss = { classToEdit = null }, 
-            onConfirm = { updatedClass -> 
-                viewModel.saveSelectedClass(updatedClass) { success -> if (success) classToEdit = null } 
-            }
-        )
+        ModalBottomSheet(onDismissRequest = { classToEdit = null }, sheetState = sheetState, containerColor = Color.White) {
+            AddClassContent(
+                majors = majors, 
+                editingClass = item, 
+                onDismiss = { classToEdit = null }, 
+                onConfirm = { updatedClass -> 
+                    viewModel.saveSelectedClass(updatedClass) { success -> if (success) classToEdit = null } 
+                }
+            )
+        }
     }
 
     eventToDelete?.let { event ->
@@ -273,12 +281,14 @@ fun CalendarApp(viewModel: CalendarViewModel) {
         AlertDialog(onDismissRequest = { classToDelete = null }, title = { Text("Remove Class") }, text = { Text("Are you sure you want to remove ${item.courseCode}?") }, confirmButton = { Button(onClick = { viewModel.deleteSelectedClass(item.id) { success -> if (success) classToDelete = null } }, colors = ButtonDefaults.buttonColors(containerColor = CoralRed)) { Text("Remove") } }, dismissButton = { TextButton(onClick = { classToDelete = null }) { Text("Cancel", color = Color.Gray) } })
     }
     
+    // REVERT: Use Dialogs for Invite and Members to ensure they work over sheets
     eventToInvite?.let { event ->
         FriendPickerDialog(eventId = event.id, onDismiss = { eventToInvite = null }, onInvite = { friend ->
             currentUser?.let { user ->
                 SocialRepository.sendEventInvite(user, friend.uid, event, onSuccess = {
                     EventInviteNotificationSender.sendEventInviteNotification(friend.uid, user.displayName ?: user.email ?: "Someone", event.title, event.id)
                     Toast.makeText(context, "Invite sent!", Toast.LENGTH_SHORT).show()
+                    eventToInvite = null
                 }, onError = { })
             }
         })
@@ -287,6 +297,7 @@ fun CalendarApp(viewModel: CalendarViewModel) {
     eventMembersToShow?.let { event ->
         EventMembersDialog(event = event, currentUserId = currentUser?.uid ?: "", onDismiss = { eventMembersToShow = null }, onKick = { targetUids ->
             viewModel.kickUsers(event.id, targetUids)
+            eventMembersToShow = null
         })
     }
 
@@ -322,7 +333,6 @@ private fun CalendarScreenBody(
 
             CalendarModeTabs(selectedMode = viewModel.mode, onModeSelected = viewModel::updateMode, modifier = Modifier.fillMaxWidth())
 
-            // a snare
             CalendarContent(
                 mode = viewModel.mode,
                 visibleMonth = viewModel.visibleMonth,
@@ -384,63 +394,6 @@ private fun ScheduleListView(classes: List<SelectedClass>, onClassClick: (Select
             Spacer(modifier = Modifier.height(80.dp))
         }
     }
-}
-
-@Composable
-private fun AddEventDialog(
-    selectedDate: LocalDate,
-    onDismiss: () -> Unit,
-    onConfirm: (String, String, String, LocalTime, LocalTime, List<UserProfile>) -> Unit
-) {
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("") }
-    var startTime by remember { mutableStateOf(LocalTime.of(9, 0)) }
-    var endTime by remember { mutableStateOf(LocalTime.of(10, 0)) }
-    var invitedFriends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
-    var showFriendPicker by remember { mutableStateOf(false) }
-    var showStartTimePicker by remember { mutableStateOf(false) }
-    var showEndTimePicker by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        modifier = Modifier.fillMaxWidth(0.95f),
-        shape = RoundedCornerShape(24.dp),
-        containerColor = Color.White,
-        title = { Text("New Event", fontWeight = FontWeight.Bold, color = CoralRed) },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CompactTimeChip(label = "Start", time = startTime, isSelected = true, onClick = { showStartTimePicker = true }, modifier = Modifier.weight(1f))
-                    CompactTimeChip(label = "End", time = endTime, isSelected = true, onClick = { showEndTimePicker = true }, modifier = Modifier.weight(1f))
-                }
-                OutlinedTextField(value = location, onValueChange = { location = it }, label = { Text("Location") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), singleLine = true)
-                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), minLines = 1)
-                
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        Text("Invites (${invitedFriends.size})", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                        TextButton(onClick = { showFriendPicker = true }) { Text("+ Add Friends", color = SharedEventBlue, fontSize = 12.sp) }
-                    }
-                    invitedFriends.forEach { friend ->
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
-                            UserAvatar(photoUrl = friend.photoUrl)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(friend.displayName, style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                            Spacer(modifier = Modifier.weight(1f))
-                            IconButton(onClick = { invitedFriends = invitedFriends.filter { it.uid != friend.uid } }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray) }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = { Button(onClick = { onConfirm(title, description, location, startTime, endTime, invitedFriends) }, colors = ButtonDefaults.buttonColors(containerColor = CoralRed), enabled = title.isNotBlank() && startTime.isBefore(endTime), shape = RoundedCornerShape(12.dp)) { Text("Save Event") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray) } }
-    )
-    if (showStartTimePicker) TimePickerDialog(startTime, { showStartTimePicker = false }, { startTime = it; showStartTimePicker = false })
-    if (showEndTimePicker) TimePickerDialog(endTime, { showEndTimePicker = false }, { endTime = it; showEndTimePicker = false })
-    if (showFriendPicker) FriendPickerDialog(onDismiss = { showFriendPicker = false }, onInvite = { friend -> if (!invitedFriends.any { it.uid == friend.uid }) invitedFriends += friend })
 }
 
 @Composable
@@ -580,14 +533,15 @@ private fun EventDetailsContent(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedButton(onClick = onShowMembers, modifier = Modifier.weight(1f)) {
+                OutlinedButton(onClick = onShowMembers, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
                     Text("Members")
                 }
                 if (isOwner) {
                     Button(
                         onClick = onInvite,
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = SharedEventBlue)
+                        colors = ButtonDefaults.buttonColors(containerColor = SharedEventBlue),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text("Invite")
                     }
@@ -598,14 +552,15 @@ private fun EventDetailsContent(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (isOwner) {
-                    OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
+                    OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
                         Text("Edit")
                     }
                 }
                 Button(
                     onClick = onDelete,
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = CoralRed)
+                    colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(if (isOwner) "Delete" else "Leave")
                 }
@@ -614,29 +569,6 @@ private fun EventDetailsContent(
     }
 }
 
-@Composable
-private fun EditEventDialog(event: CalendarEvent, onDismiss: () -> Unit, onConfirm: (String, String, String, LocalTime, LocalTime) -> Unit) {
-    var title by remember { mutableStateOf(event.title) }; var desc by remember { mutableStateOf(event.description ?: "") }; var loc by remember { mutableStateOf(event.location ?: "") }
-    var start by remember { mutableStateOf(event.start.toLocalTime()) }; var end by remember { mutableStateOf(event.endExclusive.toLocalTime()) }
-    var showStart by remember { mutableStateOf(false) }; var showEnd by remember { mutableStateOf(false) }
-
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Edit Event", fontWeight = FontWeight.Bold, color = CoralRed) }, text = {
-        Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CompactTimeChip("Start", start, { showStart = true }, modifier = Modifier.weight(1f), isSelected = true)
-                CompactTimeChip("End", end, { showEnd = true }, modifier = Modifier.weight(1f), isSelected = true)
-            }
-            OutlinedTextField(value = loc, onValueChange = { loc = it }, label = { Text("Location") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            OutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-        }
-    }, confirmButton = { Button(onClick = { onConfirm(title, desc, loc, start, end) }, colors = ButtonDefaults.buttonColors(containerColor = CoralRed), enabled = title.isNotBlank() && start.isBefore(end)) { Text("Save") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
-    if (showStart) TimePickerDialog(start, { showStart = false }, { start = it; showStart = false })
-    if (showEnd) TimePickerDialog(end, { showEnd = false }, { end = it; showEnd = false })
-}
-
-private fun buildSelectedDateEvents(events: List<CalendarEvent>, selectedDate: LocalDate): List<CalendarEvent> = events.filter { it.occursOn(selectedDate) }.sortedWith(compareByDescending<CalendarEvent> { it.isPinned }.thenByDescending { it.calendarId == "custom" }.thenBy { it.start })
+private fun buildMonthCells(month: YearMonth, firstDayOfWeek: DayOfWeek): List<LocalDate?> { val firstOfMonth = month.atDay(1); val offset = (firstOfMonth.dayOfWeek.value - firstDayOfWeek.value + 7) % 7; val res = mutableListOf<LocalDate?>(); repeat(offset) { res.add(null) }; repeat(month.lengthOfMonth()) { res.add(month.atDay(it + 1)) }; while (res.size % 7 != 0) res.add(null); return res }
 private fun buildWeekTitle(weekStart: LocalDate): String = "Week of ${weekStart.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))}"
 private fun buildWeekDates(selectedDate: LocalDate, firstDayOfWeek: DayOfWeek): List<LocalDate> { val weekStart = selectedDate.with(TemporalAdjusters.previousOrSame(firstDayOfWeek)); return (0..6).map { weekStart.plusDays(it.toLong()) } }
-private fun buildMonthCells(month: YearMonth, firstDayOfWeek: DayOfWeek): List<LocalDate?> { val firstOfMonth = month.atDay(1); val offset = (firstOfMonth.dayOfWeek.value - firstDayOfWeek.value + 7) % 7; val res = mutableListOf<LocalDate?>(); repeat(offset) { res.add(null) }; repeat(month.lengthOfMonth()) { res.add(month.atDay(it + 1)) }; while (res.size % 7 != 0) res.add(null); return res }
-private fun buildDayEventInfoMap(events: List<CalendarEvent>, currentUserId: String?): Map<LocalDate, DayEventInfo> { val map = mutableMapOf<LocalDate, DayEventInfo>(); for (event in events) { var day = event.start.toLocalDate(); val last = event.lastDateInclusive(); val isCustom = event.calendarId == "custom"; while (!day.isAfter(last)) { val cur = map[day] ?: DayEventInfo(); map[day] = cur.copy(hasCsuci = cur.hasCsuci || !isCustom, hasCustom = cur.hasCustom || (isCustom && event.ownerId == currentUserId && !event.isShared), hasPinned = cur.hasPinned || event.isPinned, hasShared = cur.hasShared || (isCustom && (event.ownerId != currentUserId || event.isShared))); day = day.plusDays(1) } }; return map }

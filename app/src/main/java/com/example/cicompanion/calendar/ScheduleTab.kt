@@ -177,38 +177,50 @@ fun ScheduleTab(viewModel: CalendarViewModel) {
     }
 
     if (showAddClassDialog) {
-        AddClassDialog(
-            majors = majors,
-            onDismiss = { showAddClassDialog = false },
-            onConfirm = { selectedClass ->
-                viewModel.saveSelectedClass(selectedClass) { success ->
-                    if (success) {
-                        showAddClassDialog = false
-                        Toast.makeText(context, "Class added successfully!", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, "Failed to add class.", Toast.LENGTH_SHORT).show()
+        ModalBottomSheet(
+            onDismissRequest = { showAddClassDialog = false },
+            sheetState = sheetState,
+            containerColor = Color.White
+        ) {
+            AddClassContent(
+                majors = majors,
+                onDismiss = { showAddClassDialog = false },
+                onConfirm = { selectedClass ->
+                    viewModel.saveSelectedClass(selectedClass) { success ->
+                        if (success) {
+                            showAddClassDialog = false
+                            Toast.makeText(context, "Class added successfully!", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "Failed to add class.", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
-            }
-        )
+            )
+        }
     }
 
     classToEdit?.let { item ->
-        AddClassDialog(
-            majors = majors,
-            editingClass = item,
-            onDismiss = { classToEdit = null },
-            onConfirm = { updatedClass ->
-                viewModel.saveSelectedClass(updatedClass) { success ->
-                    if (success) {
-                        classToEdit = null
-                        Toast.makeText(context, "Class updated successfully!", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, "Failed to update class.", Toast.LENGTH_SHORT).show()
+        ModalBottomSheet(
+            onDismissRequest = { classToEdit = null },
+            sheetState = sheetState,
+            containerColor = Color.White
+        ) {
+            AddClassContent(
+                majors = majors,
+                editingClass = item,
+                onDismiss = { classToEdit = null },
+                onConfirm = { updatedClass ->
+                    viewModel.saveSelectedClass(updatedClass) { success ->
+                        if (success) {
+                            classToEdit = null
+                            Toast.makeText(context, "Class updated successfully!", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "Failed to update class.", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
-            }
-        )
+            )
+        }
     }
 
     classToDelete?.let { item ->

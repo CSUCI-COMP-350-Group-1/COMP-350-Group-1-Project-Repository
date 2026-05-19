@@ -1,5 +1,6 @@
 package com.example.cicompanion.calendar
 
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -39,8 +40,6 @@ class CalendarViewModel(
     var selectedClasses: List<SelectedClass> by mutableStateOf(emptyList())
         private set
 
-    // EVENT NOTIFICATION MERGE:
-    // Stores enabled event-notification preference document IDs for the signed-in user.
     var enabledEventNotificationPreferenceIds: Set<String> by mutableStateOf(emptySet())
         private set
 
@@ -121,18 +120,12 @@ class CalendarViewModel(
 
                 loadCustomEvents()
                 loadSelectedClasses()
-
-                // EVENT NOTIFICATION MERGE:
-                // Refresh notification opt-ins when the signed-in user changes.
                 loadEventNotificationPreferences()
             } else {
                 customEvents = emptyList()
                 selectedClasses = emptyList()
                 incomingInvites = emptyList()
                 acceptedInvites = emptyList()
-
-                // EVENT NOTIFICATION MERGE:
-                // Clear opt-in state when signed out.
                 enabledEventNotificationPreferenceIds = emptySet()
             }
         }
@@ -145,67 +138,87 @@ class CalendarViewModel(
         acceptedInvitesListener?.remove()
     }
 
-    val events: List<CalendarEvent>
-        get() {
-            val user = FirebaseAuth.getInstance().currentUser
-            val merged = customEvents + buildSelectedClassEvents() + csuciEvents
+    // Optimization: Use derivedStateOf to prevent expensive calculations during recomposition
+    private val _allEvents = derivedStateOf {
+        val user = FirebaseAuth.getInstance().currentUser
+        val merged = customEvents + buildSelectedClassEvents() + csuciEvents
 
-            val distinctEvents = merged
-                .groupBy { event -> event.id }
-                .map { (_, sameIdEvents) ->
-                    if (sameIdEvents.size > 1) {
-                        sameIdEvents.find { event -> event.isBookmarked || event.isPinned }
-                            ?: sameIdEvents.find { event -> event.calendarId == "custom" }
-                            ?: sameIdEvents.first()
-                    } else {
-                        sameIdEvents.first()
-                    }
-                }
-
-            return distinctEvents.filter { event ->
-                when {
-                    event.isPinned -> filterPinned
-                    event.isBookmarked -> filterBookmarked
-                    event.calendarId == "custom" -> {
-                        val isShared = event.ownerId != null && event.ownerId != user?.uid
-                        if (isShared) {
-                            val hasActiveInvite = acceptedInvites.any { invite ->
-                                invite.eventId == event.id
-                            }
-                            filterShared && hasActiveInvite
-                        } else {
-                            filterCustom
-                        }
-                    }
-                    event.calendarId == "schedule" -> filterCustom
-                    else -> filterCsuci
+        val distinctEvents = merged
+            .groupBy { event -> event.id }
+            .map { (_, sameIdEvents) ->
+                if (sameIdEvents.size > 1) {
+                    sameIdEvents.find { event -> event.isBookmarked || event.isPinned }
+                        ?: sameIdEvents.find { event -> event.calendarId == "custom" }
+                        ?: sameIdEvents.first()
+                } else {
+                    sameIdEvents.first()
                 }
             }
+
+        distinctEvents.filter { event ->
+            when {
+                event.isPinned -> filterPinned
+                event.isBookmarked -> filterBookmarked
+                event.calendarId == "custom" -> {
+                    val isShared = event.ownerId != null && event.ownerId != user?.uid
+                    if (isShared) {
+                        val hasActiveInvite = acceptedInvites.any { invite ->
+                            invite.eventId == event.id
+                        }
+                        filterShared && hasActiveInvite
+                    } else {
+                        filterCustom
+                    }
+                }
+                event.calendarId == "schedule" -> filterCustom
+                else -> filterCsuci
+            }
         }
+    }
+
+    val events: List<CalendarEvent> get() = _allEvents.value
+
+    // Optimization: Calculate selected date events in ViewModel
+    val selectedDateEventsByPriority = derivedStateOf {
+        events.filter { it.occursOn(selectedDate) }
+            .sortedWith(
+                compareByDescending<CalendarEvent> { it.isPinned }
+                    .thenByDescending { it.calendarId == "custom" }
+                    .thenBy { it.start }
+            )
+    }
+
+    // Optimization: Pre-calculate info for the dot indicators on the calendar
+    val dayEventInfoMap = derivedStateOf {
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+        val map = mutableMapOf<LocalDate, DayEventInfo>()
+        for (event in events) {
+            var day = event.start.toLocalDate()
+            val last = event.lastDateInclusive()
+            val isCustom = event.calendarId == "custom"
+            while (!day.isAfter(last)) {
+                val cur = map[day] ?: DayEventInfo()
+                map[day] = cur.copy(
+                    hasCsuci = cur.hasCsuci || !isCustom,
+                    hasCustom = cur.hasCustom || (isCustom && event.ownerId == currentUserId && !event.isShared),
+                    hasPinned = cur.hasPinned || event.isPinned,
+                    hasShared = cur.hasShared || (isCustom && (event.ownerId != currentUserId || event.isShared))
+                )
+                day = day.plusDays(1)
+            }
+        }
+        map
+    }
 
     fun updateMode(newMode: CalendarMode) {
         mode = newMode
     }
 
-    fun toggleFilterCsuci() {
-        filterCsuci = !filterCsuci
-    }
-
-    fun toggleFilterCustom() {
-        filterCustom = !filterCustom
-    }
-
-    fun toggleFilterPinned() {
-        filterPinned = !filterPinned
-    }
-
-    fun toggleFilterBookmarked() {
-        filterBookmarked = !filterBookmarked
-    }
-
-    fun toggleFilterShared() {
-        filterShared = !filterShared
-    }
+    fun toggleFilterCsuci() { filterCsuci = !filterCsuci }
+    fun toggleFilterCustom() { filterCustom = !filterCustom }
+    fun toggleFilterPinned() { filterPinned = !filterPinned }
+    fun toggleFilterBookmarked() { filterBookmarked = !filterBookmarked }
+    fun toggleFilterShared() { filterShared = !filterShared }
 
     fun resetFilters() {
         filterCsuci = true
@@ -258,14 +271,11 @@ class CalendarViewModel(
         viewModelScope.launch {
             val success = FirestoreManager.saveCustomEvent(event)
             if (success) {
-                customEvents = FirestoreManager.fetchCustomEvents()
+                loadCustomEvents()
             }
         }
     }
 
-    // EVENT NOTIFICATION MERGE:
-    // Editing a custom/shared event removes the old event-version notification preference.
-    // The edited event becomes a new single-event version and must be opted into again.
     fun updateCustomEvent(
         originalEvent: CalendarEvent,
         updatedEvent: CalendarEvent
@@ -278,16 +288,12 @@ class CalendarViewModel(
 
             val success = FirestoreManager.saveCustomEvent(updatedEvent)
             if (success) {
-                customEvents = FirestoreManager.fetchCustomEvents()
-                enabledEventNotificationPreferenceIds =
-                    FirestoreManager.fetchEnabledEventNotificationPreferenceIds()
+                loadCustomEvents()
+                loadEventNotificationPreferences()
             }
         }
     }
 
-    // EVENT NOTIFICATION MERGE:
-    // Use this for all custom/shared event deletion. It cleans notification opt-in first,
-    // then uses dev's owner-vs-member delete/leave behavior.
     fun deleteEvent(event: CalendarEvent) {
         val user = FirebaseAuth.getInstance().currentUser ?: return
 
@@ -297,46 +303,29 @@ class CalendarViewModel(
                 enabled = false
             )
 
-            enabledEventNotificationPreferenceIds =
-                FirestoreManager.fetchEnabledEventNotificationPreferenceIds()
-
             if (event.ownerId == user.uid) {
                 SocialRepository.deleteEventForAll(
                     ownerId = user.uid,
                     eventId = event.id,
-                    onSuccess = {
-                        loadCustomEvents()
-                    },
-                    onError = { message ->
-                        errorMessage = message
-                    }
+                    onSuccess = { loadCustomEvents() },
+                    onError = { message -> errorMessage = message }
                 )
             } else {
                 SocialRepository.leaveEvent(
                     userId = user.uid,
                     eventId = event.id,
-                    onSuccess = {
-                        loadCustomEvents()
-                    },
-                    onError = { message ->
-                        errorMessage = message
-                    }
+                    onSuccess = { loadCustomEvents() },
+                    onError = { message -> errorMessage = message }
                 )
             }
+            loadEventNotificationPreferences()
         }
     }
 
-    // EVENT NOTIFICATION MERGE:
-    // Keep this wrapper only for older UI calls. Prefer deleteEvent(event).
-    fun deleteCustomEvent(event: CalendarEvent) {
-        deleteEvent(event)
-    }
+    fun deleteCustomEvent(event: CalendarEvent) { deleteEvent(event) }
 
-    // EVENT NOTIFICATION MERGE:
-    // Keep this wrapper only for older UI calls that pass just the event id.
     fun deleteCustomEvent(eventId: String) {
-        val event = customEvents.firstOrNull { customEvent -> customEvent.id == eventId }
-
+        val event = customEvents.firstOrNull { it.id == eventId }
         if (event != null) {
             deleteEvent(event)
             return
@@ -345,7 +334,7 @@ class CalendarViewModel(
         viewModelScope.launch {
             val success = FirestoreManager.deleteCustomEvent(eventId)
             if (success) {
-                customEvents = FirestoreManager.fetchCustomEvents()
+                loadCustomEvents()
             }
         }
     }
@@ -353,7 +342,6 @@ class CalendarViewModel(
     fun togglePinEvent(event: CalendarEvent) {
         viewModelScope.launch {
             val targetStatus = !event.isPinned
-
             if (event.calendarId != "custom") {
                 FirestoreManager.saveCustomEvent(event.copy(isPinned = targetStatus))
             } else {
@@ -365,7 +353,6 @@ class CalendarViewModel(
     fun toggleBookmarkEvent(event: CalendarEvent) {
         viewModelScope.launch {
             val targetStatus = !event.isBookmarked
-
             if (event.calendarId != "custom") {
                 FirestoreManager.saveCustomEvent(event.copy(isBookmarked = targetStatus))
             } else {
@@ -396,7 +383,6 @@ class CalendarViewModel(
         onSuccess: () -> Unit = {}
     ) {
         val ownerId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-
         SocialRepository.kickFromEvent(
             ownerId = ownerId,
             targetUserId = targetUserId,
@@ -412,7 +398,6 @@ class CalendarViewModel(
         onSuccess: () -> Unit = {}
     ) {
         val ownerId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-
         SocialRepository.kickMultipleFromEvent(
             ownerId = ownerId,
             targetUserIds = targetUserIds,
@@ -453,21 +438,10 @@ class CalendarViewModel(
         visibleMonth = YearMonth.from(date)
     }
 
-    fun previousDay() {
-        onDateSelected(selectedDate.minusDays(1))
-    }
-
-    fun nextDay() {
-        onDateSelected(selectedDate.plusDays(1))
-    }
-
-    fun previousWeek() {
-        onDateSelected(selectedDate.minusWeeks(1))
-    }
-
-    fun nextWeek() {
-        onDateSelected(selectedDate.plusWeeks(1))
-    }
+    fun previousDay() { onDateSelected(selectedDate.minusDays(1)) }
+    fun nextDay() { onDateSelected(selectedDate.plusDays(1)) }
+    fun previousWeek() { onDateSelected(selectedDate.minusWeeks(1)) }
+    fun nextWeek() { onDateSelected(selectedDate.plusWeeks(1)) }
 
     fun previousMonth() {
         visibleMonth = visibleMonth.minusMonths(1)
@@ -479,12 +453,8 @@ class CalendarViewModel(
         selectedDate = clampSelectedDateToVisibleMonth(selectedDate, visibleMonth)
     }
 
-    fun clearError() {
-        errorMessage = null
-    }
+    fun clearError() { errorMessage = null }
 
-    // EVENT NOTIFICATION MERGE:
-    // Loads all enabled push-reminder preferences for the current user.
     fun loadEventNotificationPreferences() {
         viewModelScope.launch {
             enabledEventNotificationPreferenceIds =
@@ -492,16 +462,11 @@ class CalendarViewModel(
         }
     }
 
-    // EVENT NOTIFICATION MERGE:
-    // Classes check one stable class preference.
-    // Custom/campus/shared one-time events check the exact event-version preference.
     fun isEventNotificationEnabled(event: CalendarEvent): Boolean {
         val preferenceId = FirestoreManager.buildEventNotificationPreferenceIdForEvent(event)
         return preferenceId in enabledEventNotificationPreferenceIds
     }
 
-    // EVENT NOTIFICATION MERGE:
-    // Saves/removes this user's event push-reminder opt-in.
     fun setEventNotificationEnabled(
         event: CalendarEvent,
         enabled: Boolean,
@@ -512,20 +477,15 @@ class CalendarViewModel(
                 event = event,
                 enabled = enabled
             )
-
             if (success) {
-                enabledEventNotificationPreferenceIds =
-                    FirestoreManager.fetchEnabledEventNotificationPreferenceIds()
+                loadEventNotificationPreferences()
             }
-
             onComplete(success)
         }
     }
 
     private fun buildSelectedClassEvents(): List<CalendarEvent> {
-        return selectedClasses.flatMap { selectedClass ->
-            selectedClass.toCalendarEvents()
-        }
+        return selectedClasses.flatMap { it.toCalendarEvents() }
     }
 
     private fun clampSelectedDateToVisibleMonth(

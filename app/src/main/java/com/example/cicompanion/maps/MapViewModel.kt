@@ -32,6 +32,9 @@ class MapViewModel : ViewModel() {
     var isLoading by mutableStateOf(false)
         private set
 
+    var isLoggedIn by mutableStateOf(FirebaseAuth.getInstance().currentUser != null)
+        private set
+
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
@@ -45,6 +48,8 @@ class MapViewModel : ViewModel() {
         val auth = FirebaseAuth.getInstance()
         authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
             val user = firebaseAuth.currentUser
+            isLoggedIn = user != null
+            
             // Clear existing listener on auth change
             customPinsListener?.remove()
             customPinsListener = null
@@ -82,6 +87,7 @@ class MapViewModel : ViewModel() {
     }
 
     fun togglePinMode() {
+        if (!isLoggedIn) return
         isPinMode = !isPinMode
         if (!isPinMode) {
             tempPinLocation = null
@@ -119,8 +125,6 @@ class MapViewModel : ViewModel() {
     }
 
     private fun isDuplicate(latitude: Double, longitude: Double, currentPinId: String?): Boolean {
-        // Check if any existing pin is very close to this location
-        // Threshold of ~1 meter (0.00001 degrees)
         return customPins.any { 
             it.id != currentPinId && 
             abs(it.latitude - latitude) < 0.00001 && 
@@ -160,6 +164,14 @@ class MapViewModel : ViewModel() {
             )
         }
 
+        // Optimistic update
+        val previousPins = customPins
+        if (editingPinId != null) {
+            customPins = customPins.map { if (it.id == editingPinId) pinToSave else it }
+        } else {
+            customPins = customPins + pinToSave
+        }
+
         viewModelScope.launch {
             val success = if (editingPinId != null) {
                 FirestoreManager.updateCustomPin(pinToSave)
@@ -168,41 +180,89 @@ class MapViewModel : ViewModel() {
             }
 
             if (success) {
-                // No need to manually reload, listener handles it
                 isPinMode = false
                 tempPinLocation = null
                 editingPinId = null
                 errorMessage = null
+            } else {
+                customPins = previousPins
+                errorMessage = "Failed to save pin."
+            }
+        }
+    }
+
+    fun saveSharedPin(location: CampusLocation, onComplete: () -> Unit = {}) {
+        val user = FirebaseAuth.getInstance().currentUser ?: return
+        val newPin = CustomPin(
+            id = UUID.randomUUID().toString(),
+            userId = user.uid,
+            name = location.name,
+            latitude = location.position.latitude,
+            longitude = location.position.longitude,
+            description = location.description,
+            colorArgb = location.color.toArgb(),
+            associatedEventId = location.associatedEventId
+        )
+        
+        // Optimistic update
+        val previousPins = customPins
+        customPins = customPins + newPin
+        onComplete() // Close sheet immediately for smoother experience
+        
+        viewModelScope.launch {
+            val success = FirestoreManager.saveCustomPin(newPin)
+            if (!success) {
+                customPins = previousPins
+                errorMessage = "Failed to save shared pin."
             }
         }
     }
 
     fun deletePin(pinId: String) {
+        val previousPins = customPins
+        customPins = customPins.filter { it.id != pinId }
+
         viewModelScope.launch {
-            FirestoreManager.deleteCustomPin(pinId)
-            // No need to manually reload, listener handles it
+            val success = FirestoreManager.deleteCustomPin(pinId)
+            if (!success) {
+                customPins = previousPins
+                errorMessage = "Failed to delete pin."
+            }
         }
     }
 
     fun togglePinLocation(location: CampusLocation) {
-        // Only allow pinning for custom locations
         if (!location.isCustom) return
 
-        viewModelScope.launch {
-            val existingPin = customPins.find { it.id == location.id } ?: return@launch
-            val targetStatus = !existingPin.isPinned
+        val existingPin = customPins.find { it.id == location.id } ?: return
+        val targetStatus = !existingPin.isPinned
+        val updatedPin = existingPin.copy(isPinned = targetStatus)
 
-            val updatedPin = existingPin.copy(isPinned = targetStatus)
-            FirestoreManager.updateCustomPin(updatedPin)
+        val previousPins = customPins
+        customPins = customPins.map { if (it.id == location.id) updatedPin else it }
+
+        viewModelScope.launch {
+            val success = FirestoreManager.updateCustomPin(updatedPin)
+            if (!success) {
+                customPins = previousPins
+                errorMessage = "Failed to update pin status."
+            }
         }
     }
 
     fun associateEvent(pinId: String, eventId: String?) {
+        val pin = customPins.find { it.id == pinId } ?: return
+        val updatedPin = pin.copy(associatedEventId = eventId)
+
+        val previousPins = customPins
+        customPins = customPins.map { if (it.id == pinId) updatedPin else it }
+
         viewModelScope.launch {
-            val pin = customPins.find { it.id == pinId } ?: return@launch
-            val updatedPin = pin.copy(associatedEventId = eventId)
-            FirestoreManager.updateCustomPin(updatedPin)
-            // No need to manually reload, listener handles it
+            val success = FirestoreManager.updateCustomPin(updatedPin)
+            if (!success) {
+                customPins = previousPins
+                errorMessage = "Failed to associate event."
+            }
         }
     }
 }

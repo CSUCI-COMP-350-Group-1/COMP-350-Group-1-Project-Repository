@@ -18,34 +18,22 @@ object SocialRepository {
 
     private val profileCache = mutableMapOf<String, UserProfile>()
 
-    // MESSAGING: reusable helper for accepted friends only
+    /**
+     * Efficiently fetches only accepted friends by first getting IDs from friend_requests.
+     * This avoids loading the entire users collection.
+     */
     fun fetchAcceptedFriends(
         currentUserId: String,
         onSuccess: (List<UserProfile>) -> Unit,
         onError: (String) -> Unit
     ) {
-        usersCollection().get()
-            .addOnSuccessListener { snapshot ->
-                val allUsers = snapshot.documents
-                    .mapNotNull { it.toObject(UserProfile::class.java) }
-                    .filter { it.uid.isNotBlank() && it.uid != currentUserId }
-
-                // Cache these profiles
-                allUsers.forEach { profileCache[it.uid] = it }
-
-                fetchAllFriendRequestStatuses(
-                    currentUserId = currentUserId,
-                    onSuccess = { statuses ->
-                        onSuccess(
-                            allUsers.filter { statuses[it.uid] == "accepted" }
-                        )
-                    },
-                    onError = onError
-                )
+        fetchAcceptedFriendIds(currentUserId, onSuccess = { ids ->
+            if (ids.isEmpty()) {
+                onSuccess(emptyList())
+            } else {
+                fetchUserProfiles(ids.toList(), onSuccess, onError)
             }
-            .addOnFailureListener { exception ->
-                onError(exception.message ?: "Could not load friends.")
-            }
+        }, onError)
     }
 
     fun fetchSearchableUsers(
