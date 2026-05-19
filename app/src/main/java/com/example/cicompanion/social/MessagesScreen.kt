@@ -273,9 +273,9 @@ fun MessagesScreen(navController: NavHostController, sharedLocation: String? = n
                     .padding(top = 8.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFEF3347),
-                    contentColor = Color.White,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     disabledContainerColor = Color(0xFFEF3347).copy(alpha = 0.35f),
-                    disabledContentColor = Color.White.copy(alpha = 0.75f)
+                    disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f)
                 )
             ) {
                 Icon(Icons.Default.Group, contentDescription = null)
@@ -749,7 +749,8 @@ fun MessageThreadScreen(
 
     DisposableEffect(currentUser.uid) {
         val pinsReg = SocialRepository.listenToCustomPins(currentUser.uid, { userPins = it }, {})
-        val eventsReg = SocialRepository.listenToCustomEvents(currentUser.uid, { userEvents = it }, {})
+        val eventsReg =
+            SocialRepository.listenToCustomEvents(currentUser.uid, { userEvents = it }, {})
         onDispose {
             pinsReg.remove()
             eventsReg.remove()
@@ -923,7 +924,11 @@ fun MessageThreadScreen(
                 ) {
                     Box {
                         IconButton(onClick = { showAttachmentMenu = !showAttachmentMenu }) {
-                            Icon(Icons.Default.Add, contentDescription = "Add attachment", tint = Color(0xFFEF3347))
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "Add attachment",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
                         }
                         DropdownMenu(
                             expanded = showAttachmentMenu,
@@ -933,8 +938,15 @@ fun MessageThreadScreen(
                                 text = { Text("Ping Current Location") },
                                 onClick = {
                                     showAttachmentMenu = false
-                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                                        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                                    if (ContextCompat.checkSelfPermission(
+                                            context,
+                                            Manifest.permission.ACCESS_FINE_LOCATION
+                                        ) == PackageManager.PERMISSION_GRANTED
+                                    ) {
+                                        fusedLocationClient.getCurrentLocation(
+                                            Priority.PRIORITY_HIGH_ACCURACY,
+                                            null
+                                        )
                                             .addOnSuccessListener { location ->
                                                 if (location != null) {
                                                     // GROUP MESSAGING CHANGE:
@@ -953,7 +965,12 @@ fun MessageThreadScreen(
                                         locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                                     }
                                 },
-                                leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) }
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.LocationOn,
+                                        contentDescription = null
+                                    )
+                                }
                             )
                             DropdownMenuItem(
                                 text = { Text("Send Custom Pin") },
@@ -961,7 +978,12 @@ fun MessageThreadScreen(
                                     showAttachmentMenu = false
                                     showPinPicker = true
                                 },
-                                leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) }
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.PushPin,
+                                        contentDescription = null
+                                    )
+                                }
                             )
                             DropdownMenuItem(
                                 text = { Text("Share Event") },
@@ -969,31 +991,40 @@ fun MessageThreadScreen(
                                     showAttachmentMenu = false
                                     showEventPicker = true
                                 },
-                                leadingIcon = { Icon(Icons.Default.Event, contentDescription = null) }
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Event,
+                                        contentDescription = null
+                                    )
+                                }
                             )
                         }
                     }
 
-                        OutlinedTextField(
-                            value = messageText,
-                            onValueChange = { messageText = it },
-                            modifier = Modifier.weight(1f),
-                            placeholder = { Text("Type a message") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(24.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent,
-                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    OutlinedTextField(
+                        value = messageText,
+                        onValueChange = { messageText = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("Type a message") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(24.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                alpha = 0.6f
+                            ),
+                            unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                alpha = 0.6f
                             )
                         )
+                    )
 
-                        Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     IconButton(
                         onClick = {
@@ -1086,13 +1117,20 @@ fun MessageThreadScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp) // Equal top/bottom padding
+                    .padding(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 12.dp,
+                        bottom = 12.dp
+                    ) // Equal top/bottom padding
             ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                UserAvatar(photoUrl = if (isGroupThread) "" else currentFriend?.photoUrl ?: "")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    UserAvatar(photoUrl = if (isGroupThread) "" else currentFriend?.photoUrl ?: "")
 
                     Spacer(modifier = Modifier.width(12.dp))
 
@@ -1106,121 +1144,126 @@ fun MessageThreadScreen(
                             color = MaterialTheme.colorScheme.onBackground
                         )
 
-                    if (subtitle.isNotBlank()) {
-                        Text(
-                            text = subtitle,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    } else if (currentFriend != null && currentFriend.email.isNotBlank()) {
-                        Text(
-                            text = currentFriend.email,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                if (isGroupThread) {
-                    // GROUP MESSAGING group members can rename the shared group chat
-                    Button(
-                        onClick = { showEditGroupNameDialog = true },
-                        modifier = Modifier
-                            .height(36.dp)
-                            .padding(start = 8.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) {
-                        Text(
-                            text = "Rename",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                } else {
-                    Button(
-                        onClick = {
-                            navController.navigate("${Routes.PROFILE}/$friendUserId")
-                        },
-                        modifier = Modifier
-                            .height(36.dp)
-                            .padding(start = 8.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFEF3347),
-                            contentColor = Color.White
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) {
-                        Text(
-                            text = "View Profile",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            // Messages Section
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 8.dp)
-            ) {
-                if (errorMessage != null && conversationExists) {
-                    Text(
-                        text = errorMessage!!,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                }
-
-                if (messages.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("No messages yet. Say hello!", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                } else {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(top = 8.dp)
-                    ) {
-                        items(messages, key = { it.id }) { message ->
-                            MessageBubble(
-                                message = message,
-                                isMine = message.senderId == currentUser.uid,
-                                navController = navController,
-                                ownedPins = userPins,
-                                onPinSaved = {
-                                    // already handled by listener
-                                },
-                                // GROUP MESSAGING CHANGE: only show sender names in group chats.
-                                senderName = if (isGroupThread) {
-                                    displayUserName(
-                                        userId = message.senderId,
-                                        currentUser = currentUser,
-                                        profilesById = memberProfilesById,
-                                        nicknames = nicknames
-                                    )
-                                } else {
-                                    null
-                                },
-                                currentUserId = currentUser.uid
+                        if (subtitle.isNotBlank()) {
+                            Text(
+                                text = subtitle,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
+                        } else if (currentFriend != null && currentFriend.email.isNotBlank()) {
+                            Text(
+                                text = currentFriend.email,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                    }
+
+                    if (isGroupThread) {
+                        // GROUP MESSAGING group members can rename the shared group chat
+                        Button(
+                            onClick = { showEditGroupNameDialog = true },
+                            modifier = Modifier
+                                .height(36.dp)
+                                .padding(start = 8.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                        ) {
+                            Text(
+                                text = "Rename",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        Button(
+                            onClick = {
+                                navController.navigate("${Routes.PROFILE}/$friendUserId")
+                            },
+                            modifier = Modifier
+                                .height(36.dp)
+                                .padding(start = 8.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFEF3347),
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                        ) {
+                            Text(
+                                text = "View Profile",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                // Messages Section
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 8.dp)
+                ) {
+                    if (errorMessage != null && conversationExists) {
+                        Text(
+                            text = errorMessage!!,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+
+                    if (messages.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No messages yet. Say hello!",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(top = 8.dp)
+                        ) {
+                            items(messages, key = { it.id }) { message ->
+                                MessageBubble(
+                                    message = message,
+                                    isMine = message.senderId == currentUser.uid,
+                                    navController = navController,
+                                    ownedPins = userPins,
+                                    onPinSaved = {
+                                        // already handled by listener
+                                    },
+                                    // GROUP MESSAGING CHANGE: only show sender names in group chats.
+                                    senderName = if (isGroupThread) {
+                                        displayUserName(
+                                            userId = message.senderId,
+                                            currentUser = currentUser,
+                                            profilesById = memberProfilesById,
+                                            nicknames = nicknames
+                                        )
+                                    } else {
+                                        null
+                                    },
+                                    currentUserId = currentUser.uid
+                                )
+                            }
                         }
                     }
                 }
@@ -1275,14 +1318,25 @@ private fun <T> ItemPickerDialog(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     placeholder = { Text("Search...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -1295,8 +1349,15 @@ private fun <T> ItemPickerDialog(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 if (filteredItems.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
-                        Text("No items found.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(150.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No items found.",
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 } else {
                     LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
@@ -1352,7 +1413,7 @@ private fun CreateGroupChatDialog(
                 Text(
                     text = "Select at least 2 friends",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -1392,7 +1453,7 @@ private fun CreateGroupChatDialog(
                                 if (friend.email.isNotBlank()) {
                                     Text(
                                         text = friend.email,
-                                        color = Color.Gray,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         style = MaterialTheme.typography.bodySmall,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -1410,7 +1471,7 @@ private fun CreateGroupChatDialog(
                 enabled = selectedFriendIds.size >= 2 && !isCreating,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFEF3347),
-                    contentColor = Color.White
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 Text(if (isCreating) "Creating..." else "Create")
@@ -1454,7 +1515,7 @@ private fun EditGroupNameDialog(
                 onClick = { onSave(groupName) },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFEF3347),
-                    contentColor = Color.White
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 Text("Save")
@@ -1466,13 +1527,6 @@ private fun EditGroupNameDialog(
             }
         }
     )
-}
-
-@Composable
-private fun FriendPickerCard(user: UserProfile, onClick: () -> Unit) {
-    ElevatedButton(onClick = onClick, shape = RoundedCornerShape(12.dp)) {
-        Text(text = SocialRepository.displayNameOrEmail(user), maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
 }
 
 @Composable
@@ -1616,7 +1670,7 @@ private fun MessageBubble(
         if (!isMine && !senderName.isNullOrBlank()) {
             Text(
                 text = senderName,
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
             )
