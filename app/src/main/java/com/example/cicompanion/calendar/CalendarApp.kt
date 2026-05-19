@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -155,29 +156,33 @@ fun CalendarApp(viewModel: CalendarViewModel) {
         }
     }
 
-    if (eventToShowDetails != null) {
+    // Real-time update for the bottom sheet: find the most up-to-date version of the event from the ViewModel's state
+    val currentEventToShowDetails = remember(eventToShowDetails, viewModel.events) {
+        eventToShowDetails?.let { old -> viewModel.events.find { it.id == old.id } } ?: eventToShowDetails
+    }
+
+    if (currentEventToShowDetails != null) {
         ModalBottomSheet(onDismissRequest = { eventToShowDetails = null }, sheetState = sheetState, containerColor = Color.White) {
             EventDetailsContent(
-                event = eventToShowDetails!!,
+                event = currentEventToShowDetails,
                 onDismiss = { eventToShowDetails = null },
                 onDelete = { 
-                    eventToDelete = eventToShowDetails
+                    eventToDelete = currentEventToShowDetails
                     eventToShowDetails = null 
                 },
                 onEdit = { 
-                    eventToEdit = eventToShowDetails
+                    eventToEdit = currentEventToShowDetails
                     eventToShowDetails = null 
                 },
-                onTogglePin = { viewModel.togglePinEvent(eventToShowDetails!!) },
+                onTogglePin = { viewModel.togglePinEvent(currentEventToShowDetails) },
                 onInvite = { 
-                    eventToInvite = eventToShowDetails
-                    // Reverting logic: open dialog instead of nested sheet to ensure it works
+                    eventToInvite = currentEventToShowDetails
                 },
                 onShowMembers = { 
-                    eventMembersToShow = eventToShowDetails
+                    eventMembersToShow = currentEventToShowDetails
                 },
-                notificationsEnabled = viewModel.isEventNotificationEnabled(eventToShowDetails!!),
-                onNotificationToggle = { enabled -> viewModel.setEventNotificationEnabled(eventToShowDetails!!, enabled) }
+                notificationsEnabled = viewModel.isEventNotificationEnabled(currentEventToShowDetails),
+                onNotificationToggle = { enabled -> viewModel.setEventNotificationEnabled(currentEventToShowDetails, enabled) }
             )
         }
     }
@@ -401,25 +406,71 @@ private fun CalendarModeTabs(selectedMode: CalendarMode, onModeSelected: (Calend
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         CalendarMode.entries.forEach { mode ->
             val isSelected = selectedMode == mode
-            Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(if (isSelected) CoralRed else Color.White).border(1.dp, if (isSelected) Color.Transparent else DateCellBorder, RoundedCornerShape(12.dp)).clickable { onModeSelected(mode) }.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
-                Text(text = when(mode) { CalendarMode.MONTH -> "Month"; CalendarMode.WEEK -> "Week"; CalendarMode.DAY -> "Day"; CalendarMode.SCHEDULE -> "Class" }, color = if (isSelected) Color.White else CoralRed, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isSelected) CoralRed else Color.White)
+                    .border(1.dp, if (isSelected) Color.Transparent else DateCellBorder, RoundedCornerShape(12.dp))
+                    .clickable { onModeSelected(mode) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = when(mode) { 
+                        CalendarMode.MONTH -> "Month"
+                        CalendarMode.WEEK -> "Week"
+                        CalendarMode.DAY -> "Day"
+                        CalendarMode.SCHEDULE -> "Class" 
+                    }, 
+                    color = if (isSelected) Color.White else CoralRed, 
+                    style = MaterialTheme.typography.labelMedium, 
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
 }
 
 @Composable
-private fun MonthView(visibleMonth: YearMonth, selectedDate: LocalDate, dayEventInfoMap: Map<LocalDate, DayEventInfo>, selectedDateEvents: List<CalendarEvent>, onDateSelected: (LocalDate) -> Unit, onPreviousMonth: () -> Unit, onNextMonth: () -> Unit, onEventClick: (CalendarEvent) -> Unit, highlightedEventId: String? = null) {
+private fun MonthView(
+    visibleMonth: YearMonth,
+    selectedDate: LocalDate,
+    dayEventInfoMap: Map<LocalDate, DayEventInfo>,
+    selectedDateEvents: List<CalendarEvent>,
+    onDateSelected: (LocalDate) -> Unit,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onEventClick: (CalendarEvent) -> Unit,
+    highlightedEventId: String? = null
+) {
     val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
     val monthCells = remember(visibleMonth, firstDayOfWeek) { buildMonthCells(visibleMonth, firstDayOfWeek) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionCard { HeaderWithArrows(title = visibleMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")), onPrevious = onPreviousMonth, onNext = onNextMonth); Spacer(modifier = Modifier.height(8.dp)); WeekdayHeader(firstDayOfWeek); Spacer(modifier = Modifier.height(8.dp)); MonthGrid(monthCells, selectedDate, dayEventInfoMap, onDateSelected) }
+        SectionCard {
+            HeaderWithArrows(
+                title = visibleMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+                onPrevious = onPreviousMonth,
+                onNext = onNextMonth
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            WeekdayHeader(firstDayOfWeek)
+            Spacer(modifier = Modifier.height(8.dp))
+            MonthGrid(monthCells, selectedDate, dayEventInfoMap, onDateSelected)
+        }
         EventsSection("Selected day", selectedDateEvents, onEventClick, highlightedEventId)
     }
 }
 
 @Composable
-private fun DayView(selectedDate: LocalDate, events: List<CalendarEvent>, onPreviousDay: () -> Unit, onNextDay: () -> Unit, onEventClick: (CalendarEvent) -> Unit, highlightedEventId: String? = null) {
+private fun DayView(
+    selectedDate: LocalDate,
+    events: List<CalendarEvent>,
+    onPreviousDay: () -> Unit,
+    onNextDay: () -> Unit,
+    onEventClick: (CalendarEvent) -> Unit,
+    highlightedEventId: String? = null
+) {
     val formatter = remember { DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy") }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionCard { HeaderWithArrows(selectedDate.format(formatter), onPreviousDay, onNextDay) }
@@ -428,28 +479,194 @@ private fun DayView(selectedDate: LocalDate, events: List<CalendarEvent>, onPrev
 }
 
 @Composable
-private fun WeekView(selectedDate: LocalDate, dayEventInfoMap: Map<LocalDate, DayEventInfo>, eventsForSelectedDate: List<CalendarEvent>, onDateSelected: (LocalDate) -> Unit, onPreviousWeek: () -> Unit, onNextWeek: () -> Unit, onEventClick: (CalendarEvent) -> Unit, highlightedEventId: String? = null) {
+private fun WeekView(
+    selectedDate: LocalDate,
+    dayEventInfoMap: Map<LocalDate, DayEventInfo>,
+    eventsForSelectedDate: List<CalendarEvent>,
+    onDateSelected: (LocalDate) -> Unit,
+    onPreviousWeek: () -> Unit,
+    onNextWeek: () -> Unit,
+    onEventClick: (CalendarEvent) -> Unit,
+    highlightedEventId: String? = null
+) {
     val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
     val weekDates = remember(selectedDate, firstDayOfWeek) { buildWeekDates(selectedDate, firstDayOfWeek) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionCard { HeaderWithArrows(buildWeekTitle(weekDates.first()), onPreviousWeek, onNextWeek); Spacer(modifier = Modifier.height(8.dp)); WeekdayHeader(firstDayOfWeek); Spacer(modifier = Modifier.height(8.dp)); WeekRow(weekDates, selectedDate, dayEventInfoMap, onDateSelected) }
+        SectionCard {
+            HeaderWithArrows(buildWeekTitle(weekDates.first()), onPreviousWeek, onNextWeek)
+            Spacer(modifier = Modifier.height(8.dp))
+            WeekdayHeader(firstDayOfWeek)
+            Spacer(modifier = Modifier.height(8.dp))
+            WeekRow(weekDates, selectedDate, dayEventInfoMap, onDateSelected)
+        }
         EventsSection("Selected day", eventsForSelectedDate, onEventClick, highlightedEventId)
     }
 }
 
-@Composable private fun HeaderWithArrows(title: String, onPrevious: () -> Unit, onNext: () -> Unit) { Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { NavigationCircleButton("‹", onPrevious); Text(text = title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 16.sp); NavigationCircleButton("›", onNext) } }
-@Composable private fun NavigationCircleButton(symbol: String, onClick: () -> Unit) { Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(DateCellWhite).clickable(onClick = onClick), contentAlignment = Alignment.Center) { Text(text = symbol, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) } }
-@Composable private fun WeekdayHeader(firstDayOfWeek: DayOfWeek) { val orderedDays = (0..6).map { firstDayOfWeek.plus(it.toLong()) }; Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) { orderedDays.forEach { day -> Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(DateCellWhite).border(1.dp, DateCellBorder, RoundedCornerShape(8.dp)).padding(vertical = 4.dp), contentAlignment = Alignment.Center) { Text(day.getDisplayName(TextStyle.SHORT, Locale.getDefault()), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold) } } } }
-@Composable private fun WeekRow(dates: List<LocalDate>, selectedDate: LocalDate, dayEventInfoMap: Map<LocalDate, DayEventInfo>, onDateSelected: (LocalDate) -> Unit) { Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) { dates.forEach { date -> DateCell(Modifier.weight(1f), date, date == selectedDate, dayEventInfoMap[date] ?: DayEventInfo(), { onDateSelected(date) }) } } }
-@Composable private fun MonthGrid(cells: List<LocalDate?>, selectedDate: LocalDate, infoMap: Map<LocalDate, DayEventInfo>, onDateSelected: (LocalDate) -> Unit) { Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { cells.chunked(7).forEach { week -> Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) { week.forEach { date -> if (date == null) Box(Modifier.weight(1f).height(48.dp)) else DateCell(Modifier.weight(1f), date, date == selectedDate, infoMap[date] ?: DayEventInfo(), { onDateSelected(date) }) } } } } }
-@Composable private fun DateCell(modifier: Modifier, date: LocalDate, isSelected: Boolean, info: DayEventInfo, onClick: () -> Unit) { Box(modifier.height(52.dp).background(if (isSelected) Color(0xFFF6E6D8) else Color.White, RoundedCornerShape(6.dp)).border(1.dp, if (isSelected) CoralRed else Color.Transparent, RoundedCornerShape(6.dp)).clickable(onClick = onClick).padding(2.dp)) { Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) { Text(text = date.dayOfMonth.toString(), style = MaterialTheme.typography.labelMedium, color = if (isSelected) CoralRed else MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 12.sp); Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(1.dp)) { Dot(CoralRed, info.hasCsuci); Dot(PinnedEventPurple, info.hasPinned); Dot(CustomEventOrange, info.hasCustom); Dot(SharedEventBlue, info.hasShared) } } } }
-@Composable private fun Dot(color: Color, visible: Boolean) { if (visible) Box(Modifier.size(4.dp).background(color, CircleShape)) }
-@Composable private fun EventsSection(title: String, events: List<CalendarEvent>, onEventClick: (CalendarEvent) -> Unit, highlightedEventId: String? = null) { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { SectionHeading(title); if (events.isEmpty()) SectionCard { Text("No events for this date.", color = SoftText) } else events.forEach { event -> EventCard(event, { onEventClick(event) }, event.id == highlightedEventId) } } }
-@Composable private fun EventCard(event: CalendarEvent, onClick: () -> Unit, isHighlighted: Boolean) { val isCustom = event.calendarId == "custom"; val isOwner = event.ownerId == FirebaseAuth.getInstance().currentUser?.uid; Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).border(if (isHighlighted) 1.5.dp else 0.dp, if (isHighlighted) CoralRed else Color.Transparent, RoundedCornerShape(16.dp)), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = if (!isCustom) EventCardGrey else if (isOwner && event.isShared) Color(0xFFE3F2FD) else if (isOwner) Color(0xFFF6E6D8) else Color(0xFFE3F2FD))) { Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) { Column(modifier = Modifier.weight(1f)) { Text(HtmlUtils.stripHtml(event.title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1); Text(event.timeLabel(), style = MaterialTheme.typography.bodySmall, color = SoftText) }; EventBadge(if (event.isPinned) "Pinned" else if (isCustom) (if (isOwner) (if (event.isShared) "Shared" else "Custom") else "Shared") else "CSUCI", if (event.isPinned) PinnedEventPurple else if (isCustom) (if (isOwner) (if (event.isShared) SharedEventBlue else CustomEventOrange) else SharedEventBlue) else CoralRed); Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp)) } } }
-@Composable private fun EventBadge(text: String, color: Color) { Box(Modifier.padding(start = 4.dp).clip(RoundedCornerShape(14.dp)).background(color.copy(alpha = 0.1f)).border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(14.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) { Text(text, color = color, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, fontSize = 10.sp) } }
-@Composable private fun FilterDropdown(viewModel: CalendarViewModel) { var exp by remember { mutableStateOf(false) }; Box { IconButton(onClick = { exp = true }, modifier = Modifier.size(32.dp).background(Color.White.copy(alpha = 0.2f), CircleShape)) { Icon(Icons.Outlined.FilterList, contentDescription = "Filter", tint = Color.White, modifier = Modifier.size(18.dp)) }; DropdownMenu(expanded = exp, onDismissRequest = { exp = false }, modifier = Modifier.background(Color.White).width(200.dp)) { Text("Filter Events", Modifier.padding(12.dp), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold); FilterMenuItem("CSUCI Events", viewModel.filterCsuci, CoralRed) { viewModel.toggleFilterCsuci() }; FilterMenuItem("Custom Events", viewModel.filterCustom, CustomEventOrange) { viewModel.toggleFilterCustom() }; FilterMenuItem("Pinned Events", viewModel.filterPinned, PinnedEventPurple) { viewModel.toggleFilterPinned() }; FilterMenuItem("Shared Events", viewModel.filterShared, SharedEventBlue) { viewModel.toggleFilterShared() } } } }
-@Composable private fun FilterMenuItem(label: String, isSel: Boolean, color: Color, onClick: () -> Unit) { DropdownMenuItem(text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) { Box(modifier = Modifier.size(18.dp).clip(RoundedCornerShape(4.dp)).background(if (isSel) color else Color.Transparent).border(1.dp, color, RoundedCornerShape(4.dp)).clickable(onClick = onClick), contentAlignment = Alignment.Center) { if (isSel) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp)) }; Text(label, style = MaterialTheme.typography.bodyMedium) } }, onClick = onClick) }
-@Composable private fun ErrorMessage(message: String, onDismiss: () -> Unit) { Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) { Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(message, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall); Text("Dismiss", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onDismiss).padding(horizontal = 8.dp, vertical = 4.dp)) } } }
+@Composable
+private fun HeaderWithArrows(title: String, onPrevious: () -> Unit, onNext: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        NavigationCircleButton("‹", onPrevious)
+        Text(text = title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        NavigationCircleButton("›", onNext)
+    }
+}
+
+@Composable
+private fun NavigationCircleButton(symbol: String, onClick: () -> Unit) {
+    Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(DateCellWhite).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        Text(text = symbol, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun WeekdayHeader(firstDayOfWeek: DayOfWeek) {
+    val orderedDays = (0..6).map { firstDayOfWeek.plus(it.toLong()) }
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        orderedDays.forEach { day ->
+            Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(DateCellWhite).border(1.dp, DateCellBorder, RoundedCornerShape(8.dp)).padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
+                Text(day.getDisplayName(TextStyle.SHORT, Locale.getDefault()), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeekRow(dates: List<LocalDate>, selectedDate: LocalDate, dayEventInfoMap: Map<LocalDate, DayEventInfo>, onDateSelected: (LocalDate) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        dates.forEach { date ->
+            DateCell(Modifier.weight(1f), date, date == selectedDate, dayEventInfoMap[date] ?: DayEventInfo(), { onDateSelected(date) })
+        }
+    }
+}
+
+@Composable
+private fun MonthGrid(cells: List<LocalDate?>, selectedDate: LocalDate, infoMap: Map<LocalDate, DayEventInfo>, onDateSelected: (LocalDate) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        cells.chunked(7).forEach { week ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                week.forEach { date ->
+                    if (date == null) Box(Modifier.weight(1f).height(48.dp))
+                    else DateCell(Modifier.weight(1f), date, date == selectedDate, infoMap[date] ?: DayEventInfo(), { onDateSelected(date) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DateCell(modifier: Modifier, date: LocalDate, isSelected: Boolean, info: DayEventInfo, onClick: () -> Unit) {
+    Box(modifier.height(52.dp).background(if (isSelected) Color(0xFFF6E6D8) else Color.White, RoundedCornerShape(6.dp)).border(1.dp, if (isSelected) CoralRed else Color.Transparent, RoundedCornerShape(6.dp)).clickable(onClick = onClick).padding(2.dp)) {
+        Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
+            Text(text = date.dayOfMonth.toString(), style = MaterialTheme.typography.labelMedium, color = if (isSelected) CoralRed else MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(1.dp)) {
+                Dot(CoralRed, info.hasCsuci)
+                Dot(PinnedEventPurple, info.hasPinned)
+                Dot(CustomEventOrange, info.hasCustom)
+                Dot(SharedEventBlue, info.hasShared)
+            }
+        }
+    }
+}
+
+@Composable
+private fun Dot(color: Color, visible: Boolean) {
+    if (visible) Box(Modifier.size(4.dp).background(color, CircleShape))
+}
+
+@Composable
+private fun EventsSection(title: String, events: List<CalendarEvent>, onEventClick: (CalendarEvent) -> Unit, highlightedEventId: String? = null) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionHeading(title)
+        if (events.isEmpty()) {
+            SectionCard { Text("No events for this date.", color = SoftText) }
+        } else {
+            events.forEach { event ->
+                EventCard(event, { onEventClick(event) }, event.id == highlightedEventId)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EventCard(event: CalendarEvent, onClick: () -> Unit, isHighlighted: Boolean) {
+    val isCustom = event.calendarId == "custom"
+    val isOwner = event.ownerId == FirebaseAuth.getInstance().currentUser?.uid
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .border(if (isHighlighted) 1.5.dp else 0.dp, if (isHighlighted) CoralRed else Color.Transparent, RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (!isCustom) EventCardGrey 
+            else if (isOwner && event.isShared) Color(0xFFE3F2FD) 
+            else if (isOwner) Color(0xFFF6E6D8) 
+            else Color(0xFFE3F2FD)
+        )
+    ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(HtmlUtils.stripHtml(event.title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(event.timeLabel(), style = MaterialTheme.typography.bodySmall, color = SoftText)
+            }
+            EventBadge(
+                text = if (event.isPinned) "Pinned" else if (isCustom) (if (isOwner) (if (event.isShared) "Shared" else "Custom") else "Shared") else "CSUCI",
+                color = if (event.isPinned) PinnedEventPurple else if (isCustom) (if (isOwner) (if (event.isShared) SharedEventBlue else CustomEventOrange) else SharedEventBlue) else CoralRed
+            )
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun EventBadge(text: String, color: Color) {
+    Box(Modifier.padding(start = 4.dp).clip(RoundedCornerShape(14.dp)).background(color.copy(alpha = 0.1f)).border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(14.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+        Text(text, color = color, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun FilterDropdown(viewModel: CalendarViewModel) {
+    var exp by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { exp = true }, modifier = Modifier.size(32.dp).background(Color.White.copy(alpha = 0.2f), CircleShape)) {
+            Icon(Icons.Outlined.FilterList, contentDescription = "Filter", tint = Color.White, modifier = Modifier.size(18.dp))
+        }
+        DropdownMenu(expanded = exp, onDismissRequest = { exp = false }, modifier = Modifier.background(Color.White).width(200.dp)) {
+            Text("Filter Events", Modifier.padding(12.dp), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            FilterMenuItem("CSUCI Events", viewModel.filterCsuci, CoralRed) { viewModel.toggleFilterCsuci() }
+            FilterMenuItem("Custom Events", viewModel.filterCustom, CustomEventOrange) { viewModel.toggleFilterCustom() }
+            FilterMenuItem("Pinned Events", viewModel.filterPinned, PinnedEventPurple) { viewModel.toggleFilterPinned() }
+            FilterMenuItem("Shared Events", viewModel.filterShared, SharedEventBlue) { viewModel.toggleFilterShared() }
+        }
+    }
+}
+
+@Composable
+private fun FilterMenuItem(label: String, isSel: Boolean, color: Color, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(modifier = Modifier.size(18.dp).clip(RoundedCornerShape(4.dp)).background(if (isSel) color else Color.Transparent).border(1.dp, color, RoundedCornerShape(4.dp)).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+                    if (isSel) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                }
+                Text(label, style = MaterialTheme.typography.bodyMedium)
+            }
+        },
+        onClick = onClick
+    )
+}
+
+@Composable
+private fun ErrorMessage(message: String, onDismiss: () -> Unit) {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+        Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(message, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall)
+            Text("Dismiss", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onDismiss).padding(horizontal = 8.dp, vertical = 4.dp))
+        }
+    }
+}
 
 @Composable
 private fun EventDetailsContent(
@@ -468,22 +685,23 @@ private fun EventDetailsContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
+            .padding(start = 24.dp, end = 24.dp, bottom = 40.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = HtmlUtils.stripHtml(event.title),
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.DarkGray
                 )
                 if (isCustom && (!isOwner || event.isShared)) {
                     Text(
-                        text = if (isOwner) "Shared Event (Leader)" else "Shared Event",
+                        text = if (isOwner) "Shared Event (Host)" else "Shared Event",
                         color = SharedEventBlue,
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.labelMedium
@@ -491,7 +709,13 @@ private fun EventDetailsContent(
                 }
             }
             if (isCustom) {
-                IconButton(onClick = onTogglePin) {
+                IconButton(
+                    onClick = onTogglePin,
+                    modifier = Modifier.background(
+                        if (event.isPinned) PinnedEventPurple.copy(alpha = 0.1f) else Color.Transparent,
+                        CircleShape
+                    )
+                ) {
                     Icon(
                         imageVector = if (event.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
                         contentDescription = "Pin",
@@ -500,75 +724,109 @@ private fun EventDetailsContent(
                 }
             }
         }
-        DetailRow(Icons.Outlined.Schedule, event.timeLabel())
-        event.location?.let { DetailRow(Icons.Outlined.LocationOn, HtmlUtils.stripHtml(it)) }
-        event.description?.let {
-            HorizontalDivider()
-            Text(HtmlUtils.stripHtml(it))
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            DetailRow(Icons.Outlined.Schedule, event.timeLabel())
+            event.location?.takeIf { it.isNotBlank() }?.let { DetailRow(Icons.Outlined.LocationOn, HtmlUtils.stripHtml(it)) }
         }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color.Gray.copy(alpha = 0.05f))
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(Icons.Outlined.NotificationsActive, null, Modifier.size(20.dp), CoralRed)
-                Text("Reminders")
-            }
-            Switch(
-                checked = notificationsEnabled,
-                onCheckedChange = onNotificationToggle,
-                colors = SwitchDefaults.colors(checkedTrackColor = CoralRed)
+
+        event.description?.takeIf { it.isNotBlank() }?.let {
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+            Text(
+                text = HtmlUtils.stripHtml(it),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.DarkGray
             )
         }
-        if (isCustom) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedButton(onClick = onShowMembers, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
-                    Text("Members")
-                }
-                if (isOwner) {
-                    Button(
-                        onClick = onInvite,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = SharedEventBlue),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Invite")
-                    }
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (isOwner) {
-                    OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
-                        Text("Edit")
-                    }
-                }
-                Button(
-                    onClick = onDelete,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
-                    shape = RoundedCornerShape(12.dp)
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.Gray.copy(alpha = 0.05f)
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(if (isOwner) "Delete" else "Leave")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Outlined.NotificationsActive, null, Modifier.size(20.dp), CoralRed)
+                        Text("Reminders", fontWeight = FontWeight.SemiBold)
+                    }
+                    Switch(
+                        checked = notificationsEnabled,
+                        onCheckedChange = onNotificationToggle,
+                        colors = SwitchDefaults.colors(checkedTrackColor = CoralRed),
+                        modifier = Modifier.scale(0.8f)
+                    )
+                }
+
+                if (isCustom) {
+                    HorizontalDivider(color = Color.White, thickness = 1.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        DetailActionButton(Icons.Outlined.People, "Members", onShowMembers)
+                        if (isOwner) {
+                            DetailActionButton(Icons.Outlined.PersonAdd, "Invite", onInvite, color = SharedEventBlue)
+                            DetailActionButton(Icons.Outlined.Edit, "Edit", onEdit)
+                        }
+                        DetailActionButton(
+                            icon = if (isOwner) Icons.Outlined.DeleteOutline else Icons.Outlined.ExitToApp,
+                            label = if (isOwner) "Delete" else "Leave",
+                            onClick = onDelete,
+                            color = CoralRed
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-private fun buildMonthCells(month: YearMonth, firstDayOfWeek: DayOfWeek): List<LocalDate?> { val firstOfMonth = month.atDay(1); val offset = (firstOfMonth.dayOfWeek.value - firstDayOfWeek.value + 7) % 7; val res = mutableListOf<LocalDate?>(); repeat(offset) { res.add(null) }; repeat(month.lengthOfMonth()) { res.add(month.atDay(it + 1)) }; while (res.size % 7 != 0) res.add(null); return res }
+@Composable
+private fun DetailActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    color: Color = Color.Gray
+) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(icon, contentDescription = label, tint = color, modifier = Modifier.size(22.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+private fun buildMonthCells(month: YearMonth, firstDayOfWeek: DayOfWeek): List<LocalDate?> {
+    val firstOfMonth = month.atDay(1)
+    val offset = (firstOfMonth.dayOfWeek.value - firstDayOfWeek.value + 7) % 7
+    val res = mutableListOf<LocalDate?>()
+    repeat(offset) { res.add(null) }
+    repeat(month.lengthOfMonth()) { res.add(month.atDay(it + 1)) }
+    while (res.size % 7 != 0) res.add(null)
+    return res
+}
+
 private fun buildWeekTitle(weekStart: LocalDate): String = "Week of ${weekStart.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))}"
-private fun buildWeekDates(selectedDate: LocalDate, firstDayOfWeek: DayOfWeek): List<LocalDate> { val weekStart = selectedDate.with(TemporalAdjusters.previousOrSame(firstDayOfWeek)); return (0..6).map { weekStart.plusDays(it.toLong()) } }
+
+private fun buildWeekDates(selectedDate: LocalDate, firstDayOfWeek: DayOfWeek): List<LocalDate> {
+    val weekStart = selectedDate.with(TemporalAdjusters.previousOrSame(firstDayOfWeek))
+    return (0..6).map { weekStart.plusDays(it.toLong()) }
+}
