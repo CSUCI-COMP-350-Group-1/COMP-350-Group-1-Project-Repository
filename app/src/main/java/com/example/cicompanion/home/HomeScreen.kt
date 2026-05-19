@@ -83,7 +83,7 @@ fun HomeScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(AppBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(top = 16.dp)
     ) {
         item {
@@ -107,7 +107,7 @@ fun HomeScreen(
                     modifier = Modifier.padding(start = 16.dp, top = 24.dp),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    color = MaterialTheme.colorScheme.onBackground
                 )
             }
             
@@ -137,14 +137,14 @@ fun HomeScreen(
                     text = "Quick Access",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 if (currentUser != null) {
                     IconButton(onClick = { showCustomizer = true }) {
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Customize",
-                            tint = BrandRedDark
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -155,13 +155,13 @@ fun HomeScreen(
         if (homeViewModel.isLoadingCustomization) {
             item {
                 Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = BrandRedDark)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
         } else if (homeViewModel.displayedFeatures.isEmpty()) {
             item {
                 Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    Text("No Quick Access buttons added.", color = Color.Gray)
+                    Text("No Quick Access buttons added.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         } else {
@@ -217,7 +217,8 @@ fun QuickAccessCustomizerDialog(
             Text(
                 "Customize Quick Access", 
                 fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleLarge
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
             ) 
         },
         text = {
@@ -246,8 +247,8 @@ fun QuickAccessCustomizerDialog(
                             checked = isFeatureSelected,
                             onCheckedChange = null,
                             colors = CheckboxDefaults.colors(
-                                checkedColor = BrandRedDark,
-                                checkmarkColor = Color.White
+                                checkedColor = MaterialTheme.colorScheme.primary,
+                                checkmarkColor = MaterialTheme.colorScheme.onPrimary
                             )
                         )
                         Spacer(modifier = Modifier.width(12.dp))
@@ -255,13 +256,13 @@ fun QuickAccessCustomizerDialog(
                             imageVector = feature.icon,
                             contentDescription = null,
                             modifier = Modifier.size(24.dp),
-                            tint = if (isFeatureSelected) BrandRedDark else Color.Gray
+                            tint = if (isFeatureSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = feature.label,
                             style = MaterialTheme.typography.bodyLarge,
-                            color = if (isFeatureSelected) Color.Black else Color.Gray
+                            color = if (isFeatureSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -272,22 +273,20 @@ fun QuickAccessCustomizerDialog(
                 onClick = { 
                     onSave(selected) 
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = BrandRedDark),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(50)
             ) {
-                Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Save", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            @Suppress("DEPRECATION")
             TextButton(
-                onClick = onDismiss,
-                colors = ButtonDefaults.textButtonColors(contentColor = BrandRedDark)
+                onClick = onDismiss
             ) {
-                Text("Cancel", fontWeight = FontWeight.Bold)
+                Text("Cancel", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
         },
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(24.dp)
     )
 }
@@ -299,7 +298,7 @@ fun PinnedEventItem(event: CalendarEvent, onNavigateToEvent: () -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -321,12 +320,13 @@ fun PinnedEventItem(event: CalendarEvent, onNavigateToEvent: () -> Unit) {
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = event.location ?: "No Location",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -335,14 +335,14 @@ fun PinnedEventItem(event: CalendarEvent, onNavigateToEvent: () -> Unit) {
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(BrandRedDark.copy(alpha = 0.1f))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
                     .clickable(onClick = onNavigateToEvent),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.CalendarMonth,
                     contentDescription = "View Event",
-                    tint = BrandRedDark,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
             }

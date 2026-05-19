@@ -70,9 +70,9 @@ fun UserNoteBubble(
                 .size(12.dp)
                 .offset(x = 14.dp, y = 26.dp),
             shape = CircleShape,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.surface,
             shadowElevation = 2.dp,
-            border = BorderStroke(1.dp, Color(0xFFEEEEEE))
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {}
 
         // Medium tail circle
@@ -81,9 +81,9 @@ fun UserNoteBubble(
                 .size(18.dp)
                 .offset(x = (-3).dp, y = 15.dp),
             shape = CircleShape,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.surface,
             shadowElevation = 3.dp,
-            border = BorderStroke(1.dp, Color(0xFFEEEEEE))
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {}
 
         // Main Bubble Surface
@@ -92,9 +92,9 @@ fun UserNoteBubble(
                 Surface(
                     onClick = { showFullNote = true },
                     shape = RoundedCornerShape(20.dp),
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.surface,
                     shadowElevation = 6.dp,
-                    border = BorderStroke(1.dp, Color(0xFFEEEEEE))
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Text(
                         text = note.content,
@@ -103,7 +103,7 @@ fun UserNoteBubble(
                             .widthIn(min = 12.dp, max = 100.dp),
                         fontSize = 14.sp,
                         lineHeight = 18.sp,
-                        color = Color.Black,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 3,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center
@@ -125,7 +125,7 @@ fun UserNoteBubble(
             ModalBottomSheet(
                 onDismissRequest = { showFullNote = false },
                 sheetState = sheetState,
-                containerColor = Color.White
+                containerColor = MaterialTheme.colorScheme.surface
             ) {
                 Column(
                     modifier = Modifier
@@ -137,7 +137,7 @@ fun UserNoteBubble(
                     Text(
                         text = labelText,
                         style = MaterialTheme.typography.labelLarge,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -146,12 +146,13 @@ fun UserNoteBubble(
                         text = note.content,
                         style = MaterialTheme.typography.headlineSmall,
                         textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    HorizontalDivider(thickness = 0.5.dp, color = Color.LightGray)
+                    HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -161,7 +162,7 @@ fun UserNoteBubble(
                         else
                             "Posted ${getTimeAgo(note.createdAt)}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -254,7 +255,7 @@ fun StatusDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = Color.Gray)
+                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )

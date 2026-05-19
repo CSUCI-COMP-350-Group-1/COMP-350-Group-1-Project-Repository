@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.cicompanion.ui.Routes
-import com.example.cicompanion.ui.theme.AppBackground
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.DocumentSnapshot
@@ -41,44 +40,42 @@ fun FriendsAndRequestsScreen(
     var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab) }
 
     if (currentUser == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Please sign in to view friends and requests.")
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+            Text("Please sign in to view friends and requests.", color = MaterialTheme.colorScheme.onBackground)
         }
         return
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(AppBackground)) {
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TabRow(
             selectedTabIndex = selectedTab,
-            containerColor = Color.White,
-            contentColor = Color(0xFFEF3347),
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary,
             indicator = { tabPositions ->
                 if (selectedTab < tabPositions.size) {
                     TabRowDefaults.SecondaryIndicator(
                         Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = Color(0xFFEF3347)
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
-            }
+            },
+            divider = { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
         ) {
-            Tab(
-                selected = selectedTab == 0,
-                onClick = { selectedTab = 0 },
-                text = { Text("Friends", fontSize = 12.sp) },
-                icon = { Icon(Icons.Default.People, contentDescription = null, modifier = Modifier.size(20.dp)) }
+            val tabs = listOf(
+                "Friends" to Icons.Default.People,
+                "Add Friends" to Icons.Default.PersonAdd,
+                "Requests" to Icons.Default.Mail
             )
-            Tab(
-                selected = selectedTab == 1,
-                onClick = { selectedTab = 1 },
-                text = { Text("Add Friends", fontSize = 12.sp) },
-                icon = { Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(20.dp)) }
-            )
-            Tab(
-                selected = selectedTab == 2,
-                onClick = { selectedTab = 2 },
-                text = { Text("Requests", fontSize = 12.sp) },
-                icon = { Icon(Icons.Default.Mail, contentDescription = null, modifier = Modifier.size(20.dp)) }
-            )
+            tabs.forEachIndexed { index, (label, icon) ->
+                Tab(
+                    selected = selectedTab == index,
+                    onClick = { selectedTab = index },
+                    text = { Text(label, fontSize = 12.sp) },
+                    icon = { Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    selectedContentColor = MaterialTheme.colorScheme.primary,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         when (selectedTab) {
@@ -111,7 +108,7 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
                     onSuccess = { map ->
                         nicknames = map
                         isLoading = false
-                        errorMessage = null // Clear any stale error on success
+                        errorMessage = null
                     },
                     onError = {
                         nicknames = emptyMap()
@@ -153,28 +150,28 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFFEF3347),
-                unfocusedBorderColor = Color.LightGray
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
             )
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         if (errorMessage != null) {
-            Text(text = errorMessage!!, color = Color.Red, modifier = Modifier.padding(bottom = 8.dp))
+            Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 8.dp))
         }
 
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color(0xFFEF3347))
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         } else if (friends.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("You don't have any friends yet.", textAlign = TextAlign.Center, color = Color.Gray)
+                Text("You don't have any friends yet.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else if (displayFriends.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No friends found matching \"$searchQuery\"", textAlign = TextAlign.Center, color = Color.Gray)
+                Text("No friends found matching \"$searchQuery\"", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -194,8 +191,8 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
     friendToRemove?.let { friend ->
         AlertDialog(
             onDismissRequest = { friendToRemove = null },
-            title = { Text("Unfriend ${SocialRepository.displayNameOrEmail(friend)}?") },
-            text = { Text("Do you really want to remove this person from your friends list?") },
+            title = { Text("Unfriend ${SocialRepository.displayNameOrEmail(friend)}?", color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text("Do you really want to remove this person from your friends list?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -209,19 +206,21 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
                             onError = { errorMessage = it; friendToRemove = null }
                         )
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF3347))
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
                     Text("Unfriend")
                 }
             },
             dismissButton = {
                 TextButton(
-                    onClick = { friendToRemove = null },
-                    colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
+                    onClick = { friendToRemove = null }
                 ) {
-                    Text("Cancel", fontWeight = FontWeight.Bold)
+                    Text("Cancel", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            }
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 
@@ -230,16 +229,21 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
 
         AlertDialog(
             onDismissRequest = { friendToNickname = null },
-            title = { Text("Set Nickname") },
+            title = { Text("Set Nickname", color = MaterialTheme.colorScheme.onSurface) },
             text = {
                 Column {
-                    Text("Nickname for ${SocialRepository.displayNameOrEmail(friend)}")
+                    Text("Nickname for ${SocialRepository.displayNameOrEmail(friend)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = currentNickname,
                         onValueChange = { currentNickname = it },
                         placeholder = { Text("Enter nickname") },
-                        singleLine = true
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        )
                     )
                 }
             },
@@ -257,16 +261,17 @@ fun FriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
                             onError = { errorMessage = it; friendToNickname = null }
                         )
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF3347))
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
                     Text("Save")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { friendToNickname = null }) {
-                    Text("Cancel")
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            }
+            },
+            containerColor = MaterialTheme.colorScheme.surface
         )
     }
 }
@@ -337,27 +342,27 @@ fun AddFriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFFEF3347),
-                unfocusedBorderColor = Color.LightGray
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
             )
         )
 
         if (statusMessage != null) {
-            Text(text = statusMessage!!, color = Color(0xFF2E7D32), modifier = Modifier.padding(top = 8.dp))
+            Text(text = statusMessage!!, color = Color(0xFF4CAF50), modifier = Modifier.padding(top = 8.dp))
         }
         if (errorMessage != null) {
-            Text(text = errorMessage!!, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
+            Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
         }
 
         if (isLoading && users.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color(0xFFEF3347))
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         } else if (!isLoading && displayUsers.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
                     text = if (searchQuery.isBlank()) "No users left to add." else "No users found matching \"$searchQuery\"",
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
             }
@@ -390,11 +395,14 @@ fun AddFriendsTab(currentUser: FirebaseUser, navController: NavHostController) {
                     item {
                         Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                             if (isLoading) {
-                                CircularProgressIndicator(color = Color(0xFFEF3347), modifier = Modifier.size(24.dp))
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                             } else {
                                 Button(
                                     onClick = { fetchUsers(true) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray, contentColor = Color.Black)
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 ) {
                                     Text("Load More")
                                 }
@@ -448,26 +456,26 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         if (statusMessage != null) {
-            Text(text = statusMessage!!, color = Color(0xFF2E7D32), modifier = Modifier.padding(bottom = 8.dp))
+            Text(text = statusMessage!!, color = Color(0xFF4CAF50), modifier = Modifier.padding(bottom = 8.dp))
         }
         if (errorMessage != null) {
-            Text(text = errorMessage!!, color = Color.Red, modifier = Modifier.padding(bottom = 8.dp))
+            Text(text = errorMessage!!, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 8.dp))
         }
 
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color(0xFFEF3347))
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         } else {
             if (incomingRequests.isEmpty() && outgoingRequests.isEmpty() && incomingEventInvites.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No pending requests.", color = Color.Gray)
+                    Text("No pending requests.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (incomingRequests.isNotEmpty()) {
                         item {
-                            Text("Incoming Friend Requests", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
+                            Text("Incoming Friend Requests", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.onBackground)
                         }
                         items(incomingRequests, key = { it.id }) { request ->
                             IncomingRequestCard(
@@ -494,7 +502,7 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
                     if (incomingEventInvites.isNotEmpty()) {
                         item {
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text("Event Invites", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
+                            Text("Event Invites", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.onBackground)
                         }
                         items(incomingEventInvites, key = { it.id }) { invite ->
                             EventInviteCard(
@@ -520,7 +528,7 @@ fun RequestsTab(currentUser: FirebaseUser, navController: NavHostController) {
                     if (outgoingRequests.isNotEmpty()) {
                         item {
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text("Outgoing Friend Requests", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp))
+                            Text("Outgoing Friend Requests", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.onBackground)
                         }
                         items(outgoingRequests, key = { it.id }) { request ->
                             OutgoingRequestCard(
@@ -547,25 +555,25 @@ fun EventInviteCard(invite: EventInvite, onAccept: () -> Unit, onDecline: () -> 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(40.dp).background(Color(0xFFEF3347).copy(alpha = 0.1f), CircleShape), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Event, contentDescription = null, tint = Color(0xFFEF3347))
+                Box(modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Event, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = invite.eventTitle, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(text = "Invited by ${invite.fromDisplayName}", fontSize = 12.sp, color = Color.Gray)
+                    Text(text = invite.eventTitle, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
+                    Text(text = "Invited by ${invite.fromDisplayName}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Row {
                     IconButton(onClick = onAccept) {
                         Icon(Icons.Default.Check, contentDescription = "Accept", tint = Color(0xFF4CAF50))
                     }
                     IconButton(onClick = onDecline) {
-                        Icon(Icons.Default.Close, contentDescription = "Decline", tint = Color.Red)
+                        Icon(Icons.Default.Close, contentDescription = "Decline", tint = MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -594,7 +602,7 @@ fun FriendCard(
             .fillMaxWidth()
             .clickable { onCardClick() },
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Row(
@@ -605,19 +613,19 @@ fun FriendCard(
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 if (!nickname.isNullOrBlank()) {
-                    Text(text = nickname, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(text = "(${SocialRepository.displayNameOrEmail(user)})", fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(text = nickname, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
+                    Text(text = "(${SocialRepository.displayNameOrEmail(user)})", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 } else {
-                    Text(text = SocialRepository.displayNameOrEmail(user), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(text = user.email, fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(text = SocialRepository.displayNameOrEmail(user), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
+                    Text(text = user.email, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             Row {
                 IconButton(onClick = onNickname) {
-                    Icon(Icons.Default.Edit, contentDescription = "Set Nickname", tint = Color.Gray)
+                    Icon(Icons.Default.Edit, contentDescription = "Set Nickname", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = onRemove) {
-                    Icon(Icons.Default.PersonRemove, contentDescription = "Unfriend", tint = Color.Red)
+                    Icon(Icons.Default.PersonRemove, contentDescription = "Unfriend", tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -631,7 +639,7 @@ fun UserSearchCard(user: UserProfile, requestStatus: String?, onCardClick: () ->
             .fillMaxWidth()
             .clickable { onCardClick() },
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Row(
@@ -641,15 +649,15 @@ fun UserSearchCard(user: UserProfile, requestStatus: String?, onCardClick: () ->
             UserAvatar(photoUrl = user.photoUrl)
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = SocialRepository.displayNameOrEmail(user), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(text = user.email, fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(text = SocialRepository.displayNameOrEmail(user), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
+                Text(text = user.email, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             IconButton(
                 onClick = onSendRequest,
                 enabled = requestStatus == null
             ) {
                 val icon = if (requestStatus == "pending") Icons.Default.HourglassEmpty else Icons.Default.PersonAdd
-                Icon(icon, contentDescription = null, tint = if (requestStatus == null) Color(0xFFEF3347) else Color.Gray)
+                Icon(icon, contentDescription = null, tint = if (requestStatus == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -662,7 +670,7 @@ fun IncomingRequestCard(request: FriendRequest, onCardClick: () -> Unit, onAccep
             .fillMaxWidth()
             .clickable { onCardClick() },
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Row(
@@ -672,15 +680,15 @@ fun IncomingRequestCard(request: FriendRequest, onCardClick: () -> Unit, onAccep
             UserAvatar(photoUrl = request.fromPhotoUrl)
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = request.fromDisplayName.ifBlank { request.fromEmail }, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(text = request.fromEmail, fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(text = request.fromDisplayName.ifBlank { request.fromEmail }, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
+                Text(text = request.fromEmail, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Row {
                 IconButton(onClick = onAccept) {
                     Icon(Icons.Default.Check, contentDescription = "Accept", tint = Color(0xFF4CAF50))
                 }
                 IconButton(onClick = onDecline) {
-                    Icon(Icons.Default.Close, contentDescription = "Decline", tint = Color.Red)
+                    Icon(Icons.Default.Close, contentDescription = "Decline", tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -694,7 +702,7 @@ fun OutgoingRequestCard(request: FriendRequest, onCardClick: () -> Unit, onCance
             .fillMaxWidth()
             .clickable { onCardClick() },
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Row(
@@ -704,11 +712,11 @@ fun OutgoingRequestCard(request: FriendRequest, onCardClick: () -> Unit, onCance
             UserAvatar(photoUrl = "")
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = request.toDisplayName.ifBlank { request.toEmail }, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(text = request.toEmail, fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(text = request.toDisplayName.ifBlank { request.toEmail }, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
+                Text(text = request.toEmail, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = onCancel) {
-                Icon(Icons.Default.Close, contentDescription = "Cancel Request", tint = Color.Red)
+                Icon(Icons.Default.Close, contentDescription = "Cancel Request", tint = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -723,16 +731,16 @@ fun UserAvatar(photoUrl: String) {
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape)
-                .background(Color.LightGray)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
         )
     } else {
         Box(
             modifier = Modifier
                 .size(48.dp)
-                .background(Color(0xFFEF3347).copy(alpha = 0.1f), CircleShape),
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFFEF3347))
+            Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         }
     }
 }

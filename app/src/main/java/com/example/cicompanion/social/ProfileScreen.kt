@@ -41,13 +41,11 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 
-private val BrandRed = Color(0xFFEF3347)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(navController: NavHostController, userId: String? = null) {
     var currentUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
-    
+
     // Immediately clear target user data when sign-out is detected
     val isOwnProfile = remember(userId, currentUser?.uid) {
         userId == null || (currentUser != null && userId == currentUser?.uid)
@@ -143,7 +141,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                     onSuccess = { mutualFriends = it },
                     onError = { mutualFriends = emptyList() }
                 )
-            } else {
+            } else if (currentUser != null) {
                 mutualFriends = emptyList()
 
                 SocialRepository.fetchNicknames(
@@ -154,18 +152,6 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                     onError = { /* Ignore */ }
                 )
             }
-        } else {
-            displayName = "Guest User"
-            email = "Sign in to sync your data"
-            photoUrl = null
-            bio = ""
-            major = ""
-            userNote = null
-            friendCount = 0
-            nickname = null
-            requestStatus = null
-            targetUserProfile = null
-            mutualFriends = emptyList()
         }
     }
 
@@ -176,13 +162,13 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
     }
 
     Scaffold(
-        containerColor = Color.White
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
-                .background(Color.White)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             // Increased space for the status bubble to breathe and avoid top screen elements
             Spacer(modifier = Modifier.height(24.dp))
@@ -202,7 +188,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
-                    .background(NavBackground.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
                     .padding(20.dp)
             )
 
@@ -229,7 +215,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 16.dp),
-                        color = Color.DarkGray,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
                         fontSize = 15.sp,
                         lineHeight = 20.sp
                     )
@@ -259,7 +245,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
                         FriendshipIndicator("You are Friends", Color(0xFF4CAF50), Icons.Default.CheckCircle)
                         Spacer(modifier = Modifier.height(8.dp))
                     } else if (requestStatus == "pending_received") {
-                        FriendshipIndicator("${targetUserProfile?.displayName ?: "This user"} sent you a friend request!", BrandRed, Icons.Default.PersonAdd)
+                        FriendshipIndicator("${targetUserProfile?.displayName ?: "This user"} sent you a friend request!", MaterialTheme.colorScheme.primary, Icons.Default.PersonAdd)
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
@@ -302,11 +288,7 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             onConfirm = { content, durationMs ->
                 val newNote = UserNote(
                     content = content,
-                    expiresAt = if (durationMs == -1L) {
-                        -1L
-                    } else {
-                        System.currentTimeMillis() + durationMs
-                    }
+                    expiresAt = if (durationMs == -1L) -1L else System.currentTimeMillis() + durationMs
                 )
                 SocialRepository.updateUserNote(
                     userId = currentUser!!.uid,
@@ -331,7 +313,6 @@ fun ProfileScreen(navController: NavHostController, userId: String? = null) {
             }
         )
     }
-
 }
 
 @Composable
@@ -386,8 +367,8 @@ fun MutualFriendsSection(mutualFriends: List<UserProfile>) {
                         .offset(x = (index * 16).dp)
                         .size(32.dp),
                     shape = CircleShape,
-                    border = BorderStroke(2.dp, Color.White),
-                    color = Color.LightGray
+                    border = BorderStroke(2.dp, MaterialTheme.colorScheme.surface),
+                    color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     if (friend.photoUrl.isNotBlank()) {
                         AsyncImage(
@@ -400,7 +381,7 @@ fun MutualFriendsSection(mutualFriends: List<UserProfile>) {
                             Icons.Default.Person,
                             contentDescription = null,
                             modifier = Modifier.padding(6.dp),
-                            tint = Color.Gray
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -422,7 +403,7 @@ fun MutualFriendsSection(mutualFriends: List<UserProfile>) {
         Text(
             text = text,
             fontSize = 13.sp,
-            color = Color.Gray,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             fontWeight = FontWeight.Medium,
             lineHeight = 16.sp
         )
@@ -462,7 +443,7 @@ fun ViewOnlyProfileActions(
 ) {
     val currentUser = FirebaseAuth.getInstance().currentUser
     var showRemoveDialog by remember { mutableStateOf(false) }
-    
+
     SectionLabel("Actions")
 
     if (targetUser != null && currentUser != null) {
@@ -479,7 +460,7 @@ fun ViewOnlyProfileActions(
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
                     Icon(Icons.Default.PersonAdd, contentDescription = null)
                     Spacer(Modifier.width(12.dp))
@@ -498,15 +479,15 @@ fun ViewOnlyProfileActions(
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null)
                     Spacer(Modifier.width(12.dp))
                     Text("Accept Friend Request", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
-                
+
                 Spacer(modifier = Modifier.height(12.dp))
-                
+
                 OutlinedButton(
                     onClick = {
                         val requestId = SocialRepository.createFriendRequestId(targetUser.uid, currentUser.uid)
@@ -519,8 +500,8 @@ fun ViewOnlyProfileActions(
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.5.dp, Color.Gray),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
                 ) {
                     Icon(Icons.Default.Close, contentDescription = null)
                     Spacer(Modifier.width(12.dp))
@@ -539,8 +520,8 @@ fun ViewOnlyProfileActions(
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.5.dp, BrandRed),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = BrandRed)
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null)
                     Spacer(Modifier.width(12.dp))
@@ -552,8 +533,8 @@ fun ViewOnlyProfileActions(
                     onClick = onNicknameClick,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.5.dp, Color.Gray),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null)
                     Spacer(Modifier.width(12.dp))
@@ -566,8 +547,8 @@ fun ViewOnlyProfileActions(
                     onClick = { showRemoveDialog = true },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.5.dp, Color.Gray),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
                 ) {
                     Icon(Icons.Default.Close, contentDescription = null)
                     Spacer(Modifier.width(12.dp))
@@ -583,8 +564,8 @@ fun ViewOnlyProfileActions(
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.5.dp, BrandRed),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = BrandRed)
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
                     Spacer(Modifier.width(12.dp))
@@ -597,8 +578,8 @@ fun ViewOnlyProfileActions(
     if (showRemoveDialog && targetUser != null && currentUser != null) {
         AlertDialog(
             onDismissRequest = { showRemoveDialog = false },
-            title = { Text("Remove ${SocialRepository.displayNameOrEmail(targetUser)}?") },
-            text = { Text("Do you really want to remove this person from your friends list?") },
+            title = { Text("Remove ${SocialRepository.displayNameOrEmail(targetUser)}?", color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text("Do you really want to remove this person from your friends list?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -612,14 +593,14 @@ fun ViewOnlyProfileActions(
                             onError = { showRemoveDialog = false }
                         )
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
                     Text("Remove")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showRemoveDialog = false }) {
-                    Text("Cancel", color = Color.Gray)
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )
@@ -628,7 +609,7 @@ fun ViewOnlyProfileActions(
     Spacer(modifier = Modifier.height(16.dp))
 
     TextButton(onClick = { navController.popBackStack() }) {
-        Text("Go Back", color = Color.Gray)
+        Text("Go Back", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -652,14 +633,12 @@ private fun ColumnScope.ProfileActionArea(
     onSignOut: () -> Unit,
     navController: NavHostController
 ) {
-    val showSettings = false // Toggle for edit profile and settings buttons
-
     if (currentUser == null) {
         Button(
             onClick = onSignIn,
             modifier = Modifier.fillMaxWidth().height(56.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
         ) {
             Icon(Icons.AutoMirrored.Filled.Login, contentDescription = null)
             Spacer(Modifier.width(12.dp))
@@ -674,7 +653,7 @@ private fun ColumnScope.ProfileActionArea(
             onClick = onViewFriendRequests,
             modifier = Modifier.fillMaxWidth().height(56.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = BrandRed)
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
         ) {
             Icon(Icons.Default.Group, contentDescription = null)
             Spacer(Modifier.width(12.dp))
@@ -689,33 +668,14 @@ private fun ColumnScope.ProfileActionArea(
             onClick = { navController.navigate(Routes.EDIT_PROFILE) },
             modifier = Modifier.fillMaxWidth().height(50.dp),
             shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, Color.LightGray),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
         ) {
             Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(12.dp))
             Text("Edit Profile", fontSize = 14.sp)
             Spacer(Modifier.weight(1f))
             Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
-        }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-        if (showSettings) {
-
-            OutlinedButton(
-                onClick = { /* Mockup Settings */ },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, Color.LightGray),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.DarkGray)
-            ) {
-                Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(12.dp))
-                Text("Settings", fontSize = 14.sp)
-                Spacer(Modifier.weight(1f))
-                Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
-            }
         }
         // --- END OF SOCIAL SECTION ---
 
@@ -726,9 +686,9 @@ private fun ColumnScope.ProfileActionArea(
             onClick = onSignOut,
             modifier = Modifier.padding(bottom = 16.dp)
         ) {
-            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Sign Out", color = Color.Gray, fontWeight = FontWeight.Medium)
+            Text("Sign Out", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
         }
     }
 }
@@ -739,7 +699,7 @@ fun SectionLabel(text: String) {
         text = text,
         modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
         style = MaterialTheme.typography.labelLarge,
-        color = Color.Gray,
+        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
         fontWeight = FontWeight.Bold
     )
 }
@@ -769,8 +729,8 @@ fun ProfileHeader(
                     modifier = Modifier
                         .size(80.dp)
                         .clip(CircleShape)
-                        .background(Color.White)
-                        .border(2.dp, Color.White, CircleShape),
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     if (photoUrl != null) {
@@ -800,7 +760,7 @@ fun ProfileHeader(
                     Text(
                         text = if (userNote != null && !userNote.isExpired()) "Edit Status" else "Add Status",
                         fontSize = 11.sp,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -814,18 +774,18 @@ fun ProfileHeader(
                 text = nickname ?: userDisplayName,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 22.sp,
-                color = Color.Black
+                color = MaterialTheme.colorScheme.onSurface
             )
             if (nickname != null) {
                 Text(
                     text = "($userDisplayName)",
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 14.sp
                 )
             }
             Text(
                 text = userEmail,
-                color = Color.DarkGray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 maxLines = 1
             )
@@ -834,7 +794,7 @@ fun ProfileHeader(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (showFriendCount) {
                     Surface(
-                        color = BrandRed.copy(alpha = 0.1f),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         val friendText = if (friendCount == 1) "1 Friend" else "$friendCount Friends"
@@ -843,7 +803,7 @@ fun ProfileHeader(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp,
-                            color = BrandRed
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -853,7 +813,7 @@ fun ProfileHeader(
                         Spacer(modifier = Modifier.width(8.dp))
                     }
                     Surface(
-                        color = BrandRed.copy(alpha = 0.1f),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
@@ -861,7 +821,7 @@ fun ProfileHeader(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp,
-                            color = BrandRed
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -876,7 +836,7 @@ fun DefaultAvatar() {
         imageVector = Icons.Default.Person,
         contentDescription = null,
         modifier = Modifier.size(40.dp),
-        tint = Color.LightGray
+        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
     )
 }
 

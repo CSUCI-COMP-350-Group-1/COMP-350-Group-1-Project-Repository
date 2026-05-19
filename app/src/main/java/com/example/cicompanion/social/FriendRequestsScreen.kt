@@ -213,7 +213,7 @@ private fun FriendRequestCard(
                     onClick = onDeclineRequest,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFFB0B0B0),
-                        contentColor = Color.White
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     )
                 ) {
                     Text("Decline")
@@ -224,7 +224,7 @@ private fun FriendRequestCard(
                 Button(onClick = onAcceptRequest,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xff49c46a),
-                        contentColor = Color.White
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     )
                     ) {
                     Text("Accept")
@@ -249,7 +249,7 @@ private fun IncomingRequestSummary(request: FriendRequest) {
             Text(
                 text = request.fromEmail,
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

@@ -18,7 +18,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.example.cicompanion.appNavigation.screenTitleForRoute
 import com.example.cicompanion.ui.Routes
-import com.example.cicompanion.ui.theme.AppBackground
 import com.example.cicompanion.ui.theme.CICompanionTheme
 import androidx.core.net.toUri
 
@@ -99,7 +98,7 @@ fun SearchScreen(navController: NavHostController) {
     }
 
     Scaffold(
-        containerColor = AppBackground
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -116,7 +115,11 @@ fun SearchScreen(navController: NavHostController) {
                 shape = RoundedCornerShape(8.dp),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             )
 
@@ -144,7 +147,7 @@ fun SearchScreen(navController: NavHostController) {
                             }
                         }
                     }
-                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
         }
@@ -155,12 +158,16 @@ fun SearchScreen(navController: NavHostController) {
 fun SearchResultItem(feature: AppFeature, onClick: () -> Unit) {
     ListItem(
         headlineContent = {
-            Text(text = feature.name, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = feature.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         },
         supportingContent = {
             Text(
                 text = feature.path,
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall
             )
         },

@@ -12,6 +12,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -49,9 +50,7 @@ import com.example.cicompanion.calendar.CalendarViewModel
 import com.example.cicompanion.calendar.model.CalendarEvent
 import com.example.cicompanion.social.FirestoreManager
 import com.example.cicompanion.ui.Routes
-import com.example.cicompanion.ui.theme.AppBackground
-import com.example.cicompanion.ui.theme.BrandOrange
-import com.example.cicompanion.ui.theme.CoralRed
+import com.example.cicompanion.ui.theme.*
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -85,75 +84,96 @@ private val MAP_STYLE_JSON = """
     ]
 """.trimIndent()
 
+private val DARK_MAP_STYLE_JSON = """
+[
+  { "elementType": "geometry", "stylers": [ { "color": "#000000" } ] },
+  { "elementType": "labels.text.fill", "stylers": [ { "color": "#746855" } ] },
+  { "elementType": "labels.text.stroke", "stylers": [ { "color": "#242f3e" } ] },
+  { "featureType": "administrative.locality", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] },
+  { "featureType": "poi", "stylers": [ { "visibility": "off" } ] },
+  { "featureType": "road", "elementType": "geometry", "stylers": [ { "color": "#38414e" } ] },
+  { "featureType": "road", "elementType": "geometry.stroke", "stylers": [ { "color": "#212a37" } ] },
+  { "featureType": "road", "elementType": "labels.text.fill", "stylers": [ { "color": "#9ca5b3" } ] },
+  { "featureType": "road.highway", "elementType": "geometry", "stylers": [ { "color": "#746855" } ] },
+  { "featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [ { "color": "#1f2835" } ] },
+  { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [ { "color": "#f3d19c" } ] },
+  { "featureType": "transit", "elementType": "geometry", "stylers": [ { "color": "#2f3948" } ] },
+  { "featureType": "transit.station", "elementType": "labels.text.fill", "stylers": [ { "color": "#d59563" } ] },
+  { "featureType": "water", "elementType": "geometry", "stylers": [ { "color": "#17263c" } ] },
+  { "featureType": "water", "elementType": "labels.text.fill", "stylers": [ { "color": "#515c6d" } ] },
+  { "featureType": "water", "elementType": "labels.text.stroke", "stylers": [ { "color": "#17263c" } ] }
+]
+""".trimIndent()
+
 val campusLocations = listOf(
-    CampusLocation(id = "loc_bell_tower", name = "Bell Tower", position = LatLng(34.16138604361421, -119.0432651672823), description = "Center of Campus", type = LocationType.BUILDING, icon = Icons.Default.Business, color = Color(0xFFD32F2F)),
-    CampusLocation(id = "loc_bell_tower_east", name = "Bell Tower East", position = LatLng(34.16134665298329, -119.04189180309578), description = "", type = LocationType.BUILDING, icon = Icons.Default.Business, color = Color(0xFFD32F2F), searchKeywords = listOf("BTE")),
-    CampusLocation(id = "loc_bell_tower_west", name = "Bell Tower West", position = LatLng(34.16070116130278, -119.04439859472768), description = "", type = LocationType.BUILDING, icon = Icons.Default.Business, color = Color(0xFFD32F2F), searchKeywords = listOf("BTW")),
-    CampusLocation(id = "loc_library", name = "John Spoor Broome Library", position = LatLng(34.16269668565898, -119.04094849136715), description = "Main Library", type = LocationType.BUILDING, icon = Icons.AutoMirrored.Filled.MenuBook, color = Color(0xFF388E3C), searchKeywords = listOf("Broome Library", "Library", "JSB")),
-    CampusLocation(id = "loc_union", name = "Student Union", position = LatLng(34.1610, -119.0436), description = "Dining and Lounge", type = LocationType.BUILDING, icon = Icons.Default.Groups, color = Color(0xFF388E3C), searchKeywords = listOf("SUB", "Union")),
-    CampusLocation(id = "loc_marin", name = "Marin Hall", position = LatLng(34.164528096869034, -119.04507117740494), description = "Faculty Offices for Mathematics and Data Science", type = LocationType.BUILDING, icon = Icons.Default.Business, color = Color(0xFFD32F2F), searchKeywords = listOf("Marin")),
-    CampusLocation(id = "loc_shasta", name = "Shasta Hall", position = LatLng(34.164576865185516, -119.04472618829523), description = "Faculty Offices for Computer Science and Engineering", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Shasta")),
-    CampusLocation(id = "loc_gateway", name = "Gateway Hall", position = LatLng(34.16483652693463, -119.04547452459948), description = "Large building with classrooms and study rooms", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Gateway")),
-    CampusLocation(id = "loc_napa", name = "Napa Hall", position = LatLng(34.16377605025435, -119.04540741204008), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Napa")),
-    CampusLocation(id = "loc_solano", name = "Solano Hall", position = LatLng(34.16340620613301, -119.0450085042822), description = "Offices for faculty, Division of Technology and Innovation", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Solano")),
-    CampusLocation(id = "loc_mvs", name = "Martin V. Smith Hall", position = LatLng(34.162909062826785, -119.04476226672068), description = "Houses Nursing Program", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("MVS", "Smith Hall")),
-    CampusLocation(id = "loc_sierra", name = "Sierra Hall", position = LatLng(34.16229510038971, -119.04461124101422), description = "Multimode lecture halls, classrooms and faculty offices.", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Sierra")),
-    CampusLocation(id = "loc_del_norte", name = "Del Norte Hall", position = LatLng(34.163180726190696, -119.04410235004629), description = "Lecture classrooms", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Del Norte")),
-    CampusLocation(id = "loc_madera", name = "Madera Hall", position = LatLng(34.1629335125641, -119.04394147483745), description = "Lecture classrooms", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Madera")),
-    CampusLocation(id = "loc_placer", name = "Placer Hall", position = LatLng(34.163344972360754, -119.04300312204607), description = "Offices of University Police and Parking Services", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Placer")),
-    CampusLocation(id = "loc_rush", name = "Richard R. Rush Hall", position = LatLng(34.162673963555044, -119.04342008432133), description = "Houses the University President and administration.", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Rush", "Rush Hall")),
-    CampusLocation(id = "loc_chaparral", name = "Chaparral Hall", position = LatLng(34.162096255189496, -119.04560917381353), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Chaparral")),
-    CampusLocation(id = "loc_ironwood", name = "Ironwood Hall", position = LatLng(34.16245544107054, -119.04645265103974), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Ironwood")),
-    CampusLocation(id = "loc_el_dorado", name = "El Dorado Hall", position = LatLng(34.16423447296913, -119.04710369220899), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("El Dorado")),
-    CampusLocation(id = "loc_aliso", name = "Aliso Hall", position = LatLng(34.16133147263596, -119.04535150727516), description = "8 Science Labs and 16 Faculty Offices", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Aliso")),
-    CampusLocation(id = "loc_yuba", name = "Yuba Hall", position = LatLng(34.16407767205871, -119.04109248173509), description = "Houses the Student Health Center", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Yuba")),
-    CampusLocation(id = "loc_sage", name = "Sage Hall", position = LatLng(34.164167218645936, -119.04222881533492), description = "The Enrollment Center.", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFF388E3C), searchKeywords = listOf("Sage")),
-    CampusLocation(id = "loc_malibu", name = "Malibu Hall", position = LatLng(34.16126160533967, -119.04086506383092), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFF388E3C), searchKeywords = listOf("Malibu")),
-    CampusLocation(id = "loc_topanga", name = "Topanga Hall", position = LatLng(34.16019137315942, -119.04169333763335), description = "Art Program facilities and labs.", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Topanga")),
-    CampusLocation(id = "loc_arroyo", name = "Arroyo Hall", position = LatLng(34.160354318454424, -119.04489629947327), description = "Wellness and Athletics Office. Recreation Center.", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFF388E3C), searchKeywords = listOf("Arroyo")),
-    CampusLocation(id = "loc_trinity", name = "Trinity Hall", position = LatLng(34.15934671289535, -119.0423644726643), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Trinity")),
-    CampusLocation(id = "loc_lindero", name = "Lindero Hall", position = LatLng(34.15956619235504, -119.04141202350661), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Lindero")),
-    CampusLocation(id = "loc_ojai", name = "Ojai Hall", position = LatLng(34.16173923354911, -119.04257933412188), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = Color(0xFFD32F2F), searchKeywords = listOf("Ojai")),
+    CampusLocation(id = "loc_bell_tower", name = "Bell Tower", position = LatLng(34.16138604361421, -119.0432651672823), description = "Center of Campus", type = LocationType.BUILDING, icon = Icons.Default.Business, color = MapBuildingRed),
+    CampusLocation(id = "loc_bell_tower_east", name = "Bell Tower East", position = LatLng(34.16134665298329, -119.04189180309578), description = "", type = LocationType.BUILDING, icon = Icons.Default.Business, color = MapBuildingRed, searchKeywords = listOf("BTE")),
+    CampusLocation(id = "loc_bell_tower_west", name = "Bell Tower West", position = LatLng(34.16070116130278, -119.04439859472768), description = "", type = LocationType.BUILDING, icon = Icons.Default.Business, color = MapBuildingRed, searchKeywords = listOf("BTW")),
+    CampusLocation(id = "loc_library", name = "John Spoor Broome Library", position = LatLng(34.16269668565898, -119.04094849136715), description = "Main Library", type = LocationType.BUILDING, icon = Icons.AutoMirrored.Filled.MenuBook, color = MapLibraryGreen, searchKeywords = listOf("Broome Library", "Library", "JSB")),
+    CampusLocation(id = "loc_union", name = "Student Union", position = LatLng(34.1610, -119.0436), description = "Dining and Lounge", type = LocationType.BUILDING, icon = Icons.Default.Groups, color = MapLibraryGreen, searchKeywords = listOf("SUB", "Union")),
+    CampusLocation(id = "loc_marin", name = "Marin Hall", position = LatLng(34.164528096869034, -119.04507117740494), description = "Faculty Offices for Mathematics and Data Science", type = LocationType.BUILDING, icon = Icons.Default.Business, color = MapBuildingRed, searchKeywords = listOf("Marin")),
+    CampusLocation(id = "loc_shasta", name = "Shasta Hall", position = LatLng(34.164576865185516, -119.04472618829523), description = "Faculty Offices for Computer Science and Engineering", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Shasta")),
+    CampusLocation(id = "loc_gateway", name = "Gateway Hall", position = LatLng(34.16483652693463, -119.04547452459948), description = "Large building with classrooms and study rooms", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Gateway")),
+    CampusLocation(id = "loc_napa", name = "Napa Hall", position = LatLng(34.16377605025435, -119.04540741204008), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Napa")),
+    CampusLocation(id = "loc_solano", name = "Solano Hall", position = LatLng(34.16340620613301, -119.0450085042822), description = "Offices for faculty, Division of Technology and Innovation", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Solano")),
+    CampusLocation(id = "loc_mvs", name = "Martin V. Smith Hall", position = LatLng(34.162909062826785, -119.04476226672068), description = "Houses Nursing Program", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("MVS", "Smith Hall")),
+    CampusLocation(id = "loc_sierra", name = "Sierra Hall", position = LatLng(34.16229510038971, -119.04461124101422), description = "Multimode lecture halls, classrooms and faculty offices.", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Sierra")),
+    CampusLocation(id = "loc_del_norte", name = "Del Norte Hall", position = LatLng(34.163180726190696, -119.04410235004629), description = "Lecture classrooms", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Del Norte")),
+    CampusLocation(id = "loc_madera", name = "Madera Hall", position = LatLng(34.1629335125641, -119.04394147483745), description = "Lecture classrooms", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Madera")),
+    CampusLocation(id = "loc_placer", name = "Placer Hall", position = LatLng(34.163344972360754, -119.04300312204607), description = "Offices of University Police and Parking Services", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Placer")),
+    CampusLocation(id = "loc_rush", name = "Richard R. Rush Hall", position = LatLng(34.162673963555044, -119.04342008432133), description = "Houses the University President and administration.", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Rush", "Rush Hall")),
+    CampusLocation(id = "loc_chaparral", name = "Chaparral Hall", position = LatLng(34.162096255189496, -119.04560917381353), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Chaparral")),
+    CampusLocation(id = "loc_ironwood", name = "Ironwood Hall", position = LatLng(34.16245544107054, -119.04645265103974), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Ironwood")),
+    CampusLocation(id = "loc_el_dorado", name = "El Dorado Hall", position = LatLng(34.16423447296913, -119.04710369220899), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("El Dorado")),
+    CampusLocation(id = "loc_aliso", name = "Aliso Hall", position = LatLng(34.16133147263596, -119.04535150727516), description = "8 Science Labs and 16 Faculty Offices", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Aliso")),
+    CampusLocation(id = "loc_yuba", name = "Yuba Hall", position = LatLng(34.16407767205871, -119.04109248173509), description = "Houses the Student Health Center", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Yuba")),
+    CampusLocation(id = "loc_sage", name = "Sage Hall", position = LatLng(34.164167218645936, -119.04222881533492), description = "The Enrollment Center.", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapLibraryGreen, searchKeywords = listOf("Sage")),
+    CampusLocation(id = "loc_malibu", name = "Malibu Hall", position = LatLng(34.16126160533967, -119.04086506383092), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapLibraryGreen, searchKeywords = listOf("Malibu")),
+    CampusLocation(id = "loc_topanga", name = "Topanga Hall", position = LatLng(34.16019137315942, -119.04169333763335), description = "Art Program facilities and labs.", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Topanga")),
+    CampusLocation(id = "loc_arroyo", name = "Arroyo Hall", position = LatLng(34.160354318454424, -119.04489629947327), description = "Wellness and Athletics Office. Recreation Center.", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapLibraryGreen, searchKeywords = listOf("Arroyo")),
+    CampusLocation(id = "loc_trinity", name = "Trinity Hall", position = LatLng(34.15934671289535, -119.0423644726643), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Trinity")),
+    CampusLocation(id = "loc_lindero", name = "Lindero Hall", position = LatLng(34.15956619235504, -119.04141202350661), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Lindero")),
+    CampusLocation(id = "loc_ojai", name = "Ojai Hall", position = LatLng(34.16173923354911, -119.04257933412188), description = "", type = LocationType.BUILDING, icon = Icons.Default.School, color = MapBuildingRed, searchKeywords = listOf("Ojai")),
 
     // Food category
-    CampusLocation(id = "food_islands", name = "Islands Cafe", position = LatLng(34.16046259918211, -119.04156950739008), description = "Dining commons for students and employees.", type = LocationType.FOOD, icon = Icons.Default.Restaurant, color = Color(0xFFFF9800), searchKeywords = listOf("Islands")),
-    CampusLocation(id = "food_coastal", name = "Coastal Cup", position = LatLng(34.16517607999232, -119.04492439787398), description = "A coffee shop inside Gateway Hall.", type = LocationType.FOOD, icon = Icons.Default.Restaurant, color = Color(0xFFFF9800), searchKeywords = listOf("Coastal")),
-    CampusLocation(id = "food_mom_wong", name = "Mom Wong Kitchen", position = LatLng(34.162865389467136, -119.03934866185736), description = "Camarillo\u2019s Premier Chinese Restaurant", type = LocationType.FOOD, icon = Icons.Default.Restaurant, color = Color(0xFFFF9800), searchKeywords = listOf("Mom Wong")),
-    CampusLocation(id = "food_tortillas", name = "Tortillas Grill", position = LatLng(34.16304512832548, -119.03936598760045), description = "Mexican Food", type = LocationType.FOOD, icon = Icons.Default.Restaurant, color = Color(0xFFFF9800), searchKeywords = listOf("Tortillas")),
+    CampusLocation(id = "food_islands", name = "Islands Cafe", position = LatLng(34.16046259918211, -119.04156950739008), description = "Dining commons for students and employees.", type = LocationType.FOOD, icon = Icons.Default.Restaurant, color = MapFoodOrange, searchKeywords = listOf("Islands")),
+    CampusLocation(id = "food_coastal", name = "Coastal Cup", position = LatLng(34.16517607999232, -119.04492439787398), description = "A coffee shop inside Gateway Hall.", type = LocationType.FOOD, icon = Icons.Default.Restaurant, color = MapFoodOrange, searchKeywords = listOf("Coastal")),
+    CampusLocation(id = "food_mom_wong", name = "Mom Wong Kitchen", position = LatLng(34.162865389467136, -119.03934866185736), description = "Camarillo\u2019s Premier Chinese Restaurant", type = LocationType.FOOD, icon = Icons.Default.Restaurant, color = MapFoodOrange, searchKeywords = listOf("Mom Wong")),
+    CampusLocation(id = "food_tortillas", name = "Tortillas Grill", position = LatLng(34.16304512832548, -119.03936598760045), description = "Mexican Food", type = LocationType.FOOD, icon = Icons.Default.Restaurant, color = MapFoodOrange, searchKeywords = listOf("Tortillas")),
 
     // Areas category
-    CampusLocation(id = "area_north_quad", name = "North Quad", position = LatLng(34.163869256675795, -119.04439875392643), description = "", type = LocationType.AREA, icon = Icons.Default.People, color = Color(0xFF9C27B0)),
-    CampusLocation(id = "area_north_field", name = "North Field", position = LatLng(34.167561045970785, -119.04526582938406), description = "", type = LocationType.AREA, icon = Icons.Default.Park, color = Color(0xFF9C27B0)),
-    CampusLocation(id = "area_central_mall", name = "Central Mall", position = LatLng(34.16182005886744, -119.04344776363348), description = "", type = LocationType.AREA, icon = Icons.Default.People, color = Color(0xFF9C27B0)),
-    CampusLocation(id = "area_potrero", name = "Potrero Fields", position = LatLng(34.159887809784415, -119.04743204832411), description = "", type = LocationType.AREA, icon = Icons.Default.Park, color = Color(0xFF9C27B0)),
-    CampusLocation(id = "area_south_quad", name = "South Quad", position = LatLng(34.160229605621325, -119.04270063156984), description = "", type = LocationType.AREA, icon = Icons.Default.People, color = Color(0xFF9C27B0)),
+    CampusLocation(id = "area_north_quad", name = "North Quad", position = LatLng(34.163869256675795, -119.04439875392643), description = "", type = LocationType.AREA, icon = Icons.Default.People, color = MapAreaPurple),
+    CampusLocation(id = "area_north_field", name = "North Field", position = LatLng(34.167561045970785, -119.04526582938406), description = "", type = LocationType.AREA, icon = Icons.Default.Park, color = MapAreaPurple),
+    CampusLocation(id = "area_central_mall", name = "Central Mall", position = LatLng(34.16182005886744, -119.04344776363348), description = "", type = LocationType.AREA, icon = Icons.Default.People, color = MapAreaPurple),
+    CampusLocation(id = "area_potrero", name = "Potrero Fields", position = LatLng(34.159887809784415, -119.04743204832411), description = "", type = LocationType.AREA, icon = Icons.Default.Park, color = MapAreaPurple),
+    CampusLocation(id = "area_south_quad", name = "South Quad", position = LatLng(34.160229605621325, -119.04270063156984), description = "", type = LocationType.AREA, icon = Icons.Default.People, color = MapAreaPurple),
 
     // Housing category
-    CampusLocation(id = "house_sc_v", name = "Santa Cruz Village", position = LatLng(34.15909088586997, -119.04255249590989), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000), searchKeywords = listOf("Santa Cruz")),
-    CampusLocation(id = "house_sc_d", name = "Santa Cruz Village D", position = LatLng(34.16012344365498, -119.04398722341813), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
-    CampusLocation(id = "house_sc_e", name = "Santa Cruz Village E", position = LatLng(34.15991620770629, -119.04397330984331), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
-    CampusLocation(id = "house_sc_f", name = "Santa Cruz Village F", position = LatLng(34.1597406324177, -119.04394896107382), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
-    CampusLocation(id = "house_sc_g", name = "Santa Cruz Village G", position = LatLng(34.15951036919081, -119.04383417401763), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
-    CampusLocation(id = "house_sc_h", name = "Santa Cruz Village H", position = LatLng(34.1592628355215, -119.04385504439146), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
-    CampusLocation(id = "house_anacapa_a", name = "Anacapa Village A", position = LatLng(34.15935494115949, -119.04437332533838), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000), searchKeywords = listOf("Anacapa")),
-    CampusLocation(id = "house_anacapa_b", name = "Anacapa Village B", position = LatLng(34.1597665369933, -119.04473507848517), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
-    CampusLocation(id = "house_anacapa_c", name = "Anacapa Village C", position = LatLng(34.15958520481026, -119.04532292734869), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
-    CampusLocation(id = "house_anacapa_com", name = "Anacapa Village Commons Building", position = LatLng(34.159208147754384, -119.04492291184982), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = Color(0xFF800000)),
+    CampusLocation(id = "house_sc_v", name = "Santa Cruz Village", position = LatLng(34.15909088586997, -119.04255249590989), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = MapHousingMaroon, searchKeywords = listOf("Santa Cruz")),
+    CampusLocation(id = "house_sc_d", name = "Santa Cruz Village D", position = LatLng(34.16012344365498, -119.04398722341813), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = MapHousingMaroon),
+    CampusLocation(id = "house_sc_e", name = "Santa Cruz Village E", position = LatLng(34.15991620770629, -119.04397330984331), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = MapHousingMaroon),
+    CampusLocation(id = "house_sc_f", name = "Santa Cruz Village F", position = LatLng(34.1597406324177, -119.04394896107382), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = MapHousingMaroon),
+    CampusLocation(id = "house_sc_g", name = "Santa Cruz Village G", position = LatLng(34.15951036919081, -119.04383417401763), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = MapHousingMaroon),
+    CampusLocation(id = "house_sc_h", name = "Santa Cruz Village H", position = LatLng(34.1592628355215, -119.04385504439146), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = MapHousingMaroon),
+    CampusLocation(id = "house_anacapa_a", name = "Anacapa Village A", position = LatLng(34.15935494115949, -119.04437332533838), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = MapHousingMaroon, searchKeywords = listOf("Anacapa")),
+    CampusLocation(id = "house_anacapa_b", name = "Anacapa Village B", position = LatLng(34.1597665369933, -119.04473507848517), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = MapHousingMaroon),
+    CampusLocation(id = "house_anacapa_c", name = "Anacapa Village C", position = LatLng(34.15958520481026, -119.04532292734869), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = MapHousingMaroon),
+    CampusLocation(id = "house_anacapa_com", name = "Anacapa Village Commons Building", position = LatLng(34.159208147754384, -119.04492291184982), description = "", type = LocationType.HOUSING, icon = Icons.Default.Home, color = MapHousingMaroon),
 
     // Parking Lots
-    CampusLocation(id = "park_a3", name = "Parking Lot A3", position = LatLng(34.166606172710715, -119.04703678095836), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2), searchKeywords = listOf("A3")),
-    CampusLocation(id = "park_a4", name = "Parking Lot A4", position = LatLng(34.164244290933254, -119.04646170905023), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2), searchKeywords = listOf("A4")),
-    CampusLocation(id = "park_a11", name = "Parking Lot A11", position = LatLng(34.164126287402695, -119.04786350249398), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2), searchKeywords = listOf("A11")),
-    CampusLocation(id = "park_a2", name = "Parking Lot A2", position = LatLng(34.164108680933254, -119.04164009131796), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2), searchKeywords = listOf("A2")),
-    CampusLocation(id = "park_a6", name = "Parking Lot A6", position = LatLng(34.16325952040607, -119.04202460036679), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2), searchKeywords = listOf("A6")),
-    CampusLocation(id = "park_a1", name = "Parking Lot A1", position = LatLng(34.163586436668446, -119.04267748158364), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2), searchKeywords = listOf("A1")),
-    CampusLocation(id = "park_a8", name = "Parking Lot A8", position = LatLng(34.16309446392495, -119.04030380989158), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2), searchKeywords = listOf("A8")),
-    CampusLocation(id = "park_ae", name = "Parking Lot A/E", position = LatLng(34.16186741815617, -119.04156570455609), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2), searchKeywords = listOf("A/E")),
-    CampusLocation(id = "park_a7", name = "Parking Lot A7", position = LatLng(34.160649977624885, -119.04118719083276), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2), searchKeywords = listOf("A7")),
-    CampusLocation(id = "park_a10", name = "Parking Lot A10", position = LatLng(34.15940842843663, -119.04062564402817), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2), searchKeywords = listOf("A10")),
-    CampusLocation(id = "park_sh1", name = "Parking Lot SH1", position = LatLng(34.15912561853075, -119.04537811915849), description = SH_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF00BCD4), searchKeywords = listOf("SH1")),
-    CampusLocation(id = "park_r1", name = "Parking Lot R1", position = LatLng(34.1630169076814, -119.04316226033373), description = RESTRICTED_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF673AB7), searchKeywords = listOf("R1")),
-    CampusLocation(id = "park_a5", name = "Parking Lot A5", position = LatLng(34.16050864644475, -119.04463491964691), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = Color(0xFF1976D2), searchKeywords = listOf("A5"))
+    CampusLocation(id = "park_a3", name = "Parking Lot A3", position = LatLng(34.166606172710715, -119.04703678095836), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = MapParkingBlue, searchKeywords = listOf("A3")),
+    CampusLocation(id = "park_a4", name = "Parking Lot A4", position = LatLng(34.164244290933254, -119.04646170905023), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = MapParkingBlue, searchKeywords = listOf("A4")),
+    CampusLocation(id = "park_a11", name = "Parking Lot A11", position = LatLng(34.164126287402695, -119.04786350249398), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = MapParkingBlue, searchKeywords = listOf("A11")),
+    CampusLocation(id = "park_a2", name = "Parking Lot A2", position = LatLng(34.164108680933254, -119.04164009131796), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = MapParkingBlue, searchKeywords = listOf("A2")),
+    CampusLocation(id = "park_a6", name = "Parking Lot A6", position = LatLng(34.16325952040607, -119.04202460036679), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = MapParkingBlue, searchKeywords = listOf("A6")),
+    CampusLocation(id = "park_a1", name = "Parking Lot A1", position = LatLng(34.163586436668446, -119.04267748158364), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = MapParkingBlue, searchKeywords = listOf("A1")),
+    CampusLocation(id = "park_a8", name = "Parking Lot A8", position = LatLng(34.16309446392495, -119.04030380989158), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = MapParkingBlue, searchKeywords = listOf("A8")),
+    CampusLocation(id = "park_ae", name = "Parking Lot A/E", position = LatLng(34.16186741815617, -119.04156570455609), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = MapParkingBlue, searchKeywords = listOf("A/E")),
+    CampusLocation(id = "park_a7", name = "Parking Lot A7", position = LatLng(34.160649977624885, -119.04118719083276), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = MapParkingBlue, searchKeywords = listOf("A7")),
+    CampusLocation(id = "park_a10", name = "Parking Lot A10", position = LatLng(34.15940842843663, -119.04062564402817), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = MapParkingBlue, searchKeywords = listOf("A10")),
+    CampusLocation(id = "park_sh1", name = "Parking Lot SH1", position = LatLng(34.15912561853075, -119.04537811915849), description = SH_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = MapParkingCyan, searchKeywords = listOf("SH1")),
+    CampusLocation(id = "park_r1", name = "Parking Lot R1", position = LatLng(34.1630169076814, -119.04316226033373), description = RESTRICTED_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = MapParkingDeepPurple, searchKeywords = listOf("R1")),
+    CampusLocation(id = "park_a5", name = "Parking Lot A5", position = LatLng(34.16050864644475, -119.04463491964691), description = GENERAL_PARKING_DESC, type = LocationType.PARKING, icon = Icons.Default.LocalParking, color = MapParkingBlue, searchKeywords = listOf("A5"))
 )
 
 /**
@@ -311,6 +331,7 @@ fun MapScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             if (!mapViewModel.isPinMode) {
                 MapTopControls(
@@ -412,7 +433,7 @@ fun MapScreen(
                 ModalBottomSheet(
                     onDismissRequest = { showDetailsSheet = false },
                     sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                    containerColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.surface
                 ) {
                     LocationDetailsContent(
                         location = location,
@@ -466,8 +487,8 @@ fun MapScreen(
             if (showDeleteConfirmation && selectedLocation != null) {
                 AlertDialog(
                     onDismissRequest = { showDeleteConfirmation = false },
-                    title = { Text("Delete Custom Pin", fontWeight = FontWeight.Bold) },
-                    text = { Text("Are you sure you want to remove '${selectedLocation!!.name}' from your map? This action cannot be undone.") },
+                    title = { Text("Delete Custom Pin", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                    text = { Text("Are you sure you want to remove '${selectedLocation!!.name}' from your map? This action cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     confirmButton = {
                         Button(
                             onClick = {
@@ -479,16 +500,17 @@ fun MapScreen(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = CoralRed)
                         ) {
-                            Text("Delete", color = Color.White)
+                            Text("Delete", color = MaterialTheme.colorScheme.onSurface)
                         }
                     },
                     dismissButton = {
                         TextButton(
                             onClick = { showDeleteConfirmation = false }
                         ) {
-                            Text("Cancel", color = Color.Gray)
+                            Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                    }
+                    },
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             }
 
@@ -541,7 +563,7 @@ fun EventSelectionDialog(
                 .fillMaxWidth()
                 .padding(16.dp),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             @Suppress("DEPRECATION")
             Column(
@@ -554,7 +576,7 @@ fun EventSelectionDialog(
                     "Link an Event",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = CoralRed
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(Modifier.height(16.dp))
 
@@ -562,12 +584,12 @@ fun EventSelectionDialog(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     placeholder = { Text("Search your events...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = CoralRed,
-                        unfocusedBorderColor = Color.LightGray
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
                     ),
                     singleLine = true
                 )
@@ -583,25 +605,25 @@ fun EventSelectionDialog(
                         Surface(
                             onClick = { onConfirm(null) },
                             modifier = Modifier.fillMaxWidth(),
-                            color = if (currentEventId == null) CoralRed.copy(alpha = 0.1f) else Color.Transparent,
+                            color = if (currentEventId == null) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent,
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Row(
                                 modifier = Modifier.padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.LinkOff, contentDescription = null, tint = Color.Gray)
+                                Icon(Icons.Default.LinkOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.width(12.dp))
-                                Text("None (Unlink Event)", fontWeight = FontWeight.Medium)
+                                Text("None (Unlink Event)", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
                             }
                         }
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color.LightGray.copy(alpha = 0.3f))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                     }
 
                     if (filteredEvents.isEmpty()) {
                         item {
                             Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                                Text("No events found.", color = Color.Gray)
+                                Text("No events found.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     } else {
@@ -610,18 +632,18 @@ fun EventSelectionDialog(
                             Surface(
                                 onClick = { onConfirm(event.id) },
                                 modifier = Modifier.fillMaxWidth(),
-                                color = if (isSelected) CoralRed.copy(alpha = 0.1f) else Color.Transparent,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent,
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(12.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Event, contentDescription = null, tint = if (isSelected) CoralRed else Color.Gray)
+                                    Icon(Icons.Default.Event, contentDescription = null, tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                                     Spacer(Modifier.width(12.dp))
                                     Column {
-                                        Text(event.title, fontWeight = FontWeight.Bold, color = if (isSelected) CoralRed else Color.Black)
-                                        Text(event.timeLabel(), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                        Text(event.title, fontWeight = FontWeight.Bold, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                                        Text(event.timeLabel(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
                             }
@@ -633,8 +655,7 @@ fun EventSelectionDialog(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     @Suppress("DEPRECATION")
                     TextButton(onClick = onDismiss) {
-                        @Suppress("DEPRECATION")
-                        Text("Cancel", color = Color.Gray)
+                        Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -655,11 +676,11 @@ fun PinCreationDialog(
     var selectedEventId by remember { mutableStateOf<String?>(editingPin?.associatedEventId) }
     var showEventPicker by remember { mutableStateOf(false) }
 
-    val colors = listOf(CoralRed, Color(0xFF9C27B0), Color(0xFF2196F3), Color(0xFF4CAF50), Color(0xFFFF9800))
+    val colors = listOf(CoralRed, MapAreaPurple, MapParkingBlue, MapLibraryGreen, MapFoodOrange)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (editingPin != null) "Edit Custom Pin" else "Create Custom Pin", fontWeight = FontWeight.Bold, color = CoralRed) },
+        title = { Text(if (editingPin != null) "Edit Custom Pin" else "Create Custom Pin", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(
@@ -668,7 +689,10 @@ fun PinCreationDialog(
                     label = { Text("Name") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CoralRed, focusedLabelColor = CoralRed)
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary
+                    )
                 )
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
@@ -677,25 +701,28 @@ fun PinCreationDialog(
                     label = { Text("Description") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = CoralRed, focusedLabelColor = CoralRed)
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary
+                    )
                 )
                 Spacer(Modifier.height(16.dp))
 
-                Text("Pick a Color", style = MaterialTheme.typography.labelLarge)
+                Text("Pick a Color", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                     colors.forEach { color ->
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
                                 .background(color, CircleShape)
-                                .border(if (selectedColor == color) 2.dp else 0.dp, Color.Black, CircleShape)
+                                .border(if (selectedColor == color) 2.dp else 0.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
                                 .clickable { selectedColor = color }
                         )
                     }
                 }
 
                 Spacer(Modifier.height(24.dp))
-                Text("Linked Event", style = MaterialTheme.typography.labelLarge)
+                Text("Linked Event", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(8.dp))
 
                 val selectedEvent = customEvents.find { it.id == selectedEventId }
@@ -703,25 +730,24 @@ fun PinCreationDialog(
                     onClick = { showEventPicker = true },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color.LightGray),
-                    color = Color(0xFFF8F8F8)
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                        verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = if (selectedEvent != null) Icons.Default.Event else Icons.Default.LinkOff,
                             contentDescription = null,
-                            tint = if (selectedEvent != null) CoralRed else Color.Gray
+                            tint = if (selectedEvent != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(Modifier.width(12.dp))
                         Text(
                             text = selectedEvent?.title ?: "No event linked (Tap to select)",
-                            color = if (selectedEvent != null) Color.Black else Color.Gray,
+                            color = if (selectedEvent != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.weight(1f)
                         )
-                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -730,17 +756,20 @@ fun PinCreationDialog(
             Button(
                 onClick = { onConfirm(name, description, selectedColor, selectedEventId) },
                 enabled = name.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                @Suppress("DEPRECATION")
-                Text(if (editingPin != null) "Save Changes" else "Confirm")
+                Text(if (editingPin != null) "Save Changes" else "Confirm", color = MaterialTheme.colorScheme.onPrimary)
             }
         },
         dismissButton = {
             @Suppress("DEPRECATION")
-            TextButton(onClick = onDismiss) { @Suppress("DEPRECATION") Text("Cancel", color = Color.Gray) }
-        }
+            TextButton(onClick = onDismiss) {
+                @Suppress("DEPRECATION")
+                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surface
     )
 
     if (showEventPicker) {
@@ -797,35 +826,28 @@ fun LocationDetailsContent(
                     text = location.name,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 @Suppress("DEPRECATION")
                 Text(
                     text = if (isTemp) "Shared Temporary Pin" else location.type.name.lowercase().replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Black
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(2.dp))
                 @Suppress("DEPRECATION")
-                Text(
-                    text = if (isTemp) "Clicking empty space on the map or another point will remove this pin." else location.type.name.lowercase().replaceFirstChar { it.uppercase() },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray
-                )
+                if (isTemp) {
+                    Text(
+                        text = "Clicking empty space on the map or another point will remove this pin.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
             }
-            if (!isTemp) {
-                Row {
-//                    if (location.isCustom) {
-////                        IconButton(onClick = onEditPin) {
-////                            Icon(Icons.Default.Edit, contentDescription = "Edit Pin", tint = Color.Gray)
-//                        }
-                    }
-                if (location.isCustom) {
-                    IconButton(onClick = onEditPin) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit Pin", tint = Color.Gray)
-                        }
-                    }
+            if (!isTemp && location.isCustom) {
+                IconButton(onClick = onEditPin) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit Pin", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -839,7 +861,7 @@ fun LocationDetailsContent(
                 text = "About",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -848,7 +870,7 @@ fun LocationDetailsContent(
             Text(
                 text = location.description,
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color.DarkGray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 24.sp
             )
         }
@@ -863,20 +885,23 @@ fun LocationDetailsContent(
             if (isTemp) {
                 Button(
                     onClick = onSaveSharedPin,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                    colors = ButtonDefaults.buttonColors(containerColor = MapSuccessGreen),
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     @Suppress("DEPRECATION")
-                    Text("Save to My Map")
+                    Text("Save to My Map", color = MaterialTheme.colorScheme.onPrimary)
                 }
             } else {
                 if (location.isCustom) {
                     Button(
                         onClick = onDeletePin,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.1f), contentColor = Color.Red),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -887,7 +912,10 @@ fun LocationDetailsContent(
                     }
                     Button(
                         onClick = onSendMessage,
-                        colors = ButtonDefaults.buttonColors(containerColor = CoralRed.copy(alpha = 0.1f), contentColor = CoralRed),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -904,14 +932,14 @@ fun LocationDetailsContent(
             Spacer(modifier = Modifier.height(8.dp))
             Button(
                 onClick = onAssociateEvent,
-                colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 modifier = detailsContentModifier,
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 @Suppress("DEPRECATION")
-                Text(if (location.associatedEventId != null) "Change Linked Event" else "Link an Event")
+                Text(if (location.associatedEventId != null) "Change Linked Event" else "Link an Event", color = MaterialTheme.colorScheme.onPrimary)
             }
         }
         
@@ -937,10 +965,9 @@ fun LocationDetailsContent(
                         },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Black
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
-
                 Spacer(modifier = Modifier.height(12.dp))
 
                 visibleEvents.forEach { event ->
@@ -959,23 +986,22 @@ fun LocationDetailsContent(
             Text(
                 text = "No upcoming events here.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = detailsContentModifier.padding(vertical = 8.dp)
             )
         }
 
-    Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(32.dp))
+    }
 }
-
-
 
 @Composable
 fun MapEventItem(event: CalendarEvent, onMoreClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F8F8)),
-        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -986,9 +1012,8 @@ fun MapEventItem(event: CalendarEvent, onMoreClick: () -> Unit) {
                     .size(40.dp)
                     .background(
                         when {
-                            event.isPinned -> Color(0xFF9C27B0).copy(alpha = 0.1f)
-                            /* event.isBookmarked -> Color(0xFFFFC107).copy(alpha = 0.1f) */
-                            else -> BrandOrange.copy(alpha = 0.1f)
+                            event.isPinned -> MapAreaPurple.copy(alpha = 0.1f)
+                            else -> MapFoodOrange.copy(alpha = 0.1f)
                         },
                         CircleShape
                     ),
@@ -996,21 +1021,14 @@ fun MapEventItem(event: CalendarEvent, onMoreClick: () -> Unit) {
             ) {
                 @Suppress("DEPRECATION")
                 Icon(
-                    imageVector = when {
-                        event.isPinned -> Icons.Default.PushPin
-                        /* event.isBookmarked -> Icons.Default.Bookmark */
-                        else -> Icons.Default.Event
-                    },
+                    imageVector = if (event.isPinned) Icons.Default.PushPin else Icons.Default.Event,
                     contentDescription = null,
-                    tint = when {
-                        event.isPinned -> Color(0xFF9C27B0)
-                        /* event.isBookmarked -> Color(0xFFFFC107) */
-                        else -> BrandOrange
-                    },
+                    tint = if (event.isPinned) MapAreaPurple else MapFoodOrange,
                     modifier = Modifier.size(20.dp)
                 )
             }
             Spacer(Modifier.width(12.dp))
+            @Suppress("DEPRECATION")
             Column(modifier = Modifier.weight(1f)) {
                 @Suppress("DEPRECATION")
                 Text(
@@ -1018,13 +1036,14 @@ fun MapEventItem(event: CalendarEvent, onMoreClick: () -> Unit) {
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 @Suppress("DEPRECATION")
                 Text(
                     text = event.timeLabel(),
                     fontSize = 12.sp,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             
@@ -1033,14 +1052,14 @@ fun MapEventItem(event: CalendarEvent, onMoreClick: () -> Unit) {
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(CoralRed.copy(alpha = 0.1f))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
                     .clickable(onClick = onMoreClick),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.CalendarMonth,
                     contentDescription = "Go to Calendar",
-                    tint = CoralRed,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -1061,7 +1080,7 @@ fun MapTopControls(
 ) {
     Surface(
         shadowElevation = 8.dp,
-        color = Color.White
+        color = MaterialTheme.colorScheme.surface
     ) {
         Column(modifier = Modifier.padding(bottom = 12.dp)) {
             OutlinedTextField(
@@ -1071,21 +1090,23 @@ fun MapTopControls(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 placeholder = { Text("Search campus...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = onClearSearch) {
-                            Icon(Icons.Default.Close, contentDescription = null, tint = Color.Gray)
+                            Icon(Icons.Default.Close, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 },
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Color.LightGray.copy(alpha = 0.3f),
-                    focusedBorderColor = CoralRed,
-                    focusedContainerColor = Color(0xFFF8F8F8),
-                    unfocusedContainerColor = Color(0xFFF8F8F8)
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 )
             )
 
@@ -1097,15 +1118,16 @@ fun MapTopControls(
                         .heightIn(max = 200.dp),
                     shape = RoundedCornerShape(12.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     LazyColumn {
                         items(filteredLocations) { location ->
                             ListItem(
-                                headlineContent = { Text(location.name, fontWeight = FontWeight.Medium) },
-                                supportingContent = { Text(location.type.name, fontSize = 12.sp, color = Color.Gray) },
+                                headlineContent = { Text(location.name, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface) },
+                                supportingContent = { Text(location.type.name, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 leadingContent = { Icon(location.icon, contentDescription = null, tint = location.color, modifier = Modifier.size(24.dp)) },
-                                modifier = Modifier.clickable { onResultClick(location) }
+                                modifier = Modifier.clickable { onResultClick(location) },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                             )
                         }
                     }
@@ -1162,9 +1184,9 @@ fun CustomFilterChip(
 ) {
     Surface(
         onClick = onClick,
-        color = if (selected) CoralRed else Color.White,
+        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(12.dp),
-        border = if (selected) null else BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f)),
+        border = if (selected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.height(36.dp)
     ) {
         Row(
@@ -1176,7 +1198,7 @@ fun CustomFilterChip(
                     imageVector = icon,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = if (selected) Color.White else Color.DarkGray
+                    tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.width(6.dp))
             }
@@ -1185,7 +1207,7 @@ fun CustomFilterChip(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                color = if (selected) Color.White else Color.DarkGray,
+                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp
             )
         }
@@ -1205,6 +1227,11 @@ fun MapContent(
     isPinMode: Boolean = false,
     tempPinLocation: LatLng? = null
 ) {
+    val isDarkTheme = isSystemInDarkTheme()
+    val mapStyle = remember(isDarkTheme) {
+        MapStyleOptions(if (isDarkTheme) DARK_MAP_STYLE_JSON else MAP_STYLE_JSON)
+    }
+
     val uiSettings = remember(isPinMode) {
         MapUiSettings(
             myLocationButtonEnabled = false,
@@ -1214,12 +1241,12 @@ fun MapContent(
         )
     }
 
-    val mapProperties = remember(hasLocationPermission, isPinMode) {
+    val mapProperties = remember(hasLocationPermission, isPinMode, mapStyle) {
         MapProperties(
             isMyLocationEnabled = false,
             latLngBoundsForCameraTarget = CSUCI_BOUNDS,
             minZoomPreference = 15f,
-            mapStyleOptions = MapStyleOptions(MAP_STYLE_JSON)
+            mapStyleOptions = mapStyle
         )
     }
 
@@ -1294,7 +1321,7 @@ fun MapContent(
                                     color = location.color,
                                     eventCount = eventCount,
                                     hasPinnedEvent = hasPinnedEvent,
-                                    hasBookmarkedEvent = hasBookmarkedEvent,
+                                    hasBookmarkedEvent = hasBookmarkedEvent, // self-assignment?
                                     isCustom = location.isCustom,
                                     isPinned = location.isPinned
                                 )
@@ -1347,7 +1374,7 @@ fun CustomPinMarkerIcon(color: Color, isPinned: Boolean, eventCount: Int, isEdit
                 .background(color, RoundedCornerShape(topStart = 17.dp, topEnd = 17.dp, bottomStart = 17.dp, bottomEnd = 2.dp))
                 .border(
                     width = 2.dp,
-                    color = if (isPinned) Color(0xFF9C27B0) else Color.White,
+                    color = if (isPinned) MapAreaPurple else MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(topStart = 17.dp, topEnd = 17.dp, bottomStart = 17.dp, bottomEnd = 2.dp)
                 )
         )
@@ -1356,7 +1383,7 @@ fun CustomPinMarkerIcon(color: Color, isPinned: Boolean, eventCount: Int, isEdit
         Box(
             modifier = Modifier
                 .size(20.dp)
-                .background(Color.White, CircleShape)
+                .background(MaterialTheme.colorScheme.onPrimary, CircleShape)
                 .shadow(2.dp, CircleShape),
             contentAlignment = Alignment.Center
         ) {
@@ -1375,8 +1402,8 @@ fun CustomPinMarkerIcon(color: Color, isPinned: Boolean, eventCount: Int, isEdit
                     .align(Alignment.TopEnd)
                     .offset(x = (-4).dp, y = 4.dp)
                     .size(18.dp)
-                    .background(Color.Red, CircleShape)
-                    .border(1.5.dp, Color.White, CircleShape),
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .border(1.5.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
 //                @Suppress("DEPRECATION")
@@ -1423,12 +1450,12 @@ fun SelectedPointerIcon(
         )
         Surface(
             shape = CircleShape,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.surface,
             modifier = Modifier.padding(top = 8.dp).size(32.dp),
             border = BorderStroke(2.5.dp, when {
-                location.isPinned -> Color(0xFF9C27B0) // Purple for pinned custom pins
-                hasPinnedEvent -> Color(0xFF9C27B0) // Purple for pinned
-                eventCount > 0 -> BrandOrange // Orange for regular events
+                location.isPinned -> MapAreaPurple
+                hasPinnedEvent -> MapAreaPurple
+                eventCount > 0 -> MapFoodOrange
                 else -> location.color
             }),
             shadowElevation = 4.dp
@@ -1449,8 +1476,8 @@ fun SelectedPointerIcon(
                     .align(Alignment.TopEnd)
                     .offset(x = (-8).dp, y = 8.dp)
                     .size(18.dp)
-                    .background(Color.Red, CircleShape)
-                    .border(1.5.dp, Color.White, CircleShape),
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .border(1.5.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
 //                @Suppress("DEPRECATION")
@@ -1481,10 +1508,10 @@ fun LandmarkIcon(
                 .size(34.dp)
                 .background(color, CircleShape)
                 .border(2.5.dp, when {
-                    isPinned -> Color(0xFF9C27B0) // Purple border for pinned
-                    hasPinnedEvent -> Color(0xFF9C27B0) // Purple for pinned
-                    eventCount > 0 -> BrandOrange // Orange for regular events
-                    else -> Color.White
+                    isPinned -> MapAreaPurple
+                    hasPinnedEvent -> MapAreaPurple
+                    eventCount > 0 -> MapFoodOrange
+                    else -> MaterialTheme.colorScheme.surface
                 }, CircleShape)
                 .shadow(4.dp, CircleShape)
                 .padding(7.dp),
@@ -1493,7 +1520,7 @@ fun LandmarkIcon(
             Icon(
                 imageVector = if (isCustom) Icons.Default.PushPin else icon,
                 contentDescription = null, 
-                tint = Color.White, 
+                tint = Color.White, // THIS HARDCODING IS OKAY!
                 modifier = Modifier.size(18.dp)
             )
         }
@@ -1504,8 +1531,8 @@ fun LandmarkIcon(
                     .align(Alignment.TopEnd)
                     .offset(x = (-2).dp, y = 2.dp)
                     .size(16.dp)
-                    .background(Color.Red, CircleShape)
-                    .border(1.5.dp, Color.White, CircleShape),
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .border(1.5.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
 //                @Suppress("DEPRECATION")
@@ -1527,7 +1554,7 @@ fun LocationInfoCard(location: CampusLocation, onClose: () -> Unit, onDetailsCli
             .fillMaxWidth(0.70f)
             .padding(bottom = 36.dp),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -1544,28 +1571,27 @@ fun LocationInfoCard(location: CampusLocation, onClose: () -> Unit, onDetailsCli
                     )
                 }
                 Spacer(Modifier.width(12.dp))
+                @Suppress("DEPRECATION")
                 Column(Modifier.weight(1f)) {
                     @Suppress("DEPRECATION")
-                    Text(location.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Color.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(location.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (location.description.isNotEmpty()) {
                         @Suppress("DEPRECATION")
-                        Text(location.description, style = MaterialTheme.typography.bodySmall, color = Color.DarkGray, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(location.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.LightGray) }
+                IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) }
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.Center) {
                 Surface(
                     onClick = onDetailsClick,
-                    color = AppBackground,
+                    color = MaterialTheme.colorScheme.primary,
                     shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.height(36.dp).fillMaxWidth(),
-                    border = BorderStroke(1.dp, CoralRed.copy(alpha = 0.2f))
+                    modifier = Modifier.height(36.dp).fillMaxWidth()
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        @Suppress("DEPRECATION")
-                        Text("Details", color = CoralRed, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Details", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }
@@ -1577,12 +1603,12 @@ fun LocationInfoCard(location: CampusLocation, onClose: () -> Unit, onDetailsCli
 fun UserLocationMarker(position: LatLng) {
     MarkerComposable(state = rememberMarkerState(position = position)) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.PersonPinCircle, contentDescription = null, tint = Color(0xFF1A73E8), modifier = Modifier.size(40.dp))
-            Box(modifier = Modifier.size(12.dp).offset(y = (-2).dp).background(Color.White, CircleShape))
-            Box(modifier = Modifier.size(8.dp).offset(y = (-2).dp).background(Color(0xFF1A73E8), CircleShape))
+            Icon(Icons.Default.PersonPinCircle, contentDescription = null, tint = MapUserBlue, modifier = Modifier.size(40.dp))
+            Box(modifier = Modifier.size(12.dp).offset(y = (-2).dp).background(MaterialTheme.colorScheme.onPrimary, CircleShape))
+            Box(modifier = Modifier.size(8.dp).offset(y = (-2).dp).background(MapUserBlue, CircleShape))
         }
     }
-    Circle(center = position, radius = 25.0, fillColor = Color(0xFF1A73E8).copy(alpha = 0.15f), strokeColor = Color(0xFF1A73E8).copy(alpha = 0.4f), strokeWidth = 2f)
+    Circle(center = position, radius = 25.0, fillColor = MapUserBlue.copy(alpha = 0.15f), strokeColor = MapUserBlue.copy(alpha = 0.4f), strokeWidth = 2f)
 }
 
 @Composable
@@ -1606,9 +1632,10 @@ fun MapOverlays(
                 if (hasLocationPermission) {
                     FloatingActionButton(
                         onClick = onLocationRequest,
+                        modifier = Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 1f)), CircleShape),
                         shape = CircleShape,
-                        containerColor = Color.White,
-                        contentColor = CoralRed,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary,
                         elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
                     ) {
                         Icon(painter = painterResource(id = android.R.drawable.ic_menu_mylocation), contentDescription = "My Location", modifier = Modifier.size(24.dp))
@@ -1617,9 +1644,10 @@ fun MapOverlays(
 
                 FloatingActionButton(
                     onClick = onTogglePinMode,
+                    modifier = Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 1f)), CircleShape),
                     shape = CircleShape,
-                    containerColor = Color.White,
-                    contentColor = CoralRed,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
                     elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
                 ) {
                     Icon(
@@ -1636,7 +1664,7 @@ fun MapOverlays(
             Surface(
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
                 shape = RoundedCornerShape(20.dp),
-                color = CoralRed,
+                color = MaterialTheme.colorScheme.primary,
                 shadowElevation = 8.dp
             ) {
                 @Suppress("DEPRECATION")
@@ -1645,7 +1673,7 @@ fun MapOverlays(
                            else if (tempPinSet) "Pin placed! Confirm to continue."
                            else "Tap on map to place your pin",
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -1662,9 +1690,12 @@ fun MapOverlays(
                     ) {
                         Button(
                             onClick = onClearPin,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = CoralRed),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                contentColor = MaterialTheme.colorScheme.primary
+                            ),
                             shape = RoundedCornerShape(50),
-                            border = BorderStroke(1.dp, CoralRed)
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
@@ -1673,13 +1704,13 @@ fun MapOverlays(
                         }
                         Button(
                             onClick = onConfirmPin,
-                            colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(50)
                         ) {
                             Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             @Suppress("DEPRECATION")
-                            Text("Confirm Location")
+                            Text("Confirm Location", color = MaterialTheme.colorScheme.onPrimary)
                         }
                     }
                 }
@@ -1687,19 +1718,19 @@ fun MapOverlays(
                 // Exit pin mode button
                 Surface(
                     onClick = onTogglePinMode,
-                    color = Color.White.copy(alpha = 0.9f),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color.LightGray),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.height(40.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = null, tint = Color.DarkGray, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Close, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
                         @Suppress("DEPRECATION")
-                        Text("Cancel", color = Color.DarkGray, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 }
             }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -84,23 +85,27 @@ fun ScheduleTab(viewModel: CalendarViewModel) {
     }
 
     if (currentUser == null) {
-        @Suppress("DEPRECATION")
         Box(
-            modifier = Modifier.fillMaxSize().background(Color.White),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
             contentAlignment = Alignment.Center
         ) {
-            Text("Please sign in to manage your schedule.")
+            Text(
+                "Please sign in to manage your schedule.",
+                color = MaterialTheme.colorScheme.onBackground
+            )
         }
         return
     }
 
     Scaffold(
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showAddClassDialog = true },
-                containerColor = CoralRed,
-                contentColor = Color.White,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.padding(bottom = 8.dp),
                 icon = {
@@ -111,21 +116,21 @@ fun ScheduleTab(viewModel: CalendarViewModel) {
                                 .align(Alignment.BottomEnd)
                                 .offset(x = 4.dp, y = 4.dp)
                                 .size(14.dp)
-                                .background(Color.White, CircleShape)
+                                .background(MaterialTheme.colorScheme.background, CircleShape)
                                 .padding(1.dp)
-                                .background(CoralRed, CircleShape),
+                                .background(MaterialTheme.colorScheme.primary, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 Icons.Default.Add,
                                 contentDescription = null,
-                                tint = Color.White,
+                                tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(10.dp)
                             )
                         }
                     }
                 },
-                text = { Text("Add Class", fontWeight = FontWeight.Bold) }
+                text = { Text("Add Class", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) }
             )
         }
     ) { padding ->
@@ -144,12 +149,23 @@ fun ScheduleTab(viewModel: CalendarViewModel) {
 
             if (viewModel.selectedClasses.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    @Suppress("DEPRECATION")
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Outlined.School, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color.LightGray)
+                        Icon(
+                            Icons.Outlined.School,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                        )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("No classes added yet.", color = Color.Gray)
-                        Text("Tap '+' to add your first class.", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "No classes added yet.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "Tap 'Add Class' to begin.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
             } else {
@@ -208,8 +224,8 @@ fun ScheduleTab(viewModel: CalendarViewModel) {
     classToDelete?.let { item ->
         AlertDialog(
             onDismissRequest = { classToDelete = null },
-            title = { @Suppress("DEPRECATION") Text("Remove Class") },
-            text = { @Suppress("DEPRECATION") Text("Are you sure you want to remove ${item.courseCode} from your schedule?") },
+            title = { Text("Remove Class", color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text("Are you sure you want to remove ${item.courseCode} from your schedule?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -220,18 +236,17 @@ fun ScheduleTab(viewModel: CalendarViewModel) {
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = CoralRed)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    @Suppress("DEPRECATION")
-                    Text("Remove")
+                    Text("Remove", color = MaterialTheme.colorScheme.onPrimary)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { classToDelete = null }) {
-                    @Suppress("DEPRECATION")
-                    Text("Cancel", color = Color.Gray)
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            }
+            },
+            containerColor = MaterialTheme.colorScheme.surface
         )
     }
 }
@@ -299,18 +314,16 @@ fun AddClassDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.padding(16.dp),
         shape = RoundedCornerShape(24.dp),
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.surface,
         title = {
-            @Suppress("DEPRECATION")
             Text(
                 text = if (editingClass == null) "New Class" else "Edit Class",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = CoralRed
+                color = MaterialTheme.colorScheme.primary
             )
         },
         text = {
-            @Suppress("DEPRECATION")
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -319,16 +332,15 @@ fun AddClassDialog(
                     onClick = { showMajorPicker = true },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = CoralRed),
-                    border = BorderStroke(1.dp, CoralRed.copy(alpha = 0.5f))
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        @Suppress("DEPRECATION")
                         Text(
                             text = selectedMajor?.let { "${it.code} - ${it.name}" } ?: "Select Major",
-                            color = if (selectedMajor == null) Color.Gray else CoralRed,
+                            color = if (selectedMajor == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                             modifier = Modifier.weight(1f),
                             textAlign = TextAlign.Start,
                             maxLines = 1
@@ -342,16 +354,18 @@ fun AddClassDialog(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = selectedMajor != null,
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = CoralRed, disabledContentColor = Color.Gray),
-                        border = BorderStroke(1.dp, if (selectedMajor != null) CoralRed.copy(alpha = 0.5f) else Color.Gray.copy(alpha = 0.5f))
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary,
+                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        border = BorderStroke(1.dp, if (selectedMajor != null) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Book, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            @Suppress("DEPRECATION")
                             Text(
                                 text = selectedCourse?.let { "${it.code} - ${it.title}" } ?: "Select Course",
-                                color = if (selectedCourse == null) Color.Gray else CoralRed,
+                                color = if (selectedCourse == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.weight(1f),
                                 textAlign = TextAlign.Start,
                                 maxLines = 1
@@ -360,7 +374,6 @@ fun AddClassDialog(
                     }
 
                     if (selectedCourse != null) {
-                        @Suppress("DEPRECATION")
                         Text(
                             text = buildString {
                                 append("Information: ")
@@ -371,15 +384,19 @@ fun AddClassDialog(
                                 }
                             },
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 8.dp)
                         )
                     }
                 }
 
                 Column {
-                    @Suppress("DEPRECATION")
-                    Text("Meeting Days", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Meeting Days",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                     Spacer(Modifier.height(8.dp))
                     DayChipRows(
                         selectedDays = selectedDays,
@@ -391,38 +408,53 @@ fun AddClassDialog(
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    @Suppress("DEPRECATION")
-                    Text("Time Range", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Time Range",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = startTime, onTimeChange = { startTime = it }) }
-                        @Suppress("DEPRECATION")
-                        Text("to", Modifier.padding(horizontal = 8.dp))
+                        Text(
+                            "to",
+                            Modifier.padding(horizontal = 8.dp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                         Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = endTime, onTimeChange = { endTime = it }) }
                     }
                 }
 
-                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    @Suppress("DEPRECATION")
-                    Text("Add 2nd Time Range (e.g. Lab)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Add 2nd Time Range (e.g. Lab)",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                     Spacer(Modifier.weight(1f))
                     Switch(
                         checked = hasSecondTimeRange, 
                         onCheckedChange = { hasSecondTimeRange = it },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = CoralRed,
-                            uncheckedThumbColor = Color.White,
-                            uncheckedTrackColor = Color.LightGray.copy(alpha = 0.5f)
+                            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary,
+                            uncheckedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                            uncheckedTrackColor = MaterialTheme.colorScheme.outlineVariant
                         )
                     )
                 }
 
                 if (hasSecondTimeRange) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        @Suppress("DEPRECATION")
-                        Text("2nd Meeting Days", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            "2nd Meeting Days",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                         DayChipRows(
                             selectedDays = selectedDays2,
                             onToggleDay = { dayValue ->
@@ -431,12 +463,19 @@ fun AddClassDialog(
                             }
                         )
                         
-                        @Suppress("DEPRECATION")
-                        Text("2nd Time Range", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            "2nd Time Range",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = startTime2, onTimeChange = { startTime2 = it }) }
-                            @Suppress("DEPRECATION")
-                            Text("to", Modifier.padding(horizontal = 8.dp))
+                            Text(
+                                "to",
+                                Modifier.padding(horizontal = 8.dp),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                             Box(Modifier.weight(1f)) { WheelTimePicker(initialTime = endTime2, onTimeChange = { endTime2 = it }) }
                         }
                         
@@ -446,11 +485,14 @@ fun AddClassDialog(
                             label = { Text("2nd Location (e.g. Lab Room)") },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            singleLine = true
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                            )
                         )
 
                         if (selectedCourse != null) {
-                            @Suppress("DEPRECATION")
                             Text(
                                 text = buildString {
                                     append("Information: ")
@@ -461,7 +503,7 @@ fun AddClassDialog(
                                     }
                                 },
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color.Gray,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 8.dp)
                             )
                         }
@@ -471,12 +513,16 @@ fun AddClassDialog(
                             onValueChange = { notes2Text = it },
                             label = { Text("Notes for 2nd Time (e.g. Lab Section)") },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                            )
                         )
                     }
                 }
 
-                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     DatePickerField(
@@ -499,7 +545,11 @@ fun AddClassDialog(
                     label = { Text("Term (e.g. Fall 2026)") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    singleLine = true
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
                 )
 
                 OutlinedTextField(
@@ -508,7 +558,11 @@ fun AddClassDialog(
                     label = { Text("Location") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    singleLine = true
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
                 )
 
                 OutlinedTextField(
@@ -516,12 +570,15 @@ fun AddClassDialog(
                     onValueChange = { notesText = it },
                     label = { Text("General Notes") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
                 )
             }
         },
         confirmButton = {
-            @Suppress("DEPRECATION")
             Button(
                 onClick = {
                     if (selectedMajor != null && selectedCourse != null && selectedDays.isNotEmpty()) {
@@ -554,19 +611,24 @@ fun AddClassDialog(
                         onConfirm(newClass)
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = CoralRed),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 enabled = selectedMajor != null && selectedCourse != null && selectedDays.isNotEmpty(),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                @Suppress("DEPRECATION")
-                Text(if (editingClass == null) "Add Class" else "Save Changes", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(
+                    if (editingClass == null) "Add Class" else "Save Changes",
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontWeight = FontWeight.Bold
+                )
             }
         },
         dismissButton = {
-            @Suppress("DEPRECATION")
             TextButton(onClick = onDismiss) {
-                @Suppress("DEPRECATION")
-                Text("Back", color = CoralRed, fontWeight = FontWeight.Bold)
+                Text(
+                    "Back",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     )
@@ -618,36 +680,43 @@ fun <T> CatalogItemPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { @Suppress("DEPRECATION") Text(title, fontWeight = FontWeight.Bold) },
+        title = { Text(title, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
         text = {
-            @Suppress("DEPRECATION")
             Column(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     placeholder = { Text("Search...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                    )
                 )
 
                 if (items.isEmpty()) {
-                    @Suppress("DEPRECATION")
-                    Text("No items available.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    Text(
+                        "No items available.",
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                         items(filteredItems) { item ->
-                            @Suppress("DEPRECATION")
                             Text(
                                 text = itemLabel(item),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable { onSelect(item) }
                                     .padding(vertical = 12.dp, horizontal = 4.dp),
-                                style = MaterialTheme.typography.bodyLarge
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
-                            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         }
                     }
                 }
@@ -655,12 +724,15 @@ fun <T> CatalogItemPickerDialog(
         },
         confirmButton = {},
         dismissButton = {
-            @Suppress("DEPRECATION")
             TextButton(onClick = onDismiss) {
-                @Suppress("DEPRECATION")
-                Text("Cancel", color = CoralRed, fontWeight = FontWeight.Bold)
+                Text(
+                    "Cancel",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.surface
     )
 }
 
@@ -685,15 +757,16 @@ private fun DayChipRows(
                 label = { Text(label) },
                 shape = RoundedCornerShape(12.dp),
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = CoralRed,
-                    selectedLabelColor = Color.White,
-                    labelColor = CoralRed
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                 ),
                 border = FilterChipDefaults.filterChipBorder(
                     enabled = true,
                     selected = isSelected,
-                    borderColor = CoralRed.copy(alpha = 0.5f),
-                    selectedBorderColor = CoralRed
+                    borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                    selectedBorderColor = MaterialTheme.colorScheme.primary,
+                    disabledBorderColor = MaterialTheme.colorScheme.outlineVariant
                 )
             )
         }
@@ -708,10 +781,13 @@ private fun DatePickerField(
     onDateSelected: (String) -> Unit
 ) {
     val context = LocalContext.current
-    @Suppress("DEPRECATION")
     Column(modifier = modifier) {
-        @Suppress("DEPRECATION")
-        Text(text = label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = SoftText)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Spacer(modifier = Modifier.height(4.dp))
         OutlinedButton(
             onClick = {
@@ -722,10 +798,10 @@ private fun DatePickerField(
             },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = CoralRed),
-            border = BorderStroke(1.dp, CoralRed.copy(alpha = 0.5f))
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
         ) {
-            Text(value, color = CoralRed)
+            Text(value, color = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -736,13 +812,16 @@ private fun SavedClassCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
+    val containerColor = if (isDark) MaterialTheme.colorScheme.surface else CardOffWhite
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = CardOffWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 0.dp else 4.dp),
+        border = if (isDark) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null
     ) {
-        @Suppress("DEPRECATION")
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -757,44 +836,62 @@ private fun SavedClassCard(
                     Text(
                         text = "${selectedClass.courseCode} - ${selectedClass.courseTitle}",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    @Suppress("DEPRECATION")
                     Text(
                         text = selectedClass.majorName,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Row {
                     IconButton(onClick = onEdit) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.Gray)
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Edit",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = CoralRed)
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }
             
-            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+                Icon(
+                    Icons.Outlined.Schedule,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(modifier = Modifier.width(8.dp))
-                @Suppress("DEPRECATION")
                 Text(
                     text = "${formatTimeForDisplay(selectedClass.startTime)} - ${formatTimeForDisplay(selectedClass.endTime)}",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.CalendarToday, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+                Icon(
+                    Icons.Outlined.CalendarToday,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(modifier = Modifier.width(8.dp))
-                @Suppress("DEPRECATION")
                 Text(
                     text = selectedClass.meetingPatternLabel(),
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -804,27 +901,35 @@ private fun SavedClassCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(CoralRed.copy(alpha = 0.05f))
-                        .border(1.dp, CoralRed.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                         .padding(10.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Science, contentDescription = null, modifier = Modifier.size(14.dp), tint = CoralRed)
+                        Icon(
+                            Icons.Outlined.Science,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
-                        @Suppress("DEPRECATION")
                         Text(
                             text = if (selectedClass.notes2.isNotBlank()) selectedClass.notes2 else "Secondary Meeting / Lab",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = CoralRed
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                     
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.CalendarToday, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray)
+                        Icon(
+                            Icons.Outlined.CalendarToday,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
-                        @Suppress("DEPRECATION")
                         Text(
                             text = selectedClass.daysOfWeek2.sorted().joinToString(" ") { day ->
                                 when(day) {
@@ -838,26 +943,40 @@ private fun SavedClassCard(
                                     else -> ""
                                 }
                             },
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray)
+                        Icon(
+                            Icons.Outlined.Schedule,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
-                        @Suppress("DEPRECATION")
                         Text(
                             text = "${formatTimeForDisplay(selectedClass.startTime2)} - ${formatTimeForDisplay(selectedClass.endTime2)}",
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
                     if (selectedClass.location2.isNotBlank()) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.LocationOn, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray)
+                            Icon(
+                                Icons.Outlined.LocationOn,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
-                            @Suppress("DEPRECATION")
-                            Text(text = selectedClass.location2, style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                text = selectedClass.location2,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                         }
                     }
                 }
@@ -865,10 +984,19 @@ private fun SavedClassCard(
 
             if (selectedClass.location.isNotBlank()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+                    Icon(
+                        Icons.Outlined.LocationOn,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
                     @Suppress("DEPRECATION")
-                    Text(text = selectedClass.location, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = selectedClass.location,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
             }
 
@@ -877,23 +1005,31 @@ private fun SavedClassCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .background(CoralRed.copy(alpha = 0.1f))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        @Suppress("DEPRECATION")
-                        Text(selectedClass.termLabel, color = CoralRed, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            selectedClass.termLabel,
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
 
                 if (selectedClass.notes.isNotBlank()) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Outlined.Info, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray)
+                        Icon(
+                            Icons.Outlined.Info,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
-                        @Suppress("DEPRECATION")
                         Text(
                             text = selectedClass.notes,
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )

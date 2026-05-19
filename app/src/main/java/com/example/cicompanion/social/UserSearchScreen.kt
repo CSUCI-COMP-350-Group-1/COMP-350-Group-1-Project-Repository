@@ -23,6 +23,7 @@ import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.cicompanion.ui.Routes
 import com.example.cicompanion.ui.theme.AppBackground
+import com.example.cicompanion.ui.theme.BrandRedDark
 import com.google.firebase.auth.FirebaseAuth
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -183,7 +184,7 @@ private fun UserSearchResultCard(
                     )
                     Text(
                         text = user.email,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -199,7 +200,7 @@ private fun UserSearchResultCard(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Remove Friend",
-                            tint = Color.Red
+                            tint = BrandRedDark
                         )
                     }
                 } else {
@@ -209,7 +210,7 @@ private fun UserSearchResultCard(
                         enabled = requestStatus == null
                     ) {
                         val icon = if (requestStatus == "pending") Icons.Default.Check else Icons.Default.Add
-                        val tint = if (requestStatus == "pending") Color.Gray else LocalContentColor.current
+                        val tint = if (requestStatus == "pending") MaterialTheme.colorScheme.primary else if (requestStatus == "accepted") BrandRedDark else LocalContentColor.current
 
                         Icon(
                             imageVector = icon,
@@ -229,10 +230,10 @@ private fun UserAvatarSearch(photoUrl: String) {
         AsyncImage(
             model = photoUrl,
             contentDescription = "User photo",
-            modifier = Modifier.size(48.dp).background(Color.LightGray, CircleShape)
+            modifier = Modifier.size(48.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
         )
     } else {
-        Box(modifier = Modifier.size(48.dp).background(Color.LightGray, CircleShape))
+        Box(modifier = Modifier.size(48.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape))
     }
 }
 

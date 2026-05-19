@@ -42,7 +42,7 @@ fun screenTitleForRoute(route: String?): String {
         route == Routes.USER_SEARCH -> "User Search"
         route == Routes.FRIEND_REQUESTS -> "Friend Requests"
         route == Routes.FRIENDS_AND_REQUESTS -> "Friends & Requests"
-        route == Routes.SEARCH -> "Search"
+        route == Routes.SEARCH -> "Feature Search"
         route == Routes.EDIT_PROFILE -> "Edit Profile"
         route?.startsWith(Routes.MESSAGE_THREAD_BASE) == true -> "Chat" // MESSAGING
         else -> "CI Companion"
@@ -65,14 +65,14 @@ fun TopBar(
 
     Box(modifier = Modifier.background(topBarGradient)) {
         CenterAlignedTopAppBar(
-            title = { Text(title, color = Color.White) },
+            title = { Text(title, color = MaterialTheme.colorScheme.onPrimary) },
             colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                 containerColor = Color.Transparent,
-                navigationIconContentColor = Color.White,
-                actionIconContentColor = Color.White
+                navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                actionIconContentColor = MaterialTheme.colorScheme.onPrimary
             ),
             navigationIcon = {
-                if (showBackButton) {
+                if (showBackButton) {MaterialTheme.colorScheme.onPrimary
                     IconButton(onClick = onBackClick) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
@@ -142,7 +142,10 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
     val displayName = firestoreDisplayName ?: currentUser?.displayName ?: "Signed Out"
     val photoUrl = firestorePhotoUrl ?: currentUser?.photoUrl?.toString()
 
-    ModalDrawerSheet {
+    ModalDrawerSheet(
+        drawerContainerColor = MaterialTheme.colorScheme.surface,
+        drawerContentColor = MaterialTheme.colorScheme.onSurface
+    ) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             // Profile Header Section
             Row(
@@ -155,7 +158,7 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
                     modifier = Modifier
                         .size(64.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFE6E0F8)),
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
                     if (photoUrl != null) {
@@ -169,7 +172,7 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
                             imageVector = Icons.Default.Person,
                             contentDescription = null,
                             modifier = Modifier.size(40.dp),
-                            tint = Color(0xFF6750A4)
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -180,17 +183,18 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
                     Text(
                         text = displayName,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = currentUser?.email ?: "Log in to sync data",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
             // View Profile Button
             NavigationDrawerItem(
@@ -200,25 +204,35 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
                 onClick = {
                     navController.navigate(Routes.PROFILE)
                     scope.launch { drawerState.close() }
-                }
+                },
+                colors = NavigationDrawerItemDefaults.colors(
+                    unselectedContainerColor = Color.Transparent,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurface
+                )
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             // Search Button (which was moved from the bottom to here)
             NavigationDrawerItem(
-                label = { Text("Search for Feature") },
+                label = { Text("Find a Feature") },
                 selected = false,
                 icon = { Icon(Icons.Default.Search, contentDescription = null) },
                 onClick = {
                     navController.navigate(Routes.SEARCH)
                     scope.launch { drawerState.close() }
-                }
+                },
+                colors = NavigationDrawerItemDefaults.colors(
+                    unselectedContainerColor = Color.Transparent,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurface
+                )
             )
 
             Spacer(modifier = Modifier.weight(1f))
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
             // Sign out button on the bottom
             if (currentUser != null) {
@@ -232,8 +246,9 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
                         scope.launch { drawerState.close() }
                     },
                     colors = NavigationDrawerItemDefaults.colors(
-                        unselectedTextColor = Color(0xFFEF3347),
-                        unselectedIconColor = Color(0xFFEF3347)
+                        unselectedTextColor = MaterialTheme.colorScheme.primary,
+                        unselectedIconColor = MaterialTheme.colorScheme.primary,
+                        unselectedContainerColor = Color.Transparent
                     )
                 )
             }

@@ -3,6 +3,7 @@ package com.example.cicompanion.calendar
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
@@ -37,7 +38,7 @@ fun CalendarScreen(
                 if (selectedTabIndex < tabPositions.size) {
                     TabRowDefaults.SecondaryIndicator(
                         modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
-                        color = Color.Red
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -46,16 +47,16 @@ fun CalendarScreen(
                 selected = selectedTabIndex == 0,
                 onClick = { selectedTabIndex = 0 },
                 text = { Text("Calendar") },
-                selectedContentColor = Color.Red,
-                unselectedContentColor = Color.Gray
+                selectedContentColor = MaterialTheme.colorScheme.primary,
+                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
 
             )
             Tab(
                 selected = selectedTabIndex == 1,
                 onClick = { selectedTabIndex = 1 },
                 text = { Text("Schedule") },
-                selectedContentColor = Color.Red,
-                unselectedContentColor = Color.Gray
+                selectedContentColor = MaterialTheme.colorScheme.primary,
+                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
