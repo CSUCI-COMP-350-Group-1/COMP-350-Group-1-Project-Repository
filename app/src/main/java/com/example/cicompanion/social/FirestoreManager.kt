@@ -654,6 +654,35 @@ object FirestoreManager {
         }
     }
 
+    suspend fun fetchGeneralSettings(): Map<String, Any> {
+        val user = FirebaseAuth.getInstance().currentUser ?: return emptyMap()
+        val db = FirebaseFirestore.getInstance()
+        return try {
+            val doc = db.collection("users").document(user.uid)
+                .collection("settings").document("general")
+                .get().await()
+            doc.data ?: emptyMap()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching general settings", e)
+            emptyMap()
+        }
+    }
+
+    suspend fun saveGeneralSetting(key: String, value: Any): Boolean {
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        val db = FirebaseFirestore.getInstance()
+        return try {
+            val data = hashMapOf(key to value)
+            db.collection("users").document(user.uid)
+                .collection("settings").document("general")
+                .set(data, SetOptions.merge()).await()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving general setting: $key", e)
+            false
+        }
+    }
+
     private fun parseClassTimeForSort(timeText: String): java.time.LocalTime {
         return runCatching {
             java.time.LocalTime.parse(timeText)

@@ -30,7 +30,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 fun screenTitleForRoute(route: String?): String {
-    return when {
+return when {
         route == Routes.HOME -> "Home"
         route == Routes.SOCIAL -> "Messages" //Changed to messages from Social
         route == Routes.MAP -> "Map"
@@ -221,8 +221,7 @@ fun DrawerProfileContent(navController: NavController, drawerState: DrawerState,
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             // Sign out button on the bottom
-            if (currentUser != null) {
-                NavigationDrawerItem(
+            if (currentUser != null) {                NavigationDrawerItem(
                     label = { Text("Sign Out") },
                     selected = false,
                     icon = { Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null) },

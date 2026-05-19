@@ -699,10 +699,9 @@ private fun ColumnScope.ProfileActionArea(
             Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
         }
 
-            Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         if (showSettings) {
-
             OutlinedButton(
                 onClick = { /* Mockup Settings */ },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
